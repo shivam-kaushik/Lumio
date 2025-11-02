@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/reminder_provider.dart';
 import '../../core/services/weekly_insights_service.dart';
 import '../../data/repositories/reminder_repository.dart';
+import '../theme/app_theme.dart';
 
 /// Analytics screen showing completion statistics and weekly insights
 class AnalyticsScreen extends StatefulWidget {
@@ -51,63 +52,116 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Analytics'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadInsights,
-            tooltip: 'Refresh insights',
+    // No Scaffold - MainNavigator provides it
+    return Column(
+      children: [
+        // Custom AppBar
+        Container(
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top,
+            left: AppTheme.spacingLG,
+            right: AppTheme.spacingMD,
+            bottom: AppTheme.spacingMD,
           ),
-        ],
-      ),
-      body: Consumer<ReminderProvider>(
-        builder: (context, reminderProvider, child) {
-          final stats = reminderProvider.statistics;
+          decoration: BoxDecoration(
+            color: AppTheme.backgroundColor,
+            border: Border(
+              bottom: BorderSide(
+                color: AppTheme.borderColor,
+                width: 1,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Analytics',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  color: AppTheme.textSecondary,
+                ),
+                onPressed: _loadInsights,
+                tooltip: 'Refresh insights',
+              ),
+            ],
+          ),
+        ),
+        // Body content
+        Expanded(
+          child: Consumer<ReminderProvider>(
+            builder: (context, reminderProvider, child) {
+              final stats = reminderProvider.statistics;
 
-          if (stats == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
+              if (stats == null) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Completion rate card
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        Text(
-                          '${stats['completionRate'] ?? 0}%',
-                          style: Theme.of(context).textTheme.displayLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Completion Rate',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(AppTheme.spacingLG),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                // Completion rate card - Premium design
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.primaryColor,
+                        AppTheme.primaryLight,
                       ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLG),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryColor.withOpacity(0.3),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(AppTheme.spacingXL),
+                  child: Column(
+                    children: [
+                      Text(
+                        '${stats['completionRate'] ?? 0}%',
+                        style: Theme.of(context).textTheme.displayLarge
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: -1,
+                            ),
+                      ),
+                      const SizedBox(height: AppTheme.spacingSM),
+                      Text(
+                        'Completion Rate',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.white.withOpacity(0.9),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: AppTheme.spacingLG),
 
-                // Stats grid
+                // Stats grid - Premium cards
                 GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
+                  mainAxisSpacing: AppTheme.spacingMD,
+                  crossAxisSpacing: AppTheme.spacingMD,
                   children: [
                     _buildStatCard(
                       context,
@@ -140,17 +194,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ],
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: AppTheme.spacingXL),
 
-                // Insights
+                // Insights section header
                 Text(
                   'Insights',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                    letterSpacing: -0.3,
+                  ),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: AppTheme.spacingMD),
 
                 // Weekly Trends Section
                 if (_loadingInsights)
@@ -184,10 +240,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ],
                 ],
               ],
-            ),
-          );
-        },
-      ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -197,8 +255,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final trendValue = trends['trend'] as int;
 
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.radiusLG),
+        side: const BorderSide(color: AppTheme.borderColor, width: 1),
+      ),
+      color: AppTheme.surfaceColor,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppTheme.spacingMD),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -307,23 +371,41 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     Color color,
   ) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.radiusLG),
+        side: const BorderSide(color: AppTheme.borderColor, width: 1),
+      ),
+      color: AppTheme.surfaceColor,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppTheme.spacingMD),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spacingSM),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+              ),
+              child: Icon(icon, size: 24, color: color),
+            ),
+            const SizedBox(height: AppTheme.spacingMD),
             Text(
               value,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary,
+                letterSpacing: -0.5,
+              ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppTheme.spacingXS),
             Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -344,27 +426,57 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     
     switch (type) {
       case 'positive':
-        backgroundColor = Colors.green.withOpacity(0.1);
-        iconColor = Colors.green;
+        backgroundColor = AppTheme.successColor.withOpacity(0.1);
+        iconColor = AppTheme.successColor;
         break;
       case 'warning':
-        backgroundColor = Colors.orange.withOpacity(0.1);
-        iconColor = Colors.orange;
+        backgroundColor = AppTheme.warningColor.withOpacity(0.1);
+        iconColor = AppTheme.warningColor;
         break;
       default:
-        backgroundColor = Theme.of(context).colorScheme.primary.withOpacity(0.1);
-        iconColor = Theme.of(context).colorScheme.primary;
+        backgroundColor = AppTheme.primaryColor.withOpacity(0.1);
+        iconColor = AppTheme.primaryColor;
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+        side: const BorderSide(color: AppTheme.borderColor, width: 1),
+      ),
+      color: AppTheme.surfaceColor,
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: backgroundColor,
-          child: Icon(icon, color: iconColor),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spacingMD,
+          vertical: AppTheme.spacingSM,
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(description),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+          ),
+          child: Icon(icon, color: iconColor, size: 24),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: AppTheme.spacingXS),
+          child: Text(
+            description,
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ),
       ),
     );
   }

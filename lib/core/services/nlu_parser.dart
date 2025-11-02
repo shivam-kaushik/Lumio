@@ -257,6 +257,7 @@ class NLUParser {
   }
 
   /// Calculate first occurrence time for recurring reminder
+  /// If no date is specified, starts from today
   static DateTime _calculateFirstOccurrence(int interval, String unit, {String? text, List<int>? daysOfWeek}) {
     final now = DateTime.now();
     
@@ -268,6 +269,9 @@ class NLUParser {
         return _calculateNextOccurrenceForDays(now, daysOfWeek, time);
       }
     }
+    
+    // Extract time from text if available
+    final extractedTime = text != null ? _extractTime(text) : null;
     
     Duration duration;
     switch (unit) {
@@ -291,6 +295,25 @@ class NLUParser {
         duration = Duration(minutes: interval);
     }
 
+    // If a time was extracted from text, use it with today's date
+    if (extractedTime != null) {
+      final todayWithTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        extractedTime.hour,
+        extractedTime.minute,
+      );
+      
+      // If the time has already passed today, add the interval
+      if (todayWithTime.isBefore(now)) {
+        return todayWithTime.add(duration);
+      }
+      
+      return todayWithTime;
+    }
+
+    // No time specified - start from now with the interval
     return now.add(duration);
   }
 

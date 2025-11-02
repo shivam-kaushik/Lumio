@@ -7,12 +7,13 @@ class AppConstants {
 
   // Database
   static const String dbName = 'awarely.db';
-  static const int dbVersion = 5; // Updated for Phase 2: activity recognition and smart timing
+  static const int dbVersion = 6; // Updated for reminder occurrences tracking
 
   // Tables
   static const String remindersTable = 'reminders';
   static const String contextEventsTable = 'context_events';
   static const String locationsTable = 'locations';
+  static const String reminderOccurrencesTable = 'reminder_occurrences';
 
   // Geofence
   static const double defaultGeofenceRadius = 100.0; // meters

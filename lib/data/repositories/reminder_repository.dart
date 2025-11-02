@@ -4,6 +4,7 @@ import '../../core/constants/app_constants.dart';
 import '../database/database_helper.dart';
 import '../models/reminder.dart';
 import '../models/context_event.dart';
+import '../models/reminder_occurrence.dart';
 
 /// Repository for reminder CRUD operations
 class ReminderRepository {
@@ -150,6 +151,106 @@ class ReminderRepository {
       {'outcome': outcome},
       where: 'id = ?',
       whereArgs: [eventId],
+    );
+  }
+
+  // ==================== Reminder Occurrences Methods ====================
+
+  /// Create a reminder occurrence
+  Future<String> createReminderOccurrence(ReminderOccurrence occurrence) async {
+    final db = await _dbHelper.database;
+    await db.insert(
+      AppConstants.reminderOccurrencesTable,
+      occurrence.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    return occurrence.id;
+  }
+
+  /// Get occurrence by notification ID
+  Future<ReminderOccurrence?> getOccurrenceByNotificationId(int notificationId) async {
+    final db = await _dbHelper.database;
+    final maps = await db.query(
+      AppConstants.reminderOccurrencesTable,
+      where: 'notificationId = ?',
+      whereArgs: [notificationId],
+    );
+
+    if (maps.isEmpty) return null;
+    return ReminderOccurrence.fromMap(maps.first);
+  }
+
+  /// Get all occurrences for a reminder
+  Future<List<ReminderOccurrence>> getReminderOccurrences(String reminderId) async {
+    final db = await _dbHelper.database;
+    final maps = await db.query(
+      AppConstants.reminderOccurrencesTable,
+      where: 'reminderId = ?',
+      whereArgs: [reminderId],
+      orderBy: 'scheduledTime ASC',
+    );
+
+    return maps.map((map) => ReminderOccurrence.fromMap(map)).toList();
+  }
+
+  /// Get pending (not completed) occurrences for a reminder
+  Future<List<ReminderOccurrence>> getPendingOccurrences(String reminderId) async {
+    final db = await _dbHelper.database;
+    final maps = await db.query(
+      AppConstants.reminderOccurrencesTable,
+      where: 'reminderId = ? AND isCompleted = ?',
+      whereArgs: [reminderId, 0],
+      orderBy: 'scheduledTime ASC',
+    );
+
+    return maps.map((map) => ReminderOccurrence.fromMap(map)).toList();
+  }
+
+  /// Mark an occurrence as completed
+  Future<int> completeOccurrence(String occurrenceId) async {
+    final db = await _dbHelper.database;
+    return await db.update(
+      AppConstants.reminderOccurrencesTable,
+      {
+        'isCompleted': 1,
+        'completedAt': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [occurrenceId],
+    );
+  }
+
+  /// Mark an occurrence as completed by notification ID
+  Future<int> completeOccurrenceByNotificationId(int notificationId) async {
+    final db = await _dbHelper.database;
+    return await db.update(
+      AppConstants.reminderOccurrencesTable,
+      {
+        'isCompleted': 1,
+        'completedAt': DateTime.now().toIso8601String(),
+      },
+      where: 'notificationId = ?',
+      whereArgs: [notificationId],
+    );
+  }
+
+  /// Delete occurrence
+  Future<int> deleteOccurrence(String occurrenceId) async {
+    final db = await _dbHelper.database;
+    return await db.delete(
+      AppConstants.reminderOccurrencesTable,
+      where: 'id = ?',
+      whereArgs: [occurrenceId],
+    );
+  }
+
+  /// Delete all occurrences for a reminder
+  Future<int> deleteReminderOccurrences(String reminderId) async {
+    final db = await _dbHelper.database;
+    return await db.delete(
+      AppConstants.reminderOccurrencesTable,
+      where: 'reminderId = ?',
+      whereArgs: [reminderId],
     );
   }
 

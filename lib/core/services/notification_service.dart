@@ -5,6 +5,8 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../data/database/database_helper.dart';
+import '../../data/repositories/reminder_repository.dart';
+import '../../data/models/context_event.dart';
 
 /// Notification service for managing local notifications
 class NotificationService {
@@ -73,10 +75,17 @@ class NotificationService {
   /// Handle notification tap when app is in foreground
   void _onNotificationTapped(NotificationResponse response) async {
     final payload = response.payload;
-    debugPrint('Notification tapped (foreground): $payload');
+    final actionId = response.actionId;
+    
+    debugPrint('Notification tapped (foreground): $payload, actionId: $actionId');
 
     if (payload != null) {
-      await _recordNotificationInteraction(payload, 'seen');
+      if (actionId == 'complete_action' && response.id != null) {
+        // Handle complete action
+        await _handleCompleteAction(payload, response.id!);
+      } else {
+        await _recordNotificationInteraction(payload, 'seen');
+      }
     }
   }
 
@@ -85,10 +94,47 @@ class NotificationService {
   static void _onBackgroundNotificationTapped(
       NotificationResponse response,) async {
     final payload = response.payload;
-    debugPrint('Notification tapped (background): $payload');
+    final actionId = response.actionId;
+    
+    debugPrint('Notification tapped (background): $payload, actionId: $actionId');
 
     if (payload != null) {
-      await _recordNotificationInteraction(payload, 'seen');
+      if (actionId == 'complete_action' && response.id != null) {
+        // Handle complete action
+        await _handleCompleteAction(payload, response.id!);
+      } else {
+        await _recordNotificationInteraction(payload, 'seen');
+      }
+    }
+  }
+
+  /// Handle complete action from notification
+  static Future<void> _handleCompleteAction(String reminderId, int notificationId) async {
+    debugPrint('✅ Handling complete action for reminder $reminderId, notification $notificationId');
+    
+    try {
+      // Import repositories here to avoid circular dependencies
+      final reminderRepository = ReminderRepository();
+      
+      // Mark occurrence as completed by notification ID
+      await reminderRepository.completeOccurrenceByNotificationId(notificationId);
+      
+      // Create context event for completion
+      await reminderRepository.createContextEvent(
+        ContextEvent(
+          reminderId: reminderId,
+          contextType: 'notification_action',
+          outcome: AppConstants.outcomeCompleted,
+        ),
+      );
+      
+      // Cancel the notification
+      final notificationService = NotificationService();
+      await notificationService.cancelNotification(notificationId);
+      
+      debugPrint('✅ Successfully completed reminder $reminderId from notification');
+    } catch (e) {
+      debugPrint('❌ Error handling complete action: $e');
     }
   }
 
@@ -151,7 +197,7 @@ class NotificationService {
     }
   }
 
-  /// Show immediate notification
+  /// Show immediate notification with actions
   Future<void> showNotification({
     required int id,
     required String title,
@@ -160,7 +206,15 @@ class NotificationService {
   }) async {
     debugPrint('Showing notification id=$id title="$title" payload=$payload');
 
-    const androidDetails = AndroidNotificationDetails(
+    // Create action buttons
+    const completeAction = AndroidNotificationAction(
+      'complete_action',
+      'Complete',
+      showsUserInterface: false,
+      cancelNotification: true,
+    );
+
+    final androidDetails = AndroidNotificationDetails(
       AppConstants.notificationChannelId,
       AppConstants.notificationChannelName,
       channelDescription: AppConstants.notificationChannelDesc,
@@ -174,6 +228,7 @@ class NotificationService {
       autoCancel: true,
       ongoing: false,
       fullScreenIntent: true, // Shows notification even when screen is off
+      actions: [completeAction],
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -183,7 +238,7 @@ class NotificationService {
       interruptionLevel: InterruptionLevel.timeSensitive,
     );
 
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
@@ -208,7 +263,15 @@ class NotificationService {
     debugPrint(
         '📅 Scheduling notification id=$id title="$title" at $scheduledTime payload=$payload',);
 
-    const androidDetails = AndroidNotificationDetails(
+    // Create action buttons
+    const completeAction = AndroidNotificationAction(
+      'complete_action',
+      'Complete',
+      showsUserInterface: false,
+      cancelNotification: true,
+    );
+
+    final androidDetails = AndroidNotificationDetails(
       AppConstants.notificationChannelId,
       AppConstants.notificationChannelName,
       channelDescription: AppConstants.notificationChannelDesc,
@@ -221,6 +284,7 @@ class NotificationService {
       ongoing: false,
       fullScreenIntent: true, // Critical for showing when screen is off
       visibility: NotificationVisibility.public,
+      actions: [completeAction],
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -230,7 +294,7 @@ class NotificationService {
       interruptionLevel: InterruptionLevel.timeSensitive,
     );
 
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );

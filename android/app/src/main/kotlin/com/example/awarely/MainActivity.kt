@@ -1,9 +1,12 @@
 package com.example.awarely
 
 import android.app.AlarmManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
+import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
@@ -16,11 +19,15 @@ class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.example.awarely/permissions"
     private val ALARM_CHANNEL = "com.example.awarely/alarms"
     private val WIFI_CHANNEL = "com.example.awarely/wifi"
+    private val DEVICE_STATE_CHANNEL = "com.example.awarely/device_state"
     private lateinit var alarmScheduler: AlarmScheduler
+    private var batteryReceiver: BroadcastReceiver? = null
+    private lateinit var flutterEngine: FlutterEngine
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
+        this.flutterEngine = flutterEngine
         alarmScheduler = AlarmScheduler(this)
         
         // Permissions channel
@@ -103,6 +110,135 @@ class MainActivity: FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        
+        // Device state channel for battery and screen unlock detection
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEVICE_STATE_CHANNEL).setMethodCallHandler { call, result ->
+            android.util.Log.d("MainActivity", "🔋 DeviceState: Method call: ${call.method}")
+            
+            when (call.method) {
+                "getBatteryState" -> {
+                    val state = getBatteryState()
+                    android.util.Log.d("MainActivity", "🔋 Battery state: charging=${state["isCharging"]}, level=${state["batteryLevel"]}")
+                    result.success(state)
+                }
+                "startBatteryMonitoring" -> {
+                    startBatteryMonitoring(flutterEngine)
+                    result.success(true)
+                }
+                "stopBatteryMonitoring" -> {
+                    stopBatteryMonitoring()
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+        
+        // Set up screen unlock detection (via activity lifecycle)
+        setupScreenUnlockDetection(flutterEngine)
+        
+        // Start battery monitoring
+        startBatteryMonitoring(flutterEngine)
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        // Screen unlock detected (simplified - in production use more sophisticated detection)
+        notifyScreenUnlock()
+    }
+    
+    private fun setupScreenUnlockDetection(flutterEngine: FlutterEngine) {
+        // Screen unlock is detected via onResume() lifecycle method
+        // For more accurate detection, you'd need a DeviceAdminReceiver or accessibility service
+        // This is a simplified implementation
+        android.util.Log.d("MainActivity", "📱 Screen unlock detection setup (via lifecycle)")
+    }
+    
+    private fun notifyScreenUnlock() {
+        try {
+            val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEVICE_STATE_CHANNEL)
+            channel.invokeMethod("onScreenUnlock", null)
+            android.util.Log.d("MainActivity", "📱 Screen unlock event sent to Flutter")
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error notifying screen unlock: ${e.message}")
+        }
+    }
+    
+    private fun getBatteryState(): Map<String, Any> {
+        return try {
+            val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            val batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            val status = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS)
+            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || 
+                           status == BatteryManager.BATTERY_STATUS_FULL
+            
+            mapOf(
+                "isCharging" to isCharging,
+                "batteryLevel" to batteryLevel
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error getting battery state: ${e.message}")
+            mapOf(
+                "isCharging" to false,
+                "batteryLevel" to 0
+            )
+        }
+    }
+    
+    private fun startBatteryMonitoring(flutterEngine: FlutterEngine) {
+        if (batteryReceiver != null) {
+            return // Already monitoring
+        }
+        
+        batteryReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == Intent.ACTION_BATTERY_CHANGED) {
+                    val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                    val batteryPct = if (level >= 0 && scale > 0) {
+                        (level * 100 / scale.toFloat()).toInt()
+                    } else {
+                        0
+                    }
+                    
+                    val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                    val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                                   status == BatteryManager.BATTERY_STATUS_FULL
+                    
+                    android.util.Log.d("MainActivity", "🔋 Battery changed: charging=$isCharging, level=$batteryPct%")
+                    
+                    try {
+                        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEVICE_STATE_CHANNEL)
+                        channel.invokeMethod("onBatteryStateChanged", mapOf(
+                            "isCharging" to isCharging,
+                            "batteryLevel" to batteryPct
+                        ))
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainActivity", "Error sending battery state: ${e.message}")
+                    }
+                }
+            }
+        }
+        
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        registerReceiver(batteryReceiver, filter)
+        android.util.Log.d("MainActivity", "🔋 Battery monitoring started")
+    }
+    
+    private fun stopBatteryMonitoring() {
+        batteryReceiver?.let {
+            try {
+                unregisterReceiver(it)
+                batteryReceiver = null
+                android.util.Log.d("MainActivity", "🔋 Battery monitoring stopped")
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Error stopping battery monitoring: ${e.message}")
+            }
+        }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        stopBatteryMonitoring()
     }
 
     private fun getCurrentWifiSsid(): String? {

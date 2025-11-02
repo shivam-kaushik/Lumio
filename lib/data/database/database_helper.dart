@@ -17,17 +17,68 @@ class DatabaseHelper {
     return _database!;
   }
 
+  /// Ensure reminder_occurrences table exists (safety check for migrations)
+  Future<void> _ensureOccurrencesTableExists(Database db) async {
+    try {
+      // Check if table exists
+      final result = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        [AppConstants.reminderOccurrencesTable],
+      );
+      
+      if (result.isEmpty) {
+        // Table doesn't exist, create it
+        print('⚠️ reminder_occurrences table missing, creating it now...');
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS ${AppConstants.reminderOccurrencesTable} (
+            id TEXT PRIMARY KEY,
+            reminderId TEXT NOT NULL,
+            scheduledTime TEXT NOT NULL,
+            isCompleted INTEGER DEFAULT 0,
+            completedAt TEXT,
+            notificationId INTEGER NOT NULL,
+            FOREIGN KEY (reminderId) REFERENCES ${AppConstants.remindersTable} (id)
+              ON DELETE CASCADE
+          )
+        ''');
+
+        await db.execute('''
+          CREATE INDEX IF NOT EXISTS idx_occurrences_reminder 
+          ON ${AppConstants.reminderOccurrencesTable} (reminderId)
+        ''');
+
+        await db.execute('''
+          CREATE INDEX IF NOT EXISTS idx_occurrences_time 
+          ON ${AppConstants.reminderOccurrencesTable} (scheduledTime)
+        ''');
+
+        await db.execute('''
+          CREATE INDEX IF NOT EXISTS idx_occurrences_notification 
+          ON ${AppConstants.reminderOccurrencesTable} (notificationId)
+        ''');
+        print('✅ reminder_occurrences table created successfully');
+      }
+    } catch (e) {
+      print('❌ Error ensuring reminder_occurrences table exists: $e');
+    }
+  }
+
   /// Initialize database
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(
+    final db = await openDatabase(
       path,
       version: AppConstants.dbVersion,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
+    
+    // Safety check: ensure all required tables exist (for existing databases)
+    await _ensureOccurrencesTableExists(db);
+    
+    return db;
   }
 
   /// Create database tables
@@ -123,10 +174,75 @@ class DatabaseHelper {
         last_updated TEXT NOT NULL
       )
     ''');
+
+    // Create reminder_occurrences table for tracking individual occurrences
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ${AppConstants.reminderOccurrencesTable} (
+        id TEXT PRIMARY KEY,
+        reminderId TEXT NOT NULL,
+        scheduledTime TEXT NOT NULL,
+        isCompleted INTEGER DEFAULT 0,
+        completedAt TEXT,
+        notificationId INTEGER NOT NULL,
+        FOREIGN KEY (reminderId) REFERENCES ${AppConstants.remindersTable} (id)
+          ON DELETE CASCADE
+      )
+    ''');
+
+    // Create indexes for occurrences
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_occurrences_reminder 
+      ON ${AppConstants.reminderOccurrencesTable} (reminderId)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_occurrences_time 
+      ON ${AppConstants.reminderOccurrencesTable} (scheduledTime)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_occurrences_notification 
+      ON ${AppConstants.reminderOccurrencesTable} (notificationId)
+    ''');
   }
 
   /// Upgrade database schema
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    // Migration to version 6: Add reminder_occurrences table
+    if (oldVersion < 6) {
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS ${AppConstants.reminderOccurrencesTable} (
+            id TEXT PRIMARY KEY,
+            reminderId TEXT NOT NULL,
+            scheduledTime TEXT NOT NULL,
+            isCompleted INTEGER DEFAULT 0,
+            completedAt TEXT,
+            notificationId INTEGER NOT NULL,
+            FOREIGN KEY (reminderId) REFERENCES ${AppConstants.remindersTable} (id)
+              ON DELETE CASCADE
+          )
+        ''');
+
+        await db.execute('''
+          CREATE INDEX IF NOT EXISTS idx_occurrences_reminder 
+          ON ${AppConstants.reminderOccurrencesTable} (reminderId)
+        ''');
+
+        await db.execute('''
+          CREATE INDEX IF NOT EXISTS idx_occurrences_time 
+          ON ${AppConstants.reminderOccurrencesTable} (scheduledTime)
+        ''');
+
+        await db.execute('''
+          CREATE INDEX IF NOT EXISTS idx_occurrences_notification 
+          ON ${AppConstants.reminderOccurrencesTable} (notificationId)
+        ''');
+      } catch (e) {
+        print('Error creating reminder_occurrences table: $e');
+      }
+    }
+
     // Handle future migrations here
     if (oldVersion < 2) {
       // Add recurrence fields - check if they exist first

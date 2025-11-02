@@ -7,6 +7,7 @@ import '../screens/home_setup_screen.dart';
 import '../../core/services/home_detection_service.dart';
 import 'package:flutter/foundation.dart';
 import '../../data/models/saved_location.dart';
+import '../theme/app_theme.dart';
 
 /// Comprehensive reminder creation/edit dialog with all smart features
 class SmartReminderDialog extends StatefulWidget {
@@ -227,36 +228,80 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600),
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(AppTheme.radiusXL),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.shadowColor,
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
+            // Header - Premium minimal design
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.spacingLG,
+                AppTheme.spacingLG,
+                AppTheme.spacingMD,
+                AppTheme.spacingMD,
+              ),
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
+                border: Border(
+                  bottom: BorderSide(
+                    color: AppTheme.borderColor,
+                    width: 1,
+                  ),
                 ),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.add_alert, color: Theme.of(context).primaryColor),
-                  const SizedBox(width: 12),
-                  Text(
-                    widget.reminder == null ? 'New Reminder' : 'Edit Reminder',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppTheme.primaryColor, AppTheme.primaryLight],
+                      ),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                    ),
+                    child: const Icon(
+                      Icons.add_alert_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: AppTheme.spacingMD),
+                  Expanded(
+                    child: Text(
+                      widget.reminder == null ? 'New Reminder' : 'Edit Reminder',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: AppTheme.textSecondary,
+                      size: 20,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      padding: const EdgeInsets.all(AppTheme.spacingSM),
+                    ),
                   ),
                 ],
               ),
@@ -265,20 +310,48 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
             // Scrollable content
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(AppTheme.spacingLG),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Text input
+                    // Text input - Premium styling
                     TextField(
                       controller: _textController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'What do you want to remember?',
                         hintText: 'e.g., Take medicine, Call doctor',
-                        border: OutlineInputBorder(),
+                        hintStyle: TextStyle(color: AppTheme.textTertiary),
+                        labelStyle: TextStyle(color: AppTheme.textSecondary),
+                        filled: true,
+                        fillColor: AppTheme.surfaceColor,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                          borderSide: const BorderSide(
+                            color: AppTheme.borderColor,
+                            width: 1,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                          borderSide: const BorderSide(
+                            color: AppTheme.borderColor,
+                            width: 1,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                          borderSide: const BorderSide(
+                            color: AppTheme.primaryColor,
+                            width: 2,
+                          ),
+                        ),
                       ),
                       maxLines: 2,
                       autofocus: true,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 16,
+                      ),
                     ),
 
                     const SizedBox(height: 24),
@@ -312,12 +385,12 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
                     // Time settings
                     _buildTimeSettings(),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppTheme.spacingLG),
 
                     // Advanced options
                     _buildAdvancedOptions(),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppTheme.spacingLG),
 
                     // Preview
                     if (_isRecurring || _timeAt != null) _buildPreview(),
@@ -326,14 +399,15 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
               ),
             ),
 
-            // Footer buttons
+            // Footer buttons - Premium styling
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppTheme.spacingLG),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(12),
-                  bottomRight: Radius.circular(12),
+                border: Border(
+                  top: BorderSide(
+                    color: AppTheme.borderColor,
+                    width: 1,
+                  ),
                 ),
               ),
               child: Row(
@@ -341,12 +415,38 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spacingLG,
+                        vertical: AppTheme.spacingMD,
+                      ),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(color: AppTheme.textSecondary),
+                    ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppTheme.spacingMD),
                   ElevatedButton(
                     onPressed: _save,
-                    child: Text(widget.reminder == null ? 'Create' : 'Update'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spacingLG,
+                        vertical: AppTheme.spacingMD,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      widget.reminder == null ? 'Create' : 'Update',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -498,7 +598,7 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
                   onPressed: _pickTimeRange,
                   icon: const Icon(Icons.access_time),
                   label: Text(
-                    _timeRangeStart == null
+                    _timeRangeStart == null || _timeRangeEnd == null
                         ? 'Set Time Range'
                         : '${_formatTime(_timeRangeStart!)} - ${_formatTime(_timeRangeEnd!)}',
                   ),
@@ -530,24 +630,32 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
 
   Widget _buildPreview() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppTheme.spacingMD),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade200),
+        color: AppTheme.primaryColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+        border: Border.all(
+          color: AppTheme.primaryColor.withOpacity(0.2),
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-              const SizedBox(width: 8),
+              Icon(
+                Icons.info_outline_rounded,
+                color: AppTheme.primaryColor,
+                size: 18,
+              ),
+              const SizedBox(width: AppTheme.spacingSM),
               Text(
                 'Preview',
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade700,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryColor,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -602,9 +710,14 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
             : 'location');
 
     return Card(
-      color: Colors.grey.shade50,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+        side: const BorderSide(color: AppTheme.borderColor, width: 1),
+      ),
+      color: AppTheme.surfaceColor,
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(AppTheme.spacingMD),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

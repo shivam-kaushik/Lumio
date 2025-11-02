@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:provider/provider.dart';
+
 import '../../data/models/reminder.dart';
+import '../../data/repositories/reminder_repository.dart';
 import '../theme/app_theme.dart';
 import '../../core/utils/date_time_utils.dart';
+import '../providers/reminder_provider.dart';
 
 /// Premium reminder card widget with minimal, elegant design
-class ReminderCard extends StatelessWidget {
+/// Includes smooth animations and interactive feedback
+class ReminderCard extends StatefulWidget {
   final Reminder reminder;
   final VoidCallback? onTap;
   final Function(bool)? onToggle;
@@ -21,306 +26,336 @@ class ReminderCard extends StatelessWidget {
   });
 
   @override
+  State<ReminderCard> createState() => _ReminderCardState();
+}
+
+class _ReminderCardState extends State<ReminderCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.97).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTapDown(TapDownDetails details) {
+    _controller.forward();
+    HapticFeedback.lightImpact();
+  }
+
+  void _handleTapUp(TapUpDetails details) {
+    _controller.reverse();
+  }
+
+  void _handleTapCancel() {
+    _controller.reverse();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLG),
-        border: Border.all(
-          color: reminder.enabled 
-              ? AppTheme.primaryColor.withOpacity(0.1)
-              : AppTheme.borderColor,
-          width: 1,
-        ),
-        boxShadow: reminder.enabled 
-            ? AppTheme.getElevationShadow(1)
-            : null,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(AppTheme.radiusLG),
-          child: Padding(
-            padding: const EdgeInsets.all(AppTheme.spacingMD),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top row: Status indicator + Context badges + Actions
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Status indicator (subtle left accent)
-                    Container(
-                      width: 4,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: reminder.enabled
-                            ? AppTheme.primaryColor
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    
-                    const SizedBox(width: AppTheme.spacingMD),
-                    
-                    // Main content
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Context badges row
-                          if (reminder.getContextIcons().isNotEmpty)
-                            Wrap(
-                              spacing: AppTheme.spacingSM,
-                              runSpacing: AppTheme.spacingSM,
-                              children: reminder.getContextIcons().map((icon) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppTheme.spacingSM,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getContextColor(icon)
-                                        .withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(
-                                      AppTheme.radiusSM,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    icon,
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          
-                          if (reminder.getContextIcons().isNotEmpty)
-                            const SizedBox(height: AppTheme.spacingSM),
-                          
-                          // Reminder text
-                          Text(
-                            reminder.text,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              height: 1.3,
-                              decoration: reminder.enabled
-                                  ? TextDecoration.none
-                                  : TextDecoration.lineThrough,
-                              color: reminder.enabled
-                                  ? theme.textTheme.titleMedium?.color
-                                  : theme.textTheme.bodyMedium?.color,
-                            ),
-                          ),
-                          
-                          const SizedBox(height: AppTheme.spacingSM),
-                          
-                          // Context metadata
-                          _buildMetadata(context, reminder),
-                        ],
-                      ),
-                    ),
-                    
-                    // Quick actions
-                    Column(
-                      children: [
-                        // Toggle switch
-                        Transform.scale(
-                          scale: 0.85,
-                          child: Switch(
-                            value: reminder.enabled,
-                            onChanged: onToggle,
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                        
-                        const SizedBox(height: AppTheme.spacingXS),
-                        
-                        // Delete button (subtle)
-                        IconButton(
-                          icon: Icon(
-                            Icons.close_rounded,
-                            size: 18,
-                            color: isDark
-                                ? AppTheme.textTertiary
-                                : AppTheme.textSecondary,
-                          ),
-                          onPressed: onDelete,
-                          tooltip: 'Delete',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
+          border: Border.all(
+            color: widget.reminder.enabled 
+                ? AppTheme.primaryColor.withOpacity(0.1)
+                : AppTheme.borderColor,
+            width: 1,
           ),
+          boxShadow: widget.reminder.enabled 
+              ? AppTheme.getElevationShadow(1)
+              : null,
         ),
-      ),
-    );
-  }
-
-  Widget _buildMetadata(BuildContext context, Reminder reminder) {
-    final theme = Theme.of(context);
-    final metadata = <Widget>[];
-    
-    // Priority badge
-    if (reminder.priority != ReminderPriority.medium) {
-      metadata.add(_buildMetadataChip(
-        context,
-        reminder.priority.emoji,
-        reminder.priority.displayName,
-        _getPriorityColor(reminder.priority),
-      ));
-    }
-    
-    // Category badge
-    if (reminder.category != ReminderCategory.other) {
-      metadata.add(_buildMetadataChip(
-        context,
-        reminder.category.emoji,
-        reminder.category.displayName,
-        AppTheme.textSecondary,
-      ));
-    }
-    
-    // Time metadata
-    if (reminder.timeAt != null) {
-      final timeStr = DateTimeUtils.formatTime(reminder.timeAt!);
-      final isToday = DateTimeUtils.isToday(reminder.timeAt!);
-      metadata.add(
-        Text(
-          isToday ? 'Today at $timeStr' : timeStr,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: AppTheme.textSecondary,
-            fontSize: 12,
-          ),
-        ),
-      );
-    }
-    
-    // Next occurrence for recurring
-    if (reminder.isRecurring && reminder.timeAt != null) {
-      metadata.add(
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.repeat_rounded,
-              size: 12,
-              color: AppTheme.textSecondary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              _formatNextOccurrence(reminder),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            onTapDown: _handleTapDown,
+            onTapUp: _handleTapUp,
+            onTapCancel: _handleTapCancel,
+            borderRadius: BorderRadius.circular(AppTheme.radiusLG),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spacingMD,
+                vertical: AppTheme.spacingMD,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Complete checkbox - Leftmost
+                  Consumer<ReminderProvider>(
+                    builder: (context, provider, child) {
+                      final isCompleted = !widget.reminder.enabled;
+                      return GestureDetector(
+                        onTap: () {
+                          HapticFeedback.mediumImpact();
+                          if (!isCompleted) {
+                            provider.completeReminder(widget.reminder.id);
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isCompleted
+                                  ? AppTheme.successColor
+                                  : AppTheme.borderColor,
+                              width: 2,
+                            ),
+                            color: isCompleted
+                                ? AppTheme.successColor
+                                : Colors.transparent,
+                          ),
+                          child: isCompleted
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  color: Colors.white,
+                                  size: 16,
+                                )
+                              : null,
+                        ),
+                      );
+                    },
+                  ),
+                  
+                  const SizedBox(width: AppTheme.spacingMD),
+                  
+                  // Reminder text - Center (expanded)
+                  Expanded(
+                    child: Text(
+                      widget.reminder.text,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        height: 1.4,
+                        decoration: !widget.reminder.enabled
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
+                        color: !widget.reminder.enabled
+                            ? AppTheme.textTertiary
+                            : AppTheme.textPrimary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  
+                  const SizedBox(width: AppTheme.spacingMD),
+                  
+                  // Date and time - Rightmost
+                  _buildDateTime(context, widget.reminder),
+                ],
               ),
             ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  /// Build date and time display for the right side
+  Widget _buildDateTime(BuildContext context, Reminder reminder) {
+    final theme = Theme.of(context);
+    
+    // For recurring reminders, show next pending occurrence
+    if (reminder.isRecurring) {
+      return FutureBuilder<DateTime?>(
+        future: _getNextOccurrence(reminder),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const SizedBox(
+              width: 60,
+              height: 20,
+              child: Center(
+                child: SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+          
+          final nextOccurrence = snapshot.data;
+          
+          if (nextOccurrence == null) {
+            // No pending occurrence, show recurring indicator only
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'Recurring',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+                const SizedBox(height: 2),
+                Icon(
+                  Icons.repeat_rounded,
+                  size: 12,
+                  color: AppTheme.textTertiary,
+                ),
+              ],
+            );
+          }
+          
+          final now = DateTime.now();
+          final isToday = DateTimeUtils.isToday(nextOccurrence);
+          
+          // Check if tomorrow
+          final tomorrow = now.add(const Duration(days: 1));
+          final isTomorrow = nextOccurrence.year == tomorrow.year &&
+              nextOccurrence.month == tomorrow.month &&
+              nextOccurrence.day == tomorrow.day;
+          
+          String dateText;
+          if (isToday) {
+            dateText = DateTimeUtils.formatTime(nextOccurrence);
+          } else if (isTomorrow) {
+            dateText = 'Tomorrow\n${DateTimeUtils.formatTime(nextOccurrence)}';
+          } else {
+            dateText = DateTimeUtils.formatDate(nextOccurrence);
+            final timeStr = DateTimeUtils.formatTime(nextOccurrence);
+            dateText = '$dateText\n$timeStr';
+          }
+          
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                dateText,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
+                ),
+                textAlign: TextAlign.right,
+              ),
+              const SizedBox(height: 2),
+              Icon(
+                Icons.repeat_rounded,
+                size: 12,
+                color: AppTheme.textTertiary,
+              ),
+            ],
+          );
+        },
       );
     }
     
-    if (metadata.isEmpty) return const SizedBox.shrink();
-    
-    return Wrap(
-      spacing: AppTheme.spacingSM,
-      runSpacing: AppTheme.spacingSM,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: metadata,
-    );
-  }
-
-  Widget _buildMetadataChip(
-    BuildContext context,
-    String emoji,
-    String label,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spacingSM,
-        vertical: 4,
-      ),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            emoji,
-            style: const TextStyle(fontSize: 12),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getContextColor(String icon) {
-    if (icon.contains('⏰')) return AppTheme.timeColor;
-    if (icon.contains('📍')) return AppTheme.locationColor;
-    if (icon.contains('📶')) return AppTheme.wifiColor;
-    if (icon.contains('🚪') || icon.contains('🏠')) {
-      return AppTheme.locationColor;
+    // For one-time reminders, show timeAt
+    if (reminder.timeAt == null) {
+      return const SizedBox.shrink();
     }
-    return AppTheme.primaryColor;
-  }
-
-  Color _getPriorityColor(ReminderPriority priority) {
-    switch (priority) {
-      case ReminderPriority.low:
-        return AppTheme.successColor;
-      case ReminderPriority.medium:
-        return AppTheme.textSecondary;
-      case ReminderPriority.high:
-        return AppTheme.warningColor;
-      case ReminderPriority.critical:
-        return AppTheme.errorColor;
-    }
-  }
-
-  String _formatNextOccurrence(Reminder reminder) {
-    if (reminder.timeAt == null) return 'Unknown';
     
+    final timeAt = reminder.timeAt!;
     final now = DateTime.now();
-    final next = reminder.timeAt!;
+    final isToday = DateTimeUtils.isToday(timeAt);
     
-    if (DateTimeUtils.isToday(next)) {
-      final timeStr = DateTimeUtils.formatTime(next);
-      return 'Today $timeStr';
-    }
-    
+    // Check if tomorrow
     final tomorrow = now.add(const Duration(days: 1));
-    if (next.year == tomorrow.year &&
-        next.month == tomorrow.month &&
-        next.day == tomorrow.day) {
-      final timeStr = DateTimeUtils.formatTime(next);
-      return 'Tomorrow $timeStr';
+    final isTomorrow = timeAt.year == tomorrow.year &&
+        timeAt.month == tomorrow.month &&
+        timeAt.day == tomorrow.day;
+    
+    String dateText;
+    if (isToday) {
+      dateText = DateTimeUtils.formatTime(timeAt);
+    } else if (isTomorrow) {
+      dateText = 'Tomorrow\n${DateTimeUtils.formatTime(timeAt)}';
+    } else {
+      dateText = DateTimeUtils.formatDate(timeAt);
+      final timeStr = DateTimeUtils.formatTime(timeAt);
+      dateText = '$dateText\n$timeStr';
     }
     
-    return DateTimeUtils.formatDate(next);
+    return Text(
+      dateText,
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: AppTheme.textSecondary,
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        height: 1.3,
+      ),
+      textAlign: TextAlign.right,
+    );
   }
+
+  /// Get next pending occurrence for a recurring reminder
+  Future<DateTime?> _getNextOccurrence(Reminder reminder) async {
+    try {
+      final repository = ReminderRepository();
+      final pending = await repository.getPendingOccurrences(reminder.id);
+      
+      if (pending.isNotEmpty) {
+        // Return the first pending occurrence time
+        return pending.first.scheduledTime;
+      }
+      
+      // No pending occurrences - calculate next one based on reminder pattern
+      if (reminder.timeAt != null) {
+        // If there's a timeAt, use it
+        return reminder.timeAt;
+      }
+      
+      // Calculate next occurrence from now
+      final now = DateTime.now();
+      Duration interval;
+      
+      if (reminder.repeatInterval != null && reminder.repeatUnit != null) {
+        switch (reminder.repeatUnit) {
+          case 'minutes':
+            interval = Duration(minutes: reminder.repeatInterval!);
+            break;
+          case 'hours':
+            interval = Duration(hours: reminder.repeatInterval!);
+            break;
+          case 'days':
+            interval = Duration(days: reminder.repeatInterval!);
+            break;
+          case 'weeks':
+            interval = Duration(days: reminder.repeatInterval! * 7);
+            break;
+          default:
+            interval = Duration(minutes: reminder.repeatInterval!);
+        }
+        return now.add(interval);
+      }
+      
+      return null;
+    } catch (e) {
+      debugPrint('Error getting next occurrence: $e');
+      return null;
+    }
+  }
+
 }

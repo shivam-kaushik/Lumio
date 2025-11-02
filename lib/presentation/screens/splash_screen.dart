@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import '../screens/onboarding_screen.dart';
-import '../screens/home_screen.dart';
+import '../navigation/main_navigator.dart';
 import '../../core/services/permission_service.dart';
 
 /// Splash screen shown on app launch
@@ -60,10 +60,14 @@ class _SplashScreenState extends State<SplashScreen>
     // Check if this is first launch (simplified - use SharedPreferences in production)
     const isFirstLaunch = true; // Replace with actual check
 
+    // Import MainNavigator instead of HomeScreen directly
+    final nextScreen = isFirstLaunch 
+        ? const OnboardingScreen() 
+        : const MainNavigator();
+    
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) =>
-            isFirstLaunch ? const OnboardingScreen() : const HomeScreen(),
+        builder: (context) => nextScreen,
       ),
     );
   }

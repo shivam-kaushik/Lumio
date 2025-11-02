@@ -5,6 +5,7 @@ import '../../core/services/notification_service.dart';
 import '../../core/services/permission_service.dart';
 import '../providers/theme_provider.dart';
 import 'recent_notifications_screen.dart';
+import '../theme/app_theme.dart';
 
 /// Settings screen to manage permissions and notification diagnostics
 class SettingsScreen extends StatefulWidget {
@@ -80,22 +81,70 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
-      body: RefreshIndicator(
+    // No Scaffold - MainNavigator provides it
+    return Column(
+      children: [
+        // Custom AppBar
+        Container(
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top,
+            left: AppTheme.spacingLG,
+            right: AppTheme.spacingMD,
+            bottom: AppTheme.spacingMD,
+          ),
+          decoration: BoxDecoration(
+            color: AppTheme.backgroundColor,
+            border: Border(
+              bottom: BorderSide(
+                color: AppTheme.borderColor,
+                width: 1,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Settings',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Body content
+        Expanded(
+          child: RefreshIndicator(
         onRefresh: _refreshStatuses,
+        color: AppTheme.primaryColor,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppTheme.spacingMD),
           children: [
-            // Theme Settings
-            const Text('Appearance',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),),
-            const SizedBox(height: 12),
+            // Theme Settings - Premium section header
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+              child: Text(
+                'Appearance',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingSM),
             Consumer<ThemeProvider>(
               builder: (context, themeProvider, child) {
                 return Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLG),
+                    side: const BorderSide(color: AppTheme.borderColor, width: 1),
+                  ),
+                  color: AppTheme.surfaceColor,
                   child: Column(
                     children: [
                       ListTile(
@@ -164,28 +213,59 @@ class _SettingsScreenState extends State<SettingsScreen>
                 );
               },
             ),
-            const SizedBox(height: 24),
-            const Text('Permissions',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),),
-            const SizedBox(height: 12),
-            ListTile(
-              title: const Text('Notifications'),
-              subtitle: Text(_notificationsEnabled ? 'Enabled' : 'Disabled'),
-              trailing: ElevatedButton(
-                onPressed: () async {
-                  final granted =
-                      await _permissionService.ensureNotificationPermission(
-                    context,
-                    rationale:
-                        'Notifications are used to deliver reminders. Please enable them.',
-                  );
-                  if (granted) {
-                    setState(() => _notificationsEnabled = true);
-                  }
-                },
-                child: const Text('Manage'),
+            const SizedBox(height: AppTheme.spacingLG),
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+              child: Text(
+                'Permissions',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                  letterSpacing: -0.3,
+                ),
               ),
             ),
+            const SizedBox(height: AppTheme.spacingSM),
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppTheme.radiusLG),
+                side: const BorderSide(color: AppTheme.borderColor, width: 1),
+              ),
+              color: AppTheme.surfaceColor,
+              child: ListTile(
+                title: const Text('Notifications'),
+                subtitle: Text(
+                  _notificationsEnabled ? 'Enabled' : 'Disabled',
+                  style: TextStyle(
+                    color: _notificationsEnabled
+                        ? AppTheme.successColor
+                        : AppTheme.textSecondary,
+                  ),
+                ),
+                trailing: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppTheme.borderColor),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                    ),
+                  ),
+                  onPressed: () async {
+                    final granted =
+                        await _permissionService.ensureNotificationPermission(
+                      context,
+                      rationale:
+                          'Notifications are used to deliver reminders. Please enable them.',
+                    );
+                    if (granted) {
+                      setState(() => _notificationsEnabled = true);
+                    }
+                  },
+                  child: const Text('Manage'),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingSM),
             ListTile(
               title: const Text('Exact Alarms'),
               subtitle: Text(_exactAlarmEnabled ? 'Enabled' : 'Disabled'),
@@ -334,6 +414,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           ],
         ),
       ),
+      ),
+      ],
     );
   }
   

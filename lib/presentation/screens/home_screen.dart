@@ -9,8 +9,6 @@ import '../widgets/context_group_card.dart';
 import '../widgets/smart_reminder_dialog.dart';
 import '../theme/app_theme.dart';
 import 'add_reminder_screen.dart';
-import 'analytics_screen.dart';
-import 'settings_screen.dart';
 import '../../data/models/reminder.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../../core/services/home_detection_service.dart';
@@ -63,17 +61,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Premium header
-            _buildPremiumHeader(context, isDark),
-            
-            // Main content
-            Expanded(
-              child: Consumer<ReminderProvider>(
+    // No Scaffold here - MainNavigator provides it
+    return SafeArea(
+      bottom: false, // MainNavigator handles bottom safe area
+      child: Column(
+        children: [
+          // Premium header
+          _buildPremiumHeader(context, isDark),
+          
+          // Main content
+          Expanded(
+            child: Consumer<ReminderProvider>(
                 builder: (context, reminderProvider, child) {
                   if (reminderProvider.isLoading) {
                     return const Center(
@@ -160,9 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: _buildFloatingActionButton(context),
-    );
+      );
   }
 
   Widget _buildPremiumHeader(BuildContext context, bool isDark) {
@@ -226,34 +222,17 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           
-          // Action buttons (minimal)
+          // Action button - Refresh reminders
           IconButton(
             icon: Icon(
-              Icons.insights_outlined,
+              Icons.refresh_rounded,
               color: theme.iconTheme.color,
             ),
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const AnalyticsScreen(),
-                ),
-              );
+              context.read<ReminderProvider>().loadReminders();
+              _updateContext();
             },
-            tooltip: 'Analytics',
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.settings_outlined,
-              color: theme.iconTheme.color,
-            ),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const SettingsScreen(),
-                ),
-              );
-            },
-            tooltip: 'Settings',
+            tooltip: 'Refresh',
           ),
         ],
       ),
@@ -443,41 +422,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFloatingActionButton(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppTheme.radiusLG),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.primaryColor,
-            AppTheme.primaryLight,
-          ],
-        ),
-        boxShadow: AppTheme.getElevationShadow(4),
-      ),
-      child: FloatingActionButton.extended(
-        onPressed: () {
-          HapticFeedback.mediumImpact();
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const AddReminderScreen(),
-            ),
-          );
-        },
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        icon: const Icon(Icons.add_rounded, size: 24),
-        label: Text(
-          'Add Reminder',
-          style: GoogleFonts.inter(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-            letterSpacing: 0.2,
-          ),
-        ),
-      ),
-    );
-  }
 }
