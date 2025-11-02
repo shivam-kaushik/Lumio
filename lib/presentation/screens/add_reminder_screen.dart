@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart' hide TimeOfDay;
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../providers/reminder_provider.dart';
+import '../theme/app_theme.dart';
 import '../../core/services/nlu_parser.dart';
 import '../../core/services/gpt_nlu_service.dart';
 import '../../core/services/home_detection_service.dart';
@@ -327,307 +329,397 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Reminder')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+      appBar: AppBar(
+        title: const Text('New Reminder'),
+        elevation: 0,
+      ),
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title
-            Text(
-              'What do you want to remember?',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
+            // Premium input section
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppTheme.spacingMD),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      'What do you want to remember?',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: AppTheme.spacingSM),
+                    Text(
+                      'Use natural language - we\'ll figure out the rest',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: AppTheme.spacingXL),
 
-            const SizedBox(height: 24),
-
-            // Input field
-            TextField(
-              controller: _textController,
-              decoration: InputDecoration(
-                hintText: 'e.g., Take my keys when leaving home at 8 AM',
-                suffixIcon: _isListening
-                    ? const Padding(
-                        padding: EdgeInsets.all(12.0),
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.red,
-                            ),
-                          ),
+                    // Premium input field with voice
+                    Container(
+                      decoration: BoxDecoration(
+                        color: theme.cardColor,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusLG),
+                        border: Border.all(
+                          color: _isListening
+                              ? AppTheme.primaryColor
+                              : AppTheme.borderColor,
+                          width: _isListening ? 2 : 1,
                         ),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.mic),
-                        tooltip: 'Voice input',
-                        onPressed: () async {
-                          final permissionService = PermissionService();
-                          final granted =
-                              await permissionService.ensureMicrophonePermission(
-                            context,
-                            rationale:
-                                'Microphone access is required for voice input.',
-                          );
-                          if (!granted) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Microphone permission is required for voice input.'),
-                                ),
-                              );
-                            }
-                            return;
-                          }
-
-                          if (!_isListening) {
-                            debugPrint('🎤 Voice Input: Initializing speech recognition...');
-                            final available = await _speech.initialize(
-                              onStatus: (status) {
-                                debugPrint('🎤 Voice Input: Status changed: $status');
-                                if (mounted) {
-                                  if (status == 'done' ||
-                                      status == 'notListening' ||
-                                      status == 'canceled') {
-                                    debugPrint('🎤 Voice Input: Stopped listening');
-                                    setState(() => _isListening = false);
-                                    _speech.stop();
-                                  } else if (status == 'listening') {
-                                    debugPrint('🎤 Voice Input: Now listening...');
-                                    setState(() => _isListening = true);
-                                  }
-                                }
-                              },
-                              onError: (error) {
-                                debugPrint('❌ Voice Input Error: ${error.errorMsg}');
-                                if (mounted) {
-                                  setState(() => _isListening = false);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                          'Speech recognition error: ${error.errorMsg}'),
-                                    ),
-                                  );
-                                }
-                              },
-                            );
-                            
-                            if (available) {
-                              debugPrint('✅ Voice Input: Speech recognition available');
-                              if (mounted) {
-                                setState(() => _isListening = true);
-                              }
-                              debugPrint('🎤 Voice Input: Starting to listen...');
-                              _speech.listen(
-                                onResult: (result) {
-                                  debugPrint('🎤 Voice Input: Result - "${result.recognizedWords}" (final=${result.finalResult})');
-                                  if (mounted) {
-                                    setState(() {
-                                      _textController.text =
-                                          result.recognizedWords;
-                                    });
-                                    // Auto-update preview if valid
-                                    if (result.recognizedWords.trim().isNotEmpty &&
-                                        NLUParser.hasValidIntent(
-                                            result.recognizedWords)) {
-                                      debugPrint('✅ Voice Input: Valid intent detected, updating preview');
-                                      _parsedPreview =
-                                          NLUParser.parseReminderText(
-                                              result.recognizedWords);
-                                    }
-                                  }
-                                },
-                                localeId: 'en_US',
-                                listenMode: stt.ListenMode.confirmation,
-                                cancelOnError: true,
-                                partialResults: true,
-                              );
-                            } else {
-                              debugPrint('❌ Voice Input: Speech recognition not available');
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'Speech recognition is not available on this device.'),
+                        boxShadow: _isListening
+                            ? AppTheme.getElevationShadow(2)
+                            : null,
+                      ),
+                      child: TextField(
+                        controller: _textController,
+                        decoration: InputDecoration(
+                          hintText: 'e.g., Take my keys when leaving home at 8 AM',
+                          hintStyle: TextStyle(
+                            color: AppTheme.textTertiary,
+                            fontSize: 15,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.all(AppTheme.spacingMD),
+                          suffixIcon: _isListening
+                              ? Container(
+                                  margin: const EdgeInsets.all(AppTheme.spacingSM),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.errorColor.withOpacity(0.1),
+                                    shape: BoxShape.circle,
                                   ),
-                                );
-                              }
-                            }
-                          } else {
-                            debugPrint('🎤 Voice Input: Stopping speech recognition...');
-                            setState(() => _isListening = false);
-                            await _speech.stop();
-                            debugPrint('✅ Voice Input: Stopped listening');
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Stopped listening'),
-                                  duration: Duration(seconds: 1),
+                                  child: const Icon(
+                                    Icons.mic_rounded,
+                                    color: AppTheme.errorColor,
+                                    size: 24,
+                                  ),
+                                )
+                              : IconButton(
+                                  icon: const Icon(Icons.mic_outlined),
+                                  tooltip: 'Voice input',
+                                  onPressed: () async {
+                                    HapticFeedback.mediumImpact();
+                                    final permissionService = PermissionService();
+                                    final granted =
+                                        await permissionService.ensureMicrophonePermission(
+                                      context,
+                                      rationale:
+                                          'Microphone access is required for voice input.',
+                                    );
+                                    if (!granted) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Microphone permission is required for voice input.'),
+                                          ),
+                                        );
+                                      }
+                                      return;
+                                    }
+
+                                    if (!_isListening) {
+                                      debugPrint('🎤 Voice Input: Initializing speech recognition...');
+                                      final available = await _speech.initialize(
+                                        onStatus: (status) {
+                                          debugPrint('🎤 Voice Input: Status changed: $status');
+                                          if (mounted) {
+                                            if (status == 'done' ||
+                                                status == 'notListening' ||
+                                                status == 'canceled') {
+                                              debugPrint('🎤 Voice Input: Stopped listening');
+                                              setState(() => _isListening = false);
+                                              _speech.stop();
+                                            } else if (status == 'listening') {
+                                              debugPrint('🎤 Voice Input: Now listening...');
+                                              setState(() => _isListening = true);
+                                            }
+                                          }
+                                        },
+                                        onError: (error) {
+                                          debugPrint('❌ Voice Input Error: ${error.errorMsg}');
+                                          if (mounted) {
+                                            setState(() => _isListening = false);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Speech recognition error: ${error.errorMsg}'),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      );
+                                      
+                                      if (available) {
+                                        debugPrint('✅ Voice Input: Speech recognition available');
+                                        if (mounted) {
+                                          setState(() => _isListening = true);
+                                        }
+                                        debugPrint('🎤 Voice Input: Starting to listen...');
+                                        _speech.listen(
+                                          onResult: (result) {
+                                            debugPrint('🎤 Voice Input: Result - "${result.recognizedWords}" (final=${result.finalResult})');
+                                            if (mounted) {
+                                              setState(() {
+                                                _textController.text =
+                                                    result.recognizedWords;
+                                              });
+                                              if (result.recognizedWords.trim().isNotEmpty &&
+                                                  NLUParser.hasValidIntent(
+                                                      result.recognizedWords)) {
+                                                debugPrint('✅ Voice Input: Valid intent detected, updating preview');
+                                                _parsedPreview =
+                                                    NLUParser.parseReminderText(
+                                                        result.recognizedWords);
+                                              }
+                                            }
+                                          },
+                                          localeId: 'en_US',
+                                          listenMode: stt.ListenMode.confirmation,
+                                          cancelOnError: true,
+                                          partialResults: true,
+                                        );
+                                      } else {
+                                        debugPrint('❌ Voice Input: Speech recognition not available');
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  'Speech recognition is not available on this device.'),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    } else {
+                                      debugPrint('🎤 Voice Input: Stopping speech recognition...');
+                                      setState(() => _isListening = false);
+                                      await _speech.stop();
+                                      debugPrint('✅ Voice Input: Stopped listening');
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Stopped listening'),
+                                            duration: Duration(seconds: 1),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
                                 ),
-                              );
-                            }
+                        ),
+                        maxLines: 3,
+                        textCapitalization: TextCapitalization.sentences,
+                        autofocus: true,
+                        style: theme.textTheme.bodyLarge,
+                        onChanged: (text) {
+                          if (text.trim().isNotEmpty && NLUParser.hasValidIntent(text)) {
+                            setState(() {
+                              _parsedPreview = NLUParser.parseReminderText(text);
+                            });
+                          } else {
+                            setState(() {
+                              _parsedPreview = null;
+                            });
                           }
                         },
                       ),
-              ),
-              maxLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              autofocus: true,
-              onChanged: (text) {
-                // Show preview as user types
-                if (text.trim().isNotEmpty && NLUParser.hasValidIntent(text)) {
-                  setState(() {
-                    _parsedPreview = NLUParser.parseReminderText(text);
-                  });
-                } else {
-                  setState(() {
-                    _parsedPreview = null;
-                  });
-                }
-              },
-            ),
+                    ),
+                    const SizedBox(height: AppTheme.spacingMD),
 
-            const SizedBox(height: 16),
-
-            // Preview of parsed reminder
-            if (_parsedPreview != null) ...[
-              Card(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.preview, size: 20, color: Colors.grey[600]),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Preview',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey[700],
+                    // Premium preview card
+                    if (_parsedPreview != null)
+                      Container(
+                        padding: const EdgeInsets.all(AppTheme.spacingMD),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(AppTheme.radiusLG),
+                          border: Border.all(
+                            color: AppTheme.primaryColor.withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  size: 20,
+                                  color: AppTheme.primaryColor,
                                 ),
+                                const SizedBox(width: AppTheme.spacingSM),
+                                Text(
+                                  'Preview',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppTheme.spacingMD),
+                            Text(
+                              _parsedPreview!.text,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: AppTheme.spacingSM),
+                            Text(
+                              _parsedPreview!.getContextDescription(),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    const SizedBox(height: AppTheme.spacingXL),
+
+                    // Quick actions section
+                    if (_textController.text.isEmpty) ...[
+                      Text(
+                        'Quick start',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: AppTheme.spacingMD),
+                      Wrap(
+                        spacing: AppTheme.spacingSM,
+                        runSpacing: AppTheme.spacingSM,
+                        children: [
+                          _buildQuickActionChip(
+                            context,
+                            'Every Monday at 9am',
+                            Icons.calendar_today_rounded,
+                          ),
+                          _buildQuickActionChip(
+                            context,
+                            'When I leave home',
+                            Icons.home_rounded,
+                          ),
+                          _buildQuickActionChip(
+                            context,
+                            'Tomorrow at 5pm',
+                            Icons.schedule_rounded,
+                          ),
+                          _buildQuickActionChip(
+                            context,
+                            'Daily at 8am',
+                            Icons.repeat_rounded,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppTheme.spacingXL),
+                      
+                      // Examples section
                       Text(
-                        _parsedPreview!.text,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
+                        'Examples',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _parsedPreview!.getContextDescription(),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey[600],
+                      const SizedBox(height: AppTheme.spacingMD),
+                      ...NLUParser.getSuggestions('').take(4).map((phrase) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+                          decoration: BoxDecoration(
+                            color: theme.cardColor,
+                            borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                            border: Border.all(color: AppTheme.borderColor),
+                          ),
+                          child: ListTile(
+                            leading: Icon(
+                              Icons.lightbulb_outline_rounded,
+                              color: AppTheme.primaryColor,
+                              size: 20,
                             ),
-                      ),
+                            title: Text(
+                              phrase,
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _textController.text = phrase;
+                                if (NLUParser.hasValidIntent(phrase)) {
+                                  _parsedPreview = NLUParser.parseReminderText(phrase);
+                                }
+                              });
+                            },
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: AppTheme.spacingMD,
+                              vertical: 4,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                            ),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: AppTheme.spacingXL),
                     ],
-                  ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-            ],
-
-            // Quick action chips
-            Text(
-              'Quick Actions',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+            ),
+            
+            // Sticky create button
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spacingMD),
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
                   ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildQuickActionChip(
-                  context,
-                  'Every Monday at 9am',
-                  Icons.calendar_today,
-                ),
-                _buildQuickActionChip(
-                  context,
-                  'When I leave home',
-                  Icons.home,
-                ),
-                _buildQuickActionChip(
-                  context,
-                  'Tomorrow at 5pm',
-                  Icons.schedule,
-                ),
-                _buildQuickActionChip(
-                  context,
-                  'Daily at 8am',
-                  Icons.repeat,
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Help text
-            Text(
-              'Try to include context like time, place, or actions',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey[600],
-                  ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Sample phrases
-            Text(
-              'Examples:',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-
-            const SizedBox(height: 12),
-
-            ...NLUParser.getSuggestions('').map((phrase) {
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: const Icon(Icons.lightbulb_outline_rounded),
-                  title: Text(phrase),
-                  onTap: () {
-                    _textController.text = phrase;
-                  },
-                  dense: true,
-                ),
-              );
-            }),
-
-            const SizedBox(height: 32),
-
-            // Create button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isCreating ? null : _createReminder,
-                child: _isCreating
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
+                ],
+              ),
+              child: SafeArea(
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isCreating ? null : () {
+                      HapticFeedback.mediumImpact();
+                      _createReminder();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppTheme.spacingMD,
+                      ),
+                    ),
+                    child: _isCreating
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Create Reminder',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                      )
-                    : const Text('Create Reminder'),
+                  ),
+                ),
               ),
             ),
           ],
@@ -637,17 +729,47 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   }
 
   Widget _buildQuickActionChip(BuildContext context, String text, IconData icon) {
-    return ActionChip(
-      avatar: Icon(icon, size: 18),
-      label: Text(text),
-      onPressed: () {
-        setState(() {
-          _textController.text = text;
-          if (NLUParser.hasValidIntent(text)) {
-            _parsedPreview = NLUParser.parseReminderText(text);
-          }
-        });
-      },
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+        border: Border.all(color: AppTheme.borderColor),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() {
+              _textController.text = text;
+              if (NLUParser.hasValidIntent(text)) {
+                _parsedPreview = NLUParser.parseReminderText(text);
+              }
+            });
+          },
+          borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.spacingMD,
+              vertical: AppTheme.spacingSM,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 18, color: AppTheme.primaryColor),
+                const SizedBox(width: AppTheme.spacingSM),
+                Text(
+                  text,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

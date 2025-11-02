@@ -59,6 +59,7 @@ dev_dependencies:
   flutter_lints: ^3.0.1
   mockito: ^5.4.4
   build_runner: ^2.4.7
+  # device_preview: ^0.8.0  # Uncomment if you want to use DevicePreview for UI testing
 
 flutter:
   uses-material-design: true

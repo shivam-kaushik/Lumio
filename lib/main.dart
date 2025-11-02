@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -164,7 +165,11 @@ class _AwarelyAppState extends State<AwarelyApp> {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
-          return MaterialApp(
+          // Optionally wrap with DevicePreview for UI testing
+          // To enable, set USE_DEVICE_PREVIEW = true and uncomment below
+          const useDevicePreview = false;
+          
+          final app = MaterialApp(
             title: 'Awarely',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
@@ -172,6 +177,21 @@ class _AwarelyAppState extends State<AwarelyApp> {
             themeMode: themeProvider.themeMode,
             home: const SplashScreen(),
           );
+
+          // Enable DevicePreview in debug mode for UI preview
+          // Note: This is for UI layout testing only, not actual iOS runtime
+          if (kDebugMode && useDevicePreview) {
+            // Uncomment these lines to enable DevicePreview:
+            /*
+            return DevicePreview(
+              enabled: kDebugMode,
+              builder: (context) => app,
+            );
+            */
+            return app;
+          }
+          
+          return app;
         },
       ),
     );

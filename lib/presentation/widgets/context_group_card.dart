@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../data/models/reminder.dart';
-import '../../core/services/smart_bundling_service.dart';
+import '../../core/utils/date_time_utils.dart';
+import '../theme/app_theme.dart';
 import 'reminder_card.dart';
 
-/// Widget for displaying a group of reminders with context header
+/// Premium context group card with elegant section header
 class ContextGroupCard extends StatelessWidget {
   final String contextTitle;
   final List<Reminder> reminders;
@@ -29,8 +30,9 @@ class ContextGroupCard extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final icon = contextIcon != null ? contextIcon! : SmartBundlingService.getContextIcon(contextTitle);
-    final description = SmartBundlingService.getContextDescription(
+    final theme = Theme.of(context);
+    final icon = contextIcon ?? ReminderUtils.getContextIcon(contextTitle);
+    final description = ReminderUtils.getContextDescription(
       contextTitle,
       reminders,
     );
@@ -38,60 +40,105 @@ class ContextGroupCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Context header
+        // Premium section header
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.only(
+            left: AppTheme.spacingSM,
+            bottom: AppTheme.spacingMD,
+          ),
           child: Row(
             children: [
-              Text(
-                icon,
-                style: const TextStyle(fontSize: 20),
+              // Icon badge
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: _getContextColor(contextTitle).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                ),
+                child: Center(
+                  child: Text(
+                    icon,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppTheme.spacingSM),
+              // Title and count
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       contextTitle,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.2,
+                      ),
                     ),
                     if (description.isNotEmpty)
                       Text(
                         description,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey[600],
-                            ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
                       ),
                   ],
+                ),
+              ),
+              // Count badge
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacingSM,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusRound),
+                ),
+                child: Text(
+                  '${reminders.length}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
           ),
         ),
 
-        // Reminders in this group
+        // Reminders list
         ...reminders.map((reminder) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: ReminderCard(
-              reminder: reminder,
-              onTap: onReminderTap != null
-                  ? () => onReminderTap!(reminder)
-                  : null,
-              onToggle: onToggle != null
-                  ? (enabled) => onToggle!(reminder.id, enabled)
-                  : null,
-              onDelete: onDelete != null ? () => onDelete!(reminder.id) : null,
-            ),
+          return ReminderCard(
+            reminder: reminder,
+            onTap: onReminderTap != null
+                ? () => onReminderTap!(reminder)
+                : null,
+            onToggle: onToggle != null
+                ? (enabled) => onToggle!(reminder.id, enabled)
+                : null,
+            onDelete: onDelete != null ? () => onDelete!(reminder.id) : null,
           );
         }),
-
-        const SizedBox(height: 16),
       ],
     );
   }
-}
 
+  Color _getContextColor(String contextTitle) {
+    switch (contextTitle.toLowerCase()) {
+      case 'relevant now':
+        return AppTheme.primaryColor;
+      case 'time-based':
+        return AppTheme.timeColor;
+      case 'location-based':
+        return AppTheme.locationColor;
+      case 'recurring':
+        return AppTheme.secondaryColor;
+      default:
+        return AppTheme.textSecondary;
+    }
+  }
+}

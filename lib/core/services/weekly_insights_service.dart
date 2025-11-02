@@ -1,6 +1,4 @@
-import 'package:flutter/foundation.dart';
 import '../../data/repositories/reminder_repository.dart';
-import '../../data/models/context_event.dart';
 
 /// Service for analyzing weekly patterns and generating insights
 class WeeklyInsightsService {
