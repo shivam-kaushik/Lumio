@@ -23,7 +23,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   Position? _currentPosition;
-  String? _currentWifiSsid;
+  String? _currentActivity;
   bool _hideCompleted = true;
 
   @override
@@ -47,10 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       final homeService = HomeDetectionService();
-      final wifiSsid = await homeService.getCurrentWifiSsid();
-      setState(() {
-        _currentWifiSsid = wifiSsid;
-      });
     } catch (e) {
       debugPrint('Error updating context: $e');
     }
@@ -88,11 +84,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
 
                   final visibleReminders = reminderProvider.reminders;
-                  final groups = ReminderUtils.groupByContext(
-                    visibleReminders,
-                    currentPosition: _currentPosition,
-                    currentWifiSsid: _currentWifiSsid,
-                  );
+                         final groups = ReminderUtils.groupByContext(
+                           visibleReminders,
+                           currentPosition: _currentPosition,
+                         );
 
                   if (groups.isEmpty) {
                     return _buildEmptyState(context);
@@ -124,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 contextTitle: entry.key,
                                 reminders: entry.value,
                                 contextIcon: ReminderUtils.getContextIcon(entry.key),
+                                currentPosition: _currentPosition,
                                 onReminderTap: (reminder) async {
                                   final result = await showDialog<Reminder>(
                                     context: context,
@@ -146,9 +142,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                         }),
                         
-                        // Bottom padding
+                        // Bottom padding above bottom navigation bar
                         const SliverPadding(
-                          padding: EdgeInsets.only(bottom: 100),
+                          padding: EdgeInsets.only(bottom: 120),
                         ),
                       ],
                     ),

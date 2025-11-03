@@ -1,21 +1,15 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../../data/models/saved_location.dart';
 
 /// Service for intelligently detecting user's home location
-/// Uses multi-layered approach: Auto-learning + WiFi + GPS + Manual
+/// Uses GPS-based location detection with auto-learning and manual setup
 class HomeDetectionService {
   static const String _prefHomeLocation = 'home_location';
-  static const String _prefHomeWifiList = 'home_wifi_list';
   static const String _prefLocationVisits = 'location_visits';
   static const String _prefHomeDetectionMode = 'home_detection_mode';
-
-  static const _wifiChannel = MethodChannel('com.example.awarely/wifi');
 
   // Detection modes
   static const String modeAutomatic = 'automatic';
@@ -46,65 +40,6 @@ class HomeDetectionService {
     debugPrint('✅ Home location set manually: ${location.name}');
   }
 
-  /// Get list of WiFi networks associated with home
-  Future<List<String>> getHomeWifiNetworks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString(_prefHomeWifiList);
-
-    if (jsonString == null) return [];
-
-    try {
-      final List<dynamic> list = jsonDecode(jsonString);
-      return list.cast<String>();
-    } catch (e) {
-      debugPrint('❌ Error parsing home WiFi list: $e');
-      return [];
-    }
-  }
-
-  /// Add a WiFi network to home WiFi list
-  Future<void> addHomeWifiNetwork(String ssid) async {
-    final prefs = await SharedPreferences.getInstance();
-    final networks = await getHomeWifiNetworks();
-
-    if (!networks.contains(ssid)) {
-      networks.add(ssid);
-      await prefs.setString(_prefHomeWifiList, jsonEncode(networks));
-      debugPrint('✅ Added home WiFi: $ssid');
-    }
-  }
-
-  /// Remove a WiFi network from home WiFi list
-  Future<void> removeHomeWifiNetwork(String ssid) async {
-    final prefs = await SharedPreferences.getInstance();
-    final networks = await getHomeWifiNetworks();
-
-    if (networks.contains(ssid)) {
-      networks.remove(ssid);
-      await prefs.setString(_prefHomeWifiList, jsonEncode(networks));
-      debugPrint('✅ Removed home WiFi: $ssid');
-    }
-  }
-
-  /// Check if user is currently at home (WiFi-based)
-  Future<bool> isAtHomeViaWifi() async {
-    try {
-      // Get current WiFi SSID
-      final currentSsid = await getCurrentWifiSsid();
-      if (currentSsid == null) return false;
-
-      // Check against home WiFi list
-      final homeNetworks = await getHomeWifiNetworks();
-      final isHome = homeNetworks.contains(currentSsid);
-
-      debugPrint(
-          '📶 WiFi check: $currentSsid ${isHome ? "IS" : "is NOT"} home',);
-      return isHome;
-    } catch (e) {
-      debugPrint('❌ Error checking home WiFi: $e');
-      return false;
-    }
-  }
 
   /// Check if user is currently at home (GPS-based)
   Future<bool> isAtHomeViaGps() async {
@@ -133,48 +68,9 @@ class HomeDetectionService {
     }
   }
 
-  /// Check if user is at home (combines WiFi + GPS)
-  /// WiFi is preferred as it's faster and more battery efficient
+  /// Check if user is at home (GPS-based)
   Future<bool> isAtHome() async {
-    // Try WiFi first (fastest, most reliable)
-    final wifiResult = await isAtHomeViaWifi();
-    if (wifiResult) return true;
-
-    // Fallback to GPS if WiFi check failed
     return await isAtHomeViaGps();
-  }
-
-  /// Get current WiFi SSID
-  /// Note: iOS 13+ restricts WiFi SSID access (privacy feature)
-  /// On iOS, this will return null and rely on GPS-based detection
-  Future<String?> getCurrentWifiSsid() async {
-    try {
-      final connectivity = Connectivity();
-      final result = await connectivity.checkConnectivity();
-
-      if (result != ConnectivityResult.wifi) {
-        debugPrint('📶 Not connected to WiFi');
-        return null;
-      }
-
-      // Platform-specific handling
-      if (Platform.isIOS) {
-        // iOS 13+ restrictions: Can't read WiFi SSID without special entitlements
-        // Return null and rely on GPS-based home detection instead
-        debugPrint('📶 iOS: WiFi SSID unavailable due to iOS privacy restrictions');
-        debugPrint('📶 iOS: Using GPS-based home detection as fallback');
-        return null; // Or return a placeholder like 'wifi_connected'
-      }
-
-      // Android: Get SSID from native code
-      final ssid =
-          await _wifiChannel.invokeMethod<String>('getCurrentWifiSsid');
-      debugPrint('📶 Current WiFi SSID: ${ssid ?? "none"}');
-      return ssid;
-    } catch (e) {
-      debugPrint('❌ Error getting WiFi SSID: $e');
-      return null;
-    }
   }
 
   /// Learn home location automatically based on user behavior
@@ -278,38 +174,18 @@ class HomeDetectionService {
     }
   }
 
-  /// Learn home WiFi automatically
-  /// If user is at home (GPS) and connected to WiFi, remember that WiFi
-  Future<void> learnHomeWifi() async {
-    try {
-      final isHome = await isAtHomeViaGps();
-      if (!isHome) return;
 
-      final ssid = await getCurrentWifiSsid();
-      if (ssid == null) return;
-
-      // Add this WiFi to home networks
-      await addHomeWifiNetwork(ssid);
-      debugPrint('🏠 Learned home WiFi: $ssid');
-    } catch (e) {
-      debugPrint('❌ Error learning home WiFi: $e');
-    }
-  }
-
-  /// Setup wizard: Ask user to set home location and WiFi
+  /// Setup wizard: Check if home location is set
   Future<Map<String, dynamic>> getSetupStatus() async {
     final home = await getHomeLocation();
-    final wifiNetworks = await getHomeWifiNetworks();
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString(_prefHomeDetectionMode);
 
     return {
       'hasHomeLocation': home != null,
       'homeLocation': home?.toMap(),
-      'hasHomeWifi': wifiNetworks.isNotEmpty,
-      'homeWifiNetworks': wifiNetworks,
       'detectionMode': mode ?? 'none',
-      'isFullySetup': home != null || wifiNetworks.isNotEmpty,
+      'isFullySetup': home != null,
     };
   }
 
@@ -317,7 +193,6 @@ class HomeDetectionService {
   Future<void> resetHomeData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_prefHomeLocation);
-    await prefs.remove(_prefHomeWifiList);
     await prefs.remove(_prefLocationVisits);
     await prefs.remove(_prefHomeDetectionMode);
     debugPrint('🗑️ Reset all home detection data');
@@ -326,20 +201,14 @@ class HomeDetectionService {
   /// Get debug information
   Future<Map<String, dynamic>> getDebugInfo() async {
     final home = await getHomeLocation();
-    final wifiNetworks = await getHomeWifiNetworks();
-    final currentSsid = await getCurrentWifiSsid();
-    final isHomeWifi = await isAtHomeViaWifi();
     final isHomeGps = await isAtHomeViaGps();
     final prefs = await SharedPreferences.getInstance();
     final visits = prefs.getString(_prefLocationVisits);
 
     return {
       'homeLocation': home?.toMap(),
-      'homeWifiNetworks': wifiNetworks,
-      'currentWifiSsid': currentSsid,
-      'isAtHomeViaWifi': isHomeWifi,
       'isAtHomeViaGps': isHomeGps,
-      'isAtHome': isHomeWifi || isHomeGps,
+      'isAtHome': isHomeGps,
       'detectionMode': prefs.getString(_prefHomeDetectionMode),
       'totalLocationVisits': visits != null
           ? (jsonDecode(visits) as Map)

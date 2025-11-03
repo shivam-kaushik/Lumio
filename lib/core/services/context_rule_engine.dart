@@ -26,7 +26,6 @@ class ContextRuleEngine {
   Future<RuleEvaluationResult> evaluateReminder(Reminder reminder, {
     DateTime? currentTime,
     Position? currentPosition,
-    String? currentWifiSsid,
   }) async {
     if (kDebugMode) {
       print('');
@@ -50,7 +49,6 @@ class ContextRuleEngine {
     final locationResult = await _evaluateLocationCondition(
       reminder,
       currentPosition: currentPosition,
-      currentWifiSsid: currentWifiSsid,
     );
     conditions['location'] = locationResult['met'] as bool;
     details['location'] = locationResult['details'] as String;
@@ -152,7 +150,6 @@ class ContextRuleEngine {
   Future<Map<String, dynamic>> _evaluateLocationCondition(
     Reminder reminder, {
     Position? currentPosition,
-    String? currentWifiSsid,
   }) async {
     // Check if reminder has location-based trigger
     if (reminder.geofenceId == null && 

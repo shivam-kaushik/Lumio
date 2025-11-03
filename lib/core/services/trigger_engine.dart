@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../data/models/reminder.dart';
+import 'weather_service.dart';
 import '../../data/models/context_event.dart';
 import '../../data/repositories/reminder_repository.dart';
 import '../../core/constants/app_constants.dart';
@@ -19,6 +20,7 @@ class TriggerEngine {
   final ReminderRepository _reminderRepository;
   final NotificationService _notificationService;
   final HomeDetectionService _homeService = HomeDetectionService();
+  final WeatherService _weatherService = WeatherService();
   final ActivityRecognitionService _activityService = ActivityRecognitionService();
 
   StreamSubscription<Position>? _positionSubscription;
@@ -34,10 +36,11 @@ class TriggerEngine {
   })  : _reminderRepository = reminderRepository,
         _notificationService = notificationService;
 
-  /// Start monitoring context (location + wifi + activity)
+  /// Start monitoring context (location + activity)
   Future<void> startMonitoring() async {
     await _startLocationMonitoring();
-    await _startWifiMonitoring();
+    // Initialize home status
+    _wasAtHome = await _homeService.isAtHome();
     await _startActivityMonitoring();
   }
 
@@ -237,16 +240,6 @@ class TriggerEngine {
     _previousActivity = currentActivityName;
   }
 
-  /// Get current WiFi SSID from home service
-  Future<String?> getCurrentWifiSsid() async {
-    return await _homeService.getCurrentWifiSsid();
-  }
-
-  /// Check if user is on home WiFi
-  Future<bool> isOnHomeWifi() async {
-    return await _homeService.isAtHomeViaWifi();
-  }
-
   Future<bool> _checkLocationPermission() async {
     LocationPermission permission = await Geolocator.checkPermission();
 
@@ -295,6 +288,8 @@ class TriggerEngine {
       {bool leaving = false, bool arriving = false,}) async {
     final reminders = await _reminderRepository.getActiveReminders();
     final isAtHome = await _homeService.isAtHome();
+    final currentPos = _currentPosition ??
+        (await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium));
 
     if (kDebugMode) {
       print(
@@ -314,6 +309,22 @@ class TriggerEngine {
 
       // Handle leaving home
       if (leaving && reminder.onLeaveContext && !isAtHome) {
+        // Weather gate: if reminder requires rain, check weather now
+        if (reminder.weatherCondition == 'rain') {
+          if (currentPos != null) {
+            final w = await _weatherService.fetchCurrentWeather(
+              latitude: currentPos.latitude,
+              longitude: currentPos.longitude,
+            );
+            final raining = (w != null) && _weatherService.isRaining(w);
+            if (!raining) {
+              if (kDebugMode) {
+                print('  🌦️ Skipping (not raining) for weather-based reminder: ${reminder.text}');
+              }
+              continue;
+            }
+          }
+        }
         if (kDebugMode) {
           print('  🔔 TRIGGERING "leaving home" reminder: ${reminder.text}');
         }

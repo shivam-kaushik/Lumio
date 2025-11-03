@@ -96,6 +96,7 @@ class DatabaseHelper {
         wifiSsid TEXT,
         onLeaveContext INTEGER DEFAULT 0,
         onArriveContext INTEGER DEFAULT 0,
+        weatherCondition TEXT,
         enabled INTEGER DEFAULT 1,
         createdAt TEXT NOT NULL,
         lastTriggeredAt TEXT,
@@ -344,6 +345,17 @@ class DatabaseHelper {
         ''');
       } catch (e) {
         print('learning_patterns table already exists or error: $e');
+      }
+    }
+
+    if (oldVersion < 7) {
+      // Add weatherCondition to reminders
+      try {
+        await db.execute(
+          'ALTER TABLE ${AppConstants.remindersTable} ADD COLUMN weatherCondition TEXT',
+        );
+      } catch (e) {
+        print('weatherCondition column already exists or error: $e');
       }
     }
   }

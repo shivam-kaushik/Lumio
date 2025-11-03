@@ -296,7 +296,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(AppTheme.spacingMD),
+      padding: const EdgeInsets.fromLTRB(
+        AppTheme.spacingMD,
+        AppTheme.spacingMD,
+        AppTheme.spacingMD,
+        120, // keep above bottom nav bar
+      ),
       children: [
         // Date header
         Padding(

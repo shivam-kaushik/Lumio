@@ -121,7 +121,12 @@ class _SettingsScreenState extends State<SettingsScreen>
         onRefresh: _refreshStatuses,
         color: AppTheme.primaryColor,
         child: ListView(
-          padding: const EdgeInsets.all(AppTheme.spacingMD),
+          padding: const EdgeInsets.fromLTRB(
+            AppTheme.spacingMD,
+            AppTheme.spacingMD,
+            AppTheme.spacingMD,
+            120, // keep above bottom nav bar
+          ),
           children: [
             // Theme Settings - Premium section header
             Padding(

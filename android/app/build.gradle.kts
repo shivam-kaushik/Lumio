@@ -22,6 +22,11 @@ android {
         jvmTarget = "17"
     }
 
+    // Provide Google Maps API key to AndroidManifest via placeholders
+    val mapsKey: String? = System.getenv("GOOGLE_MAPS_API_KEY")
+        ?: project.findProperty("GOOGLE_MAPS_API_KEY") as String?
+        ?: project.findProperty("MAPS_API_KEY") as String?
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.awarely"
@@ -32,6 +37,9 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
+
+        // Inject placeholder for AndroidManifest.xml meta-data
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = mapsKey ?: ""
     }
 
     buildTypes {
@@ -48,6 +56,9 @@ android {
 dependencies {
     // Core library desugaring (provides java.time and other JDK APIs on older devices)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+    
+    // Google Maps for Android
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
 }
 
 flutter {

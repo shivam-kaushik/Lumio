@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../screens/home_screen.dart';
 import '../screens/analytics_screen.dart';
 import '../screens/calendar_screen.dart';
+import '../screens/map_view_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/add_reminder_screen.dart';
 import '../theme/app_theme.dart';
@@ -28,6 +29,7 @@ class _MainNavigatorState extends State<MainNavigator>
     const HomeScreen(), // Reminders list
     const AnalyticsScreen(), // Stats
     const CalendarScreen(), // Calendar
+    const MapViewScreen(), // Map View
     const SettingsScreen(), // Settings
   ];
 
@@ -49,6 +51,12 @@ class _MainNavigatorState extends State<MainNavigator>
       icon: Icons.calendar_today_outlined,
       activeIcon: Icons.calendar_today_rounded,
       label: 'Calendar',
+      badge: null,
+    ),
+    NavigationTab(
+      icon: Icons.map_outlined,
+      activeIcon: Icons.map_rounded,
+      label: 'Map',
       badge: null,
     ),
     NavigationTab(

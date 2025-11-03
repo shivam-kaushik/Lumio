@@ -7,7 +7,7 @@ class AppConstants {
 
   // Database
   static const String dbName = 'awarely.db';
-  static const int dbVersion = 6; // Updated for reminder occurrences tracking
+  static const int dbVersion = 7; // Weather condition support
 
   // Tables
   static const String remindersTable = 'reminders';
@@ -78,5 +78,6 @@ class AppConstants {
     'Remind me to call Mom at 8 PM',
     'Remind me to carry my ID when leaving for work',
     'Remind me to drink water every 2 hours',
+    "Remind me to take umbrella when it's raining",
   ];
 }

@@ -95,6 +95,28 @@ class NLUParser {
     final cleanText = _cleanReminderText(text);
     debugPrint('   Clean text: "$cleanText"');
 
+    // Weather intent parsing
+    debugPrint('');
+    debugPrint('🌦️ Detecting weather intents...');
+    String? weatherCondition;
+    if (lowerText.contains("when it's raining") ||
+        lowerText.contains('when its raining') ||
+        lowerText.contains('when raining') ||
+        lowerText.contains('if raining') ||
+        lowerText.contains('when it rains') ||
+        lowerText.contains('if it rains') ||
+        (lowerText.contains('umbrella') && (lowerText.contains('rain') || lowerText.contains("raining")))) {
+      weatherCondition = 'rain';
+      // If user didn't specify movement, default to leaving home
+      if (!onLeaveContext && !onArriveContext) {
+        onLeaveContext = true;
+        locationName ??= 'home';
+      }
+      debugPrint('   ✅ Weather condition detected: rain');
+    } else {
+      debugPrint('   ❌ No weather condition detected');
+    }
+
     debugPrint('');
     debugPrint('📦 Creating Reminder object...');
     debugPrint('   text: "$cleanText"');
@@ -111,6 +133,7 @@ class NLUParser {
       geofenceId: locationName,
       onLeaveContext: onLeaveContext,
       onArriveContext: onArriveContext,
+      weatherCondition: weatherCondition,
       repeatInterval: repeatInterval,
       repeatUnit: repeatUnit,
       repeatOnDays: daysOfWeek,

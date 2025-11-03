@@ -151,6 +151,7 @@ class Reminder {
   final String? wifiSsid;
   final bool onLeaveContext;
   final bool onArriveContext;
+  final String? weatherCondition; // e.g., 'rain'
   final bool enabled;
   final DateTime createdAt;
   final DateTime? lastTriggeredAt;
@@ -192,6 +193,7 @@ class Reminder {
     this.wifiSsid,
     this.onLeaveContext = false,
     this.onArriveContext = false,
+    this.weatherCondition,
     this.enabled = true,
     DateTime? createdAt,
     this.lastTriggeredAt,
@@ -228,6 +230,7 @@ class Reminder {
       wifiSsid: map['wifiSsid'] as String?,
       onLeaveContext: (map['onLeaveContext'] as int) == 1,
       onArriveContext: (map['onArriveContext'] as int) == 1,
+      weatherCondition: map['weatherCondition'] as String?,
       enabled: (map['enabled'] as int) == 1,
       createdAt: DateTime.parse(map['createdAt'] as String),
       lastTriggeredAt: map['lastTriggeredAt'] != null
@@ -284,6 +287,7 @@ class Reminder {
       'wifiSsid': wifiSsid,
       'onLeaveContext': onLeaveContext ? 1 : 0,
       'onArriveContext': onArriveContext ? 1 : 0,
+      'weatherCondition': weatherCondition,
       'enabled': enabled ? 1 : 0,
       'createdAt': createdAt.toIso8601String(),
       'lastTriggeredAt': lastTriggeredAt?.toIso8601String(),
@@ -356,6 +360,9 @@ class Reminder {
     if (wifiSsid != null) {
       parts.add('via Wi-Fi: $wifiSsid');
     }
+    if (weatherCondition != null) {
+      parts.add('if ${weatherCondition}');
+    }
 
     if (isPaused) {
       parts.add('⏸️ Paused');
@@ -409,6 +416,7 @@ class Reminder {
     String? wifiSsid,
     bool? onLeaveContext,
     bool? onArriveContext,
+    String? weatherCondition,
     bool? enabled,
     DateTime? lastTriggeredAt,
     int? triggerCount,
@@ -436,6 +444,7 @@ class Reminder {
       wifiSsid: wifiSsid ?? this.wifiSsid,
       onLeaveContext: onLeaveContext ?? this.onLeaveContext,
       onArriveContext: onArriveContext ?? this.onArriveContext,
+      weatherCondition: weatherCondition ?? this.weatherCondition,
       enabled: enabled ?? this.enabled,
       createdAt: createdAt,
       lastTriggeredAt: lastTriggeredAt ?? this.lastTriggeredAt,

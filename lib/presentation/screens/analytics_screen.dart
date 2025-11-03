@@ -105,7 +105,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               }
 
               return SingleChildScrollView(
-                padding: const EdgeInsets.all(AppTheme.spacingLG),
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.spacingLG,
+                  AppTheme.spacingLG,
+                  AppTheme.spacingLG,
+                  120, // prevent content behind bottom nav bar
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -239,6 +244,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     )),
                   ],
                 ],
+                // Bottom spacer to ensure scrollable area above nav bar
+                const SizedBox(height: 16),
               ],
                 ),
               );

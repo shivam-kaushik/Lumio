@@ -29,6 +29,7 @@ dependencies:
   geofence_service: ^6.0.0+1
   connectivity_plus: ^5.0.2
   permission_handler: ^11.1.0
+  google_maps_flutter: ^2.5.0
   
   # Background Tasks
   workmanager: ^0.6.0

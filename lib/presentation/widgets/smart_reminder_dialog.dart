@@ -4,6 +4,7 @@ import 'priority_selector.dart';
 import 'category_selector.dart';
 import 'time_selectors.dart';
 import '../screens/home_setup_screen.dart';
+import '../screens/map_view_screen.dart';
 import '../../core/services/home_detection_service.dart';
 import 'package:flutter/foundation.dart';
 import '../../data/models/saved_location.dart';
@@ -775,16 +776,25 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
                   );
 
                   if (shouldSetup == true) {
-                    // Open HomeSetupScreen and then attempt to fetch home
-                    await Navigator.push(
+                    // Navigate to map view to select location (for location selection only)
+                    final locationResult = await Navigator.push<Map<String, dynamic>>(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const HomeSetupScreen(),
+                        builder: (context) => const MapViewScreen(),
+                        settings: const RouteSettings(
+                          arguments: true, // Indicates this is for location selection only
+                        ),
                       ),
                     );
-                    await _applyHomeLocationFromService();
-                    if (_geofenceLat != null) {
-                      setState(() => _enableLocation = true);
+                    
+                    if (locationResult != null && mounted) {
+                      setState(() {
+                        _geofenceLat = locationResult['latitude'] as double?;
+                        _geofenceLng = locationResult['longitude'] as double?;
+                        _geofenceRadius = locationResult['radius'] as double? ?? 100.0;
+                        _locationContext = locationResult['locationName'] as String?;
+                        _enableLocation = true;
+                      });
                     }
                   }
                 } else {
@@ -806,19 +816,30 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  OutlinedButton(
+                  OutlinedButton.icon(
                     onPressed: () async {
-                      // Allow user to (re)open home setup and fetch location
-                      await Navigator.push(
+                      // Navigate to map view to select/update location (for location selection only)
+                      final locationResult = await Navigator.push<Map<String, dynamic>>(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const HomeSetupScreen(),
+                          builder: (context) => const MapViewScreen(),
+                          settings: const RouteSettings(
+                            arguments: true, // Indicates this is for location selection only
+                          ),
                         ),
                       );
-                      await _applyHomeLocationFromService();
-                      if (mounted) setState(() {});
+                      
+                      if (locationResult != null && mounted) {
+                        setState(() {
+                          _geofenceLat = locationResult['latitude'] as double?;
+                          _geofenceLng = locationResult['longitude'] as double?;
+                          _geofenceRadius = locationResult['radius'] as double? ?? 100.0;
+                          _locationContext = locationResult['locationName'] as String?;
+                        });
+                      }
                     },
-                    child: const Text('Set / Update'),
+                    icon: const Icon(Icons.map_rounded),
+                    label: const Text('Select on Map'),
                   ),
                 ],
               ),

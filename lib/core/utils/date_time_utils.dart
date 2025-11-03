@@ -165,7 +165,6 @@ class ReminderUtils {
   static Map<String, List<Reminder>> groupByContext(
     List<Reminder> reminders, {
     Position? currentPosition,
-    String? currentWifiSsid,
     DateTime? currentTime,
   }) {
     final groups = <String, List<Reminder>>{
@@ -181,42 +180,14 @@ class ReminderUtils {
     for (var reminder in reminders) {
       if (!reminder.enabled) continue;
 
-      // Check if reminder is relevant right now
-      bool isRelevantNow = false;
+      // Note: Location-based reminders should always be grouped under "Location-Based",
+      // regardless of proximity. Do not add them to "Relevant Now" based on distance.
 
-      // Check location-based relevance
-      if (currentPosition != null &&
-          reminder.geofenceLat != null &&
-          reminder.geofenceLng != null) {
-        final distance = Geolocator.distanceBetween(
-          currentPosition.latitude,
-          currentPosition.longitude,
-          reminder.geofenceLat!,
-          reminder.geofenceLng!,
-        );
-
-        final radius = reminder.geofenceRadius ?? 100.0;
-        if (distance <= radius) {
-          isRelevantNow = true;
-          groups['Relevant Now']!.add(reminder);
-          continue;
-        }
-      }
-
-      // Check WiFi-based relevance
-      if (currentWifiSsid != null && reminder.wifiSsid != null) {
-        if (currentWifiSsid == reminder.wifiSsid) {
-          isRelevantNow = true;
-          groups['Relevant Now']!.add(reminder);
-          continue;
-        }
-      }
 
       // Check time-based relevance (within next hour)
-      if (reminder.timeAt != null && !isRelevantNow) {
+      if (reminder.timeAt != null) {
         final timeDiff = reminder.timeAt!.difference(now).inMinutes;
         if (timeDiff >= 0 && timeDiff <= 60) {
-          isRelevantNow = true;
           groups['Relevant Now']!.add(reminder);
           continue;
         }
@@ -231,7 +202,9 @@ class ReminderUtils {
       // Group by type
       if (reminder.isRecurring) {
         groups['Recurring']!.add(reminder);
-      } else if (reminder.geofenceId != null) {
+      } else if (reminder.geofenceId != null ||
+                 reminder.geofenceLat != null ||
+                 reminder.geofenceLng != null) {
         groups['Location-Based']!.add(reminder);
       } else {
         groups['Other']!.add(reminder);
@@ -248,13 +221,11 @@ class ReminderUtils {
   static List<Reminder> getRelevantReminders(
     List<Reminder> allReminders, {
     Position? currentPosition,
-    String? currentWifiSsid,
     DateTime? currentTime,
   }) {
     final groups = groupByContext(
       allReminders,
       currentPosition: currentPosition,
-      currentWifiSsid: currentWifiSsid,
       currentTime: currentTime,
     );
 

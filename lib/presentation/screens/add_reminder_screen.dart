@@ -91,9 +91,8 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                 title: const Text('🏠 Home Setup Required'),
                 content: const Text(
                   'This reminder needs to know your home location. Would you like to set it up now?\n\n'
-                  'Quick setup takes just 2 steps:\n'
-                  '✓ Add your home WiFi\n'
-                  '✓ Set your GPS location',
+                  'Quick setup:\n'
+                  '✓ Set your home GPS location on the map',
                 ),
                 actions: [
                   TextButton(
