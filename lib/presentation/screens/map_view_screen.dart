@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -27,6 +29,7 @@ class _MapViewScreenState extends State<MapViewScreen> {
   Position? _currentPosition;
   Set<Marker> _markers = {};
   Set<Circle> _circles = {};
+  MapType _mapType = MapType.normal;
   final HomeDetectionService _homeService = HomeDetectionService();
   final PlacesService _placesService = PlacesService();
   final WeatherService _weatherService = WeatherService();
@@ -45,6 +48,12 @@ class _MapViewScreenState extends State<MapViewScreen> {
   IconData? _weatherIcon;
   double? _weatherTempC;
 
+  // Map initialization state
+  bool _mapInitialized = false;
+  bool _mapLoadError = false;
+  DateTime? _mapLoadStartTime;
+  bool _tilesLoaded = false; // Track if map tiles are actually visible
+
   @override
   void initState() {
     super.initState();
@@ -62,9 +71,53 @@ class _MapViewScreenState extends State<MapViewScreen> {
       await _updateMapMarkers();
       await _updateWeather();
       debugPrint('🗺️ MapViewScreen: Map markers updated: ${_markers.length} markers, ${_circles.length} circles');
+      await _logMapDiagnostics('initialize-complete');
     } catch (e, stackTrace) {
       debugPrint('❌ MapViewScreen: Error in _initializeMap: $e');
       debugPrint('Stack trace: $stackTrace');
+    }
+  }
+
+  /// Force map tiles to refresh by briefly switching map type
+  Future<void> _forceMapRefresh() async {
+    if (_mapController == null) return;
+    try {
+      debugPrint('🗺️ MapViewScreen: Forcing map tiles refresh by toggling map type');
+      setState(() => _mapType = MapType.none);
+      await Future.delayed(const Duration(milliseconds: 150));
+      if (!mounted) return;
+      setState(() => _mapType = MapType.normal);
+      unawaited(_logMapDiagnostics('forceMapRefresh'));
+    } catch (e) {
+      debugPrint('⚠️ MapViewScreen: Failed to force map refresh: $e');
+    }
+  }
+
+  Future<void> _logMapDiagnostics(String label) async {
+    try {
+      debugPrint(
+        '🧭 MapDiagnostics[$label]: mapInitialized=$_mapInitialized, '
+        'tilesLoaded=$_tilesLoaded, mapLoadError=$_mapLoadError, '
+        'mapType=$_mapType, markers=${_markers.length}, circles=${_circles.length}, '
+        'currentPosition=$_currentPosition, mapLoadStart=$_mapLoadStartTime',
+      );
+
+      if (_mapController == null) {
+        debugPrint('🧭 MapDiagnostics[$label]: mapController is null');
+        return;
+      }
+
+      final zoom = await _mapController!.getZoomLevel();
+      final visibleRegion = await _mapController!.getVisibleRegion();
+      debugPrint(
+        '🧭 MapDiagnostics[$label]: controller ok, zoom=${zoom.toStringAsFixed(2)}, '
+        'visibleRegion NE(${visibleRegion.northeast.latitude.toStringAsFixed(5)}, '
+        '${visibleRegion.northeast.longitude.toStringAsFixed(5)}) '
+        'SW(${visibleRegion.southwest.latitude.toStringAsFixed(5)}, '
+        '${visibleRegion.southwest.longitude.toStringAsFixed(5)})',
+      );
+    } catch (e) {
+      debugPrint('⚠️ MapDiagnostics[$label]: Failed to gather diagnostics: $e');
     }
   }
 
@@ -621,6 +674,7 @@ class _MapViewScreenState extends State<MapViewScreen> {
                       color: AppTheme.textSecondary,
                     ),
                     onPressed: () async {
+                      await _forceMapRefresh(); // refresh tiles first
                       await _updateCurrentLocation();
                       await _loadLocationReminders();
                       await _updateMapMarkers();
@@ -775,6 +829,22 @@ class _MapViewScreenState extends State<MapViewScreen> {
               debugPrint('   Current position: ${_currentPosition?.latitude}, ${_currentPosition?.longitude}');
               debugPrint('   Markers count: ${_markers.length}');
               debugPrint('   Circles count: ${_circles.length}');
+              debugPrint('   Map initialized: $_mapInitialized');
+              
+              // Start timeout timer if not already started
+              if (_mapLoadStartTime == null) {
+                _mapLoadStartTime = DateTime.now();
+                // Set a timeout to detect if map never loads (10 seconds)
+                Future.delayed(const Duration(seconds: 10), () {
+                  if (mounted && !_mapInitialized) {
+                    debugPrint('⚠️ MapViewScreen: Map failed to initialize after 10 seconds');
+                    setState(() {
+                      _mapLoadError = true;
+                    });
+                    unawaited(_logMapDiagnostics('timeout-no-init'));
+                  }
+                });
+              }
               
               final isForLocationSelection = ModalRoute.of(context)?.settings.arguments as bool? ?? false;
               return Stack(
@@ -791,25 +861,84 @@ class _MapViewScreenState extends State<MapViewScreen> {
                     circles: _circles,
                     myLocationEnabled: true,
                     myLocationButtonEnabled: false,
-                    mapType: MapType.normal,
+                    mapType: _mapType,
                     onMapCreated: (GoogleMapController controller) async {
                       debugPrint('🗺️ MapViewScreen: onMapCreated called - map is ready!');
                       _mapController = controller;
+                      setState(() {
+                        _mapInitialized = true;
+                        _mapLoadError = false;
+                      });
+                      unawaited(_logMapDiagnostics('onMapCreated'));
                       debugPrint('🗺️ MapViewScreen: Map controller set, updating markers...');
                       // Update markers after map is ready
                       await _updateMapMarkers();
                       debugPrint('🗺️ MapViewScreen: Markers updated after map creation');
+                      // Force a tiles refresh once after creation (helps if tiles are stuck)
+                      await _forceMapRefresh();
+                      
+                      // Check if tiles loaded after a delay (API key validation)
+                      Future.delayed(const Duration(seconds: 3), () {
+                        if (mounted) {
+                          // If map is initialized but we haven't detected tiles, likely API key issue
+                          if (_mapInitialized && !_tilesLoaded) {
+                            debugPrint('⚠️ MapViewScreen: Map initialized but tiles not detected - possible API key issue');
+                            setState(() {
+                              _mapLoadError = true;
+                            });
+                            unawaited(_logMapDiagnostics('tiles-missing-detected'));
+                          }
+                        }
+                      });
                     },
                     onCameraIdle: () {
                       debugPrint('🗺️ MapViewScreen: Camera idle');
+                      // Mark as initialized when camera becomes idle (map is fully loaded)
+                      if (!_mapInitialized) {
+                        setState(() {
+                          _mapInitialized = true;
+                          _mapLoadError = false;
+                        });
+                      }
+                      // Camera idle usually means tiles are loaded
+                      if (!_tilesLoaded) {
+                        setState(() {
+                          _tilesLoaded = true;
+                          _mapLoadError = false;
+                        });
+                        debugPrint('✅ MapViewScreen: Map tiles detected');
+                        unawaited(_logMapDiagnostics('camera-idle'));
+                      }
                     },
                     onTap: (LatLng position) {
                       debugPrint('🗺️ MapViewScreen: Map tapped at: ${position.latitude}, ${position.longitude}');
                       _handleMapTap(position);
                     },
                   ),
-                  // Error overlay if map fails to load
-                  if (_markers.isEmpty && _locationReminders.isNotEmpty)
+                  // Loading overlay if map hasn't initialized yet
+                  if (!_mapInitialized && !_mapLoadError)
+                    Positioned.fill(
+                      child: Container(
+                        color: AppTheme.backgroundColor,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const CircularProgressIndicator(),
+                              const SizedBox(height: AppTheme.spacingMD),
+                              Text(
+                                'Loading map...',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Error overlay if map fails to load or tiles don't appear
+                  if (_mapLoadError || (!_tilesLoaded && _mapInitialized && _mapLoadStartTime != null && DateTime.now().difference(_mapLoadStartTime!).inSeconds > 5))
                     Positioned(
                       top: 20,
                       left: 20,
@@ -817,7 +946,7 @@ class _MapViewScreenState extends State<MapViewScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(AppTheme.spacingMD),
                         decoration: BoxDecoration(
-                          color: AppTheme.warningColor.withOpacity(0.9),
+                          color: AppTheme.warningColor.withOpacity(0.95),
                           borderRadius: BorderRadius.circular(AppTheme.radiusLG),
                           boxShadow: AppTheme.getElevationShadow(2),
                         ),
@@ -827,7 +956,7 @@ class _MapViewScreenState extends State<MapViewScreen> {
                           children: [
                             Row(
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.warning_rounded,
                                   color: Colors.white,
                                   size: 20,
@@ -835,22 +964,82 @@ class _MapViewScreenState extends State<MapViewScreen> {
                                 const SizedBox(width: AppTheme.spacingSM),
                                 Expanded(
                                   child: Text(
-                                    'Google Maps API Key Required',
+                                    'Google Maps API Key Issue',
                                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                                  onPressed: () {
+                                    setState(() {
+                                      _mapLoadError = false;
+                                    });
+                                  },
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
                               ],
                             ),
                             const SizedBox(height: AppTheme.spacingXS),
                             Text(
-                              'To view location reminders on the map, please add your Google Maps API key. See GOOGLE_MAPS_SETUP.md for instructions.',
+                              'Map tiles are not loading. This usually means:\n\n'
+                              '1. API key is missing or invalid\n'
+                              '   → Add GOOGLE_MAPS_API_KEY to android/local.properties\n'
+                              '   → Or set it as an environment variable\n\n'
+                              '2. API key restrictions are too strict\n'
+                              '   → Check Google Cloud Console\n'
+                              '   → Ensure Maps SDK for Android is enabled\n'
+                              '   → Verify package name: com.example.awarely\n\n'
+                              '3. Billing not enabled\n'
+                              '   → Enable billing in Google Cloud Console\n\n'
+                              'After fixing, run: flutter clean && flutter run',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: Colors.white,
-                                fontSize: 12,
+                                fontSize: 11,
+                                height: 1.4,
                               ),
+                            ),
+                            const SizedBox(height: AppTheme.spacingSM),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _mapLoadError = false;
+                                        _tilesLoaded = false;
+                                        _mapInitialized = false;
+                                        _mapLoadStartTime = null;
+                                      });
+                                    unawaited(_logMapDiagnostics('retry-button'));
+                                      _initializeMap();
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: AppTheme.warningColor,
+                                    ),
+                                    child: const Text('Retry'),
+                                  ),
+                                ),
+                                const SizedBox(width: AppTheme.spacingSM),
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () async {
+                                      // Force refresh tiles
+                                      await _forceMapRefresh();
+                                      unawaited(_logMapDiagnostics('manual-refresh-tiles'));
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                      side: const BorderSide(color: Colors.white),
+                                    ),
+                                    child: const Text('Refresh Tiles'),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

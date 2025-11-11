@@ -73,7 +73,7 @@ class _ReminderCardState extends State<ReminderCard>
     return ScaleTransition(
       scale: _scaleAnimation,
       child: Container(
-        margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
+        margin: const EdgeInsets.only(bottom: 6), // Further reduced
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(AppTheme.radiusLG),
@@ -89,16 +89,16 @@ class _ReminderCardState extends State<ReminderCard>
         ),
         child: Material(
           color: Colors.transparent,
-          child: InkWell(
+      child: InkWell(
             onTap: widget.onTap,
             onTapDown: _handleTapDown,
             onTapUp: _handleTapUp,
             onTapCancel: _handleTapCancel,
             borderRadius: BorderRadius.circular(AppTheme.radiusLG),
-            child: Padding(
+        child: Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: AppTheme.spacingMD,
-                vertical: AppTheme.spacingMD,
+                horizontal: 12, // Reduced from spacingMD
+                vertical: 8, // Further reduced
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -116,10 +116,10 @@ class _ReminderCardState extends State<ReminderCard>
                         },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
+                          width: 20, // Reduced from 24
+                          height: 20, // Reduced from 24
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
                             border: Border.all(
                               color: isCompleted
                                   ? AppTheme.successColor
@@ -134,7 +134,7 @@ class _ReminderCardState extends State<ReminderCard>
                               ? const Icon(
                                   Icons.check_rounded,
                                   color: Colors.white,
-                                  size: 16,
+                                  size: 14, // Reduced from 16
                                 )
                               : null,
                         ),
@@ -142,15 +142,16 @@ class _ReminderCardState extends State<ReminderCard>
                     },
                   ),
                   
-                  const SizedBox(width: AppTheme.spacingMD),
+                  const SizedBox(width: 10), // Reduced from spacingMD
                   
                   // Reminder text - Center (expanded)
                   Expanded(
                     child: Text(
                       widget.reminder.text,
-                      style: theme.textTheme.bodyLarge?.copyWith(
+                      style: theme.textTheme.bodyMedium?.copyWith( // Changed from bodyLarge
                         fontWeight: FontWeight.w500,
-                        height: 1.4,
+                        height: 1.3, // Reduced from 1.4
+                        fontSize: 14, // Explicit smaller font
                         decoration: !widget.reminder.enabled
                             ? TextDecoration.lineThrough
                             : TextDecoration.none,
@@ -163,7 +164,7 @@ class _ReminderCardState extends State<ReminderCard>
                     ),
                   ),
                   
-                  const SizedBox(width: AppTheme.spacingMD),
+                  const SizedBox(width: 10), // Reduced from spacingMD
                   
                   // Date and time - Rightmost
                   _buildDateTime(context, widget.reminder),
@@ -207,17 +208,17 @@ class _ReminderCardState extends State<ReminderCard>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
+              Text(
                   'Recurring',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppTheme.textSecondary,
-                    fontSize: 12,
+                    fontSize: 11, // Reduced from 12
                     fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.right,
                 ),
                 const SizedBox(height: 2),
-                Icon(
+                    Icon(
                   Icons.repeat_rounded,
                   size: 12,
                   color: AppTheme.textTertiary,

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 
@@ -73,27 +74,64 @@ class DateTimeUtils {
   /// Parse time string (e.g., "8 PM", "20:00") to DateTime
   static DateTime? parseTime(String timeStr) {
     try {
+      // Normalize input - trim and ensure proper spacing
+      var normalized = timeStr.trim();
+      
       // Try various formats
-      final formats = ['h:mm a', 'hh:mm a', 'h a', 'HH:mm', 'H:mm'];
+      final formats = [
+        'h:mm a',    // "8:30 PM"
+        'hh:mm a',   // "08:30 PM"
+        'h a',       // "8 PM" - THIS IS THE KEY FORMAT
+        'hh a',      // "08 PM"
+        'HH:mm',     // "20:30"
+        'H:mm',      // "20:30"
+        'h:mm',      // "8:30"
+      ];
 
       for (var format in formats) {
         try {
-          final parsedTime = DateFormat(format).parse(timeStr);
+          final parsedTime = DateFormat(format, 'en_US').parse(normalized);
           final now = DateTime.now();
-          return DateTime(
+          final result = DateTime(
             now.year,
             now.month,
             now.day,
             parsedTime.hour,
             parsedTime.minute,
           );
-        } catch (_) {
+          debugPrint('   ✅ parseTime: "$normalized" -> $result (format: $format)');
+          return result;
+        } catch (e) {
+          // Continue to next format
           continue;
         }
       }
 
+      // Fallback: Manual parsing for "8 pm" format
+      final simpleTimeMatch = RegExp(r'(\d{1,2})\s*(am|pm|AM|PM)', caseSensitive: false).firstMatch(normalized);
+      if (simpleTimeMatch != null) {
+        final hourStr = simpleTimeMatch.group(1);
+        final amPmStr = simpleTimeMatch.group(2)?.toLowerCase();
+        if (hourStr != null && amPmStr != null) {
+          var hour = int.tryParse(hourStr);
+          if (hour != null) {
+            if (amPmStr == 'pm' && hour != 12) {
+              hour += 12;
+            } else if (amPmStr == 'am' && hour == 12) {
+              hour = 0;
+            }
+            final now = DateTime.now();
+            final result = DateTime(now.year, now.month, now.day, hour, 0);
+            debugPrint('   ✅ parseTime (manual): "$normalized" -> $result');
+            return result;
+          }
+        }
+      }
+
+      debugPrint('   ❌ parseTime: Failed to parse "$normalized"');
       return null;
     } catch (e) {
+      debugPrint('   ❌ parseTime error: $e');
       return null;
     }
   }

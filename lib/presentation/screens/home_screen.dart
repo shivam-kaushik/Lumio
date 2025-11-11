@@ -9,6 +9,7 @@ import '../widgets/context_group_card.dart';
 import '../widgets/smart_reminder_dialog.dart';
 import '../theme/app_theme.dart';
 import 'add_reminder_screen.dart';
+import 'ai_chat_screen.dart';
 import '../../data/models/reminder.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../../core/services/home_detection_service.dart';
@@ -218,17 +219,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           
-          // Action button - Refresh reminders
+          // AI Assistant button
           IconButton(
             icon: Icon(
-              Icons.refresh_rounded,
-              color: theme.iconTheme.color,
+              Icons.smart_toy_rounded,
+              color: AppTheme.primaryColor,
             ),
             onPressed: () {
-              context.read<ReminderProvider>().loadReminders();
-              _updateContext();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const AiChatScreen(),
+                ),
+              );
             },
-            tooltip: 'Refresh',
+            tooltip: 'AI Assistant',
           ),
         ],
       ),
