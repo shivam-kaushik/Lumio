@@ -3,6 +3,7 @@ import '../../data/models/reminder.dart' as model;
 import 'priority_selector.dart';
 import 'category_selector.dart';
 import 'time_selectors.dart';
+import 'skill_selector_dropdown.dart'; // MVP
 import '../screens/home_setup_screen.dart';
 import '../screens/map_view_screen.dart';
 import '../../core/services/home_detection_service.dart';
@@ -52,6 +53,9 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
   DateTime? _timeRangeEnd;
   model.TimeOfDay? _preferredTimeOfDay;
 
+  // MVP: Skill linking
+  int? _linkedSkillId;
+
   bool _showAdvanced = false;
 
   @override
@@ -84,6 +88,8 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
     _geofenceLng = reminder?.geofenceLng;
     _geofenceRadius = reminder?.geofenceRadius;
     _locationContext = reminder?.geofenceId; // may be 'home' or other id
+    // MVP: Initialize skill link
+    _linkedSkillId = reminder?.linkedSkillId;
     // If a suggestion is provided and no geofence is set, store suggestion but keep disabled
     if (!_enableLocation && widget.locationSuggestion != null) {
       _locationContext = widget.locationSuggestion!['context'] as String?;
@@ -190,7 +196,7 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
     final text = _textController.text.trim();
     if (text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a reminder text')),
+        const SnackBar(content: Text('Please enter a task text')),
       );
       return;
     }
@@ -222,6 +228,7 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
       geofenceRadius: _enableLocation ? _geofenceRadius : null,
       onLeaveContext: _onLeaveContext,
       onArriveContext: _onArriveContext,
+      linkedSkillId: _linkedSkillId, // MVP
     );
 
     Navigator.of(context).pop(reminder);
@@ -285,7 +292,7 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
                   const SizedBox(width: AppTheme.spacingMD),
                   Expanded(
                     child: Text(
-                      widget.reminder == null ? 'New Reminder' : 'Edit Reminder',
+                      widget.reminder == null ? 'New Task' : 'Edit Task',
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textPrimary,
@@ -377,6 +384,15 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
                     CategorySelector(
                       selectedCategory: _category,
                       onChanged: (c) => setState(() => _category = c),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // MVP: Skill linking
+                    SkillSelectorDropdown(
+                      selectedSkillId: _linkedSkillId,
+                      onChanged: (skillId) => setState(() => _linkedSkillId = skillId),
+                      required: false,
                     ),
 
                     const SizedBox(height: 24),
@@ -735,7 +751,7 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
 
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text('Enable location triggers for this reminder'),
+              title: Text('Enable location triggers for this task'),
               value: _enableLocation,
               onChanged: (val) async {
                 if (val && (_geofenceLat == null || _geofenceLng == null)) {

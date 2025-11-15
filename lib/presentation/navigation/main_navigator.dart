@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../screens/home_screen.dart';
-import '../screens/analytics_screen.dart';
-import '../screens/calendar_screen.dart';
-import '../screens/map_view_screen.dart';
+import '../screens/goals_screen.dart';
+import '../screens/subtasks_calendar_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/add_reminder_screen.dart';
+import '../screens/add_rep_screen.dart';
 import '../theme/app_theme.dart';
 
 /// Main navigation wrapper with bottom tab bar
@@ -24,39 +24,32 @@ class _MainNavigatorState extends State<MainNavigator>
   late final List<GlobalKey<NavigatorState>> _navigatorKeys;
   late final List<AnimationController> _fadeControllers;
 
-  // Tab pages
+  // Tab pages (MVP: Simplified navigation)
   final List<Widget> _pages = [
-    const HomeScreen(), // Reminders list
-    const AnalyticsScreen(), // Stats
-    const CalendarScreen(), // Calendar
-    const MapViewScreen(), // Map View
+    const HomeScreen(), // Tasks list
+    const GoalsScreen(), // Goals
+    const SubtasksCalendarScreen(), // Calendar (showing subtasks)
     const SettingsScreen(), // Settings
   ];
 
-  // Tab configurations
+  // Tab configurations (MVP: Simplified)
   final List<NavigationTab> _tabs = [
     NavigationTab(
       icon: Icons.list_outlined,
       activeIcon: Icons.list_rounded,
-      label: 'Reminders',
+      label: 'Tasks',
       badge: null,
     ),
     NavigationTab(
-      icon: Icons.bar_chart_outlined,
-      activeIcon: Icons.bar_chart_rounded,
-      label: 'Stats',
+      icon: Icons.flag_outlined,
+      activeIcon: Icons.flag_rounded,
+      label: 'Goals',
       badge: null,
     ),
     NavigationTab(
       icon: Icons.calendar_today_outlined,
       activeIcon: Icons.calendar_today_rounded,
       label: 'Calendar',
-      badge: null,
-    ),
-    NavigationTab(
-      icon: Icons.map_outlined,
-      activeIcon: Icons.map_rounded,
-      label: 'Map',
       badge: null,
     ),
     NavigationTab(
@@ -117,25 +110,75 @@ class _MainNavigatorState extends State<MainNavigator>
 
   void _onFabPressed() {
     HapticFeedback.mediumImpact();
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const AddReminderScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0.0, 1.0),
-              end: Offset.zero,
-            ).animate(
-              CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
+    // MVP: Show bottom sheet with options
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppTheme.radiusLG),
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: AppTheme.spacingMD),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.borderColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            child: child,
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 300),
+              const SizedBox(height: AppTheme.spacingLG),
+              ListTile(
+                leading: const Icon(Icons.alarm_rounded, color: AppTheme.primaryColor),
+                title: const Text('Schedule a Task'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) =>
+                          const AddReminderScreen(),
+                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                        return SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.0, 1.0),
+                            end: Offset.zero,
+                          ).animate(
+                            CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOutCubic,
+                            ),
+                          ),
+                          child: child,
+                        );
+                      },
+                      transitionDuration: const Duration(milliseconds: 300),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.track_changes_rounded, color: AppTheme.primaryColor),
+                title: const Text('Log a Rep'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AddRepScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: AppTheme.spacingMD),
+            ],
+          ),
+        ),
       ),
     );
   }

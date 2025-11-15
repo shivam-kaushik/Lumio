@@ -8,11 +8,13 @@ import '../../data/models/reminder.dart';
 import 'weather_service.dart';
 import '../../data/models/context_event.dart';
 import '../../data/repositories/reminder_repository.dart';
+import '../../data/repositories/growth_repository.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/date_time_utils.dart';
 import 'notification_service.dart';
 import 'home_detection_service.dart';
 import 'activity_recognition_service.dart';
+import 'privacy_gpt_service.dart';
 
 /// Context trigger engine that monitors sensors and triggers reminders
 /// Integrated with HomeDetectionService for WiFi + GPS home detection
@@ -22,6 +24,8 @@ class TriggerEngine {
   final HomeDetectionService _homeService = HomeDetectionService();
   final WeatherService _weatherService = WeatherService();
   final ActivityRecognitionService _activityService = ActivityRecognitionService();
+  final GrowthRepository _growthRepository = GrowthRepository();
+  final PrivacyGptService _privacyGpt = PrivacyGptService();
 
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
@@ -433,11 +437,57 @@ class TriggerEngine {
     if (kDebugMode) {
       print('📱 Showing notification...');
     }
+    
+    // MVP: Create payload with skill info if linked
+    String payload;
+    String title;
+    String body;
+    
+    if (reminder.linkedSkillId != null) {
+      // Skill-linked reminder - generate motivational message
+      try {
+        final skill = await _growthRepository.getSkillById(reminder.linkedSkillId!);
+        final reps = await _growthRepository.getRepsForSkill(reminder.linkedSkillId!);
+        final streak = await _growthRepository.getStreak();
+        
+        // Get goal name if skill is linked to a goal
+        String? goalName;
+        if (skill?.goalId != null) {
+          final goal = await _growthRepository.getGoal(skill!.goalId!);
+          goalName = goal?.name;
+        }
+        
+        // Generate motivational message
+        final motivationalMessage = await _privacyGpt.generateMotivationalMessage(
+          goalName: goalName ?? 'Your goal',
+          taskDescription: reminder.text,
+          skillName: skill?.name,
+          streakCount: streak,
+          totalReps: reps.length,
+          motivationAnchor: null, // Could be stored in reminder metadata
+        );
+        
+        payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}"}';
+        title = '🚀 Execution Time!';
+        body = motivationalMessage ?? 'Ready to log your rep? (${reminder.text})';
+      } catch (e) {
+        debugPrint('❌ Error generating motivational message: $e');
+        payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}"}';
+        title = 'Momentum Rep Ready!';
+        body = 'Ready to log your rep? (${reminder.text})';
+      }
+    } else {
+      // Standard task
+      payload = '{"action":"complete","reminder_id":"${reminder.id}"}';
+      title = 'Task';
+      body = reminder.text;
+    }
+    
     await _notificationService.showNotification(
       id: reminder.id.hashCode,
-      title: 'Reminder',
-      body: reminder.text,
-      payload: reminder.id,
+      title: title,
+      body: body,
+      payload: payload,
     );
     if (kDebugMode) {
       print('✅ Notification shown');
@@ -462,12 +512,27 @@ class TriggerEngine {
         await _reminderRepository.updateReminder(updatedReminder);
 
         // Schedule notification for next occurrence
+        // MVP: Create payload with skill info if linked
+        String payload;
+        String title;
+        String body;
+        
+        if (reminder.linkedSkillId != null) {
+          payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}"}';
+          title = 'Momentum Rep Ready!';
+          body = 'Ready to log your rep? (${reminder.text})';
+        } else {
+          payload = '{"action":"complete","reminder_id":"${reminder.id}"}';
+          title = 'Task';
+          body = reminder.text;
+        }
+        
         await _notificationService.scheduleNotification(
           id: reminder.id.hashCode,
-          title: 'Reminder',
-          body: reminder.text,
+          title: title,
+          body: body,
           scheduledTime: nextTime,
-          payload: reminder.id,
+          payload: payload,
         );
 
         if (kDebugMode) {
@@ -488,7 +553,7 @@ class TriggerEngine {
       final nextTime = constantNow.add(const Duration(minutes: 5));
       await _notificationService.scheduleNotification(
         id: reminder.id.hashCode,
-        title: 'Reminder',
+        title: 'Task',
         body: reminder.text,
         scheduledTime: nextTime,
         payload: reminder.id,

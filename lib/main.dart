@@ -11,7 +11,9 @@ import 'core/services/permission_service.dart';
 import 'core/services/trigger_engine.dart';
 import 'data/database/database_helper.dart';
 import 'data/repositories/reminder_repository.dart';
+import 'data/repositories/growth_repository.dart';
 import 'presentation/providers/reminder_provider.dart';
+import 'presentation/providers/growth_provider.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/screens/splash_screen.dart';
@@ -148,6 +150,7 @@ class _AwarelyAppState extends State<AwarelyApp> {
       providers: [
         // Repositories
         Provider<ReminderRepository>(create: (_) => ReminderRepository()),
+        Provider<GrowthRepository>(create: (_) => GrowthRepository()), // MVP
 
         // Services
         Provider<NotificationService>(create: (_) => NotificationService()),
@@ -161,6 +164,11 @@ class _AwarelyAppState extends State<AwarelyApp> {
           create: (context) => ReminderProvider(
             reminderRepository: context.read<ReminderRepository>(),
           )..loadReminders(),
+        ),
+        ChangeNotifierProvider<GrowthProvider>( // MVP
+          create: (context) => GrowthProvider(
+            repository: context.read<GrowthRepository>(),
+          )..loadGrowthData(),
         ),
       ],
       child: Consumer<ThemeProvider>(

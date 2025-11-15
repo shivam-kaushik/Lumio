@@ -54,7 +54,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     final hasExactAlarm = await permissionService.ensureExactAlarmPermission(
       context,
       rationale:
-          'Exact alarms are needed to deliver reminders at the right time.',
+          'Exact alarms are needed to deliver tasks at the right time.',
     );
 
     if (!hasExactAlarm) {
@@ -90,7 +90,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
               builder: (context) => AlertDialog(
                 title: const Text('🏠 Home Setup Required'),
                 content: const Text(
-                  'This reminder needs to know your home location. Would you like to set it up now?\n\n'
+                  'This task needs to know your home location. Would you like to set it up now?\n\n'
                   'Quick setup:\n'
                   '✓ Set your home GPS location on the map',
                 ),
@@ -231,14 +231,14 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
 
         if (id != null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Reminder created successfully!')),
+            const SnackBar(content: Text('Task created successfully!')),
           );
           Navigator.of(context).pop();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content:
-                  Text(reminderProvider.error ?? 'Failed to create reminder'),
+                  Text(reminderProvider.error ?? 'Failed to create task'),
             ),
           );
         }
@@ -270,14 +270,14 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
 
         if (id != null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Reminder created successfully!')),
+            const SnackBar(content: Text('Task created successfully!')),
           );
           Navigator.of(context).pop();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content:
-                  Text(reminderProvider.error ?? 'Failed to create reminder'),
+                  Text(reminderProvider.error ?? 'Failed to create task'),
             ),
           );
         }
@@ -332,7 +332,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New Reminder'),
+        title: const Text('New Task'),
         elevation: 0,
       ),
       body: SafeArea(
@@ -711,7 +711,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                             ),
                           )
                         : const Text(
-                            'Create Reminder',
+                            'Create Task',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,

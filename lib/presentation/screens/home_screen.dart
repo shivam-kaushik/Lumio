@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../providers/reminder_provider.dart';
+import '../providers/growth_provider.dart';
 import '../widgets/context_group_card.dart';
 import '../widgets/smart_reminder_dialog.dart';
 import '../theme/app_theme.dart';
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ReminderProvider>().loadReminders();
+      context.read<GrowthProvider>().loadGrowthData();
       _updateContext();
     });
   }
@@ -85,70 +87,77 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
 
                   final visibleReminders = reminderProvider.reminders;
-                         final groups = ReminderUtils.groupByContext(
-                           visibleReminders,
-                           currentPosition: _currentPosition,
-                         );
+                  
+                  return Consumer<GrowthProvider>(
+                    builder: (context, growthProvider, _) {
+                      // Group tasks by goals
+                      final groups = _groupTasksByGoals(
+                        visibleReminders,
+                        growthProvider,
+                      );
 
-                  if (groups.isEmpty) {
-                    return _buildEmptyState(context);
-                  }
+                      if (groups.isEmpty) {
+                        return _buildEmptyState(context);
+                      }
 
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      await reminderProvider.loadReminders();
-                      await _updateContext();
+                      return RefreshIndicator(
+                        onRefresh: () async {
+                          await reminderProvider.loadReminders();
+                          await growthProvider.loadGrowthData();
+                          await _updateContext();
+                        },
+                        child: CustomScrollView(
+                          slivers: [
+                            // Stats header (optional)
+                            SliverToBoxAdapter(
+                              child: _buildStatsHeader(context, reminderProvider),
+                            ),
+                            
+                            // Task groups by goals
+                            ...groups.entries.map((entry) {
+                              return SliverPadding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  AppTheme.spacingMD,
+                                  0,
+                                  AppTheme.spacingMD,
+                                  AppTheme.spacingMD,
+                                ),
+                                sliver: SliverToBoxAdapter(
+                                  child: ContextGroupCard(
+                                    contextTitle: entry.key,
+                                    reminders: entry.value,
+                                    contextIcon: entry.key == 'General Tasks' ? null : '🎯',
+                                    currentPosition: _currentPosition,
+                                    onReminderTap: (reminder) async {
+                                      final result = await showDialog<Reminder>(
+                                        context: context,
+                                        builder: (context) => SmartReminderDialog(
+                                          reminder: reminder,
+                                        ),
+                                      );
+                                      if (result != null && mounted) {
+                                        reminderProvider.updateReminder(result);
+                                      }
+                                    },
+                                    onToggle: (id, enabled) {
+                                      reminderProvider.toggleReminder(id, enabled);
+                                    },
+                                    onDelete: (id) {
+                                      reminderProvider.deleteReminder(id);
+                                    },
+                                  ),
+                                ),
+                              );
+                            }),
+                        
+                            // Bottom padding above bottom navigation bar
+                            const SliverPadding(
+                              padding: EdgeInsets.only(bottom: 120),
+                            ),
+                          ],
+                        ),
+                      );
                     },
-                    child: CustomScrollView(
-                      slivers: [
-                        // Stats header (optional)
-                        SliverToBoxAdapter(
-                          child: _buildStatsHeader(context, reminderProvider),
-                        ),
-                        
-                        // Reminder groups
-                        ...groups.entries.map((entry) {
-                          return SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppTheme.spacingMD,
-                              0,
-                              AppTheme.spacingMD,
-                              AppTheme.spacingMD,
-                            ),
-                            sliver: SliverToBoxAdapter(
-                              child: ContextGroupCard(
-                                contextTitle: entry.key,
-                                reminders: entry.value,
-                                contextIcon: ReminderUtils.getContextIcon(entry.key),
-                                currentPosition: _currentPosition,
-                                onReminderTap: (reminder) async {
-                                  final result = await showDialog<Reminder>(
-                                    context: context,
-                                    builder: (context) => SmartReminderDialog(
-                                      reminder: reminder,
-                                    ),
-                                  );
-                                  if (result != null && mounted) {
-                                    reminderProvider.updateReminder(result);
-                                  }
-                                },
-                                onToggle: (id, enabled) {
-                                  reminderProvider.toggleReminder(id, enabled);
-                                },
-                                onDelete: (id) {
-                                  reminderProvider.deleteReminder(id);
-                                },
-                              ),
-                            ),
-                          );
-                        }),
-                        
-                        // Bottom padding above bottom navigation bar
-                        const SliverPadding(
-                          padding: EdgeInsets.only(bottom: 120),
-                        ),
-                      ],
-                    ),
                   );
                 },
               ),
@@ -156,6 +165,121 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       );
+  }
+
+  /// Group tasks by goals (via skill linkage)
+  Map<String, List<Reminder>> _groupTasksByGoals(
+    List<Reminder> reminders,
+    GrowthProvider growthProvider,
+  ) {
+    final groups = <String, List<Reminder>>{};
+    
+    debugPrint('🔍 Categorizing ${reminders.length} reminders...');
+    debugPrint('📊 Available skills: ${growthProvider.skills.length}');
+    debugPrint('📊 Available goals: ${growthProvider.goals.length}');
+    
+    // Log all skills and their goalIds
+    for (var skill in growthProvider.skills) {
+      debugPrint('  Skill: ${skill.name} (id: ${skill.id}, goalId: ${skill.goalId})');
+    }
+    
+    // Log all goals
+    for (var goal in growthProvider.goals) {
+      debugPrint('  Goal: ${goal.name} (id: ${goal.id})');
+    }
+    
+    // Ensure we have skills and goals loaded
+    if (growthProvider.skills.isEmpty && growthProvider.goals.isEmpty) {
+      debugPrint('⚠️ No growth data available - putting all in General Tasks');
+      // If no growth data, put everything in General Tasks
+      for (var reminder in reminders) {
+        groups.putIfAbsent('General Tasks', () => []).add(reminder);
+      }
+      return groups;
+    }
+    
+    for (var reminder in reminders) {
+      String groupName = 'General Tasks';
+      
+      debugPrint('🔍 Processing reminder: "${reminder.text}" (linkedGoalId: ${reminder.linkedGoalId}, linkedSkillId: ${reminder.linkedSkillId})');
+      
+      // Priority 1: Use linkedGoalId if available (direct link)
+      if (reminder.linkedGoalId != null) {
+        try {
+          final matchingGoals = growthProvider.goals.where(
+            (g) => g.id == reminder.linkedGoalId,
+          );
+          
+          if (matchingGoals.isNotEmpty) {
+            groupName = matchingGoals.first.name;
+            debugPrint('  ✅ Task "${reminder.text}" categorized under goal (via linkedGoalId): $groupName');
+          } else {
+            debugPrint('  ⚠️ Goal not found for linkedGoalId: ${reminder.linkedGoalId}');
+            debugPrint('  Available goal IDs: ${growthProvider.goals.map((g) => g.id).join(", ")}');
+          }
+        } catch (e) {
+          debugPrint('  ❌ Error categorizing task via linkedGoalId: $e');
+        }
+      }
+      // Priority 2: Fallback to skill-based lookup if no direct goal link
+      else if (reminder.linkedSkillId != null) {
+        try {
+          // Find the skill
+          final matchingSkills = growthProvider.skills.where(
+            (s) => s.id == reminder.linkedSkillId,
+          );
+          
+          if (matchingSkills.isNotEmpty) {
+            final skill = matchingSkills.first;
+            debugPrint('  ✅ Found skill: ${skill.name} (id: ${skill.id}, goalId: ${skill.goalId})');
+            
+            // Find the goal for this skill
+            if (skill.goalId != null) {
+              final matchingGoals = growthProvider.goals.where(
+                (g) => g.id == skill.goalId,
+              );
+              
+              if (matchingGoals.isNotEmpty) {
+                groupName = matchingGoals.first.name;
+                debugPrint('  ✅ Task "${reminder.text}" categorized under goal (via skill): $groupName');
+              } else {
+                debugPrint('  ⚠️ Goal not found for skill ${skill.id} (goalId: ${skill.goalId})');
+                debugPrint('  Available goal IDs: ${growthProvider.goals.map((g) => g.id).join(", ")}');
+              }
+            } else {
+              debugPrint('  ⚠️ Skill ${skill.id} has no goalId');
+            }
+          } else {
+            debugPrint('  ⚠️ Skill not found: ${reminder.linkedSkillId}');
+            debugPrint('  Available skill IDs: ${growthProvider.skills.map((s) => s.id).join(", ")}');
+          }
+        } catch (e) {
+          debugPrint('  ❌ Error categorizing task via skill: $e');
+        }
+      } else {
+        debugPrint('  ℹ️ Task "${reminder.text}" has no linkedGoalId or linkedSkillId - going to General Tasks');
+      }
+      
+      groups.putIfAbsent(groupName, () => []).add(reminder);
+    }
+    
+    debugPrint('📋 Final groups: ${groups.keys.join(", ")}');
+    for (var entry in groups.entries) {
+      debugPrint('  ${entry.key}: ${entry.value.length} tasks');
+    }
+    
+    // Sort groups: Goals first (alphabetically), then "General Tasks" at the end
+    final sortedGroups = <String, List<Reminder>>{};
+    final goalNames = groups.keys.where((k) => k != 'General Tasks').toList()
+      ..sort();
+    for (var goalName in goalNames) {
+      sortedGroups[goalName] = groups[goalName]!;
+    }
+    if (groups.containsKey('General Tasks')) {
+      sortedGroups['General Tasks'] = groups['General Tasks']!;
+    }
+    
+    return sortedGroups;
   }
 
   Widget _buildPremiumHeader(BuildContext context, bool isDark) {
@@ -339,14 +463,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: AppTheme.spacingXL),
             Text(
-              'No reminders yet',
+              'No tasks yet',
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: AppTheme.spacingSM),
             Text(
-              'Create your first smart reminder\nto get started',
+              'Create your first task\nto get started',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: AppTheme.textSecondary,
@@ -363,7 +487,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
               icon: const Icon(Icons.add_rounded, size: 20),
-              label: const Text('Create Reminder'),
+              label: const Text('Create Task'),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppTheme.spacingXL,

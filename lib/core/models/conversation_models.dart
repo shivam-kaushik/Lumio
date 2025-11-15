@@ -17,6 +17,10 @@ enum ConversationState {
   confirming,
   completed,
   cancelled,
+  goalSetting, // MVP: Setting a business goal
+  goalAskingDeadline, // Asking for target deadline
+  goalAskingCapacity, // Asking for hours/day commitment
+  goalConfirming, // MVP: Confirming goal roadmap
 }
 
 /// Message role in conversation

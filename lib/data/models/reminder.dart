@@ -182,6 +182,12 @@ class Reminder {
   final String? activityType; // 'still', 'walking', 'running', 'onBicycle', 'inVehicle', 'onFoot'
   final bool useSmartTiming; // Use adaptive timing based on learned patterns
 
+  // MVP: Skill linking
+  final int? linkedSkillId; // Link reminder to skill for automatic rep logging
+  
+  // Core Features: Goal linking
+  final int? linkedGoalId; // Link reminder directly to goal for categorization
+
   Reminder({
     String? id,
     required this.text,
@@ -212,6 +218,8 @@ class Reminder {
     this.keepRemindingUntilCompleted = false,
     this.activityType,
     this.useSmartTiming = false,
+    this.linkedSkillId,
+    this.linkedGoalId,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now();
 
@@ -271,6 +279,8 @@ class Reminder {
       keepRemindingUntilCompleted: (map['keepRemindingUntilCompleted'] as int?) == 1,
       activityType: map['activityType'] as String?,
       useSmartTiming: (map['useSmartTiming'] as int?) == 1,
+      linkedSkillId: map['linked_skill_id'] as int?,
+      linkedGoalId: map['linked_goal_id'] as int?,
     );
   }
 
@@ -306,6 +316,8 @@ class Reminder {
       'keepRemindingUntilCompleted': keepRemindingUntilCompleted ? 1 : 0,
       'activityType': activityType,
       'useSmartTiming': useSmartTiming ? 1 : 0,
+      'linked_skill_id': linkedSkillId,
+      'linked_goal_id': linkedGoalId,
     };
   }
 
@@ -432,6 +444,8 @@ class Reminder {
     bool? isPaused,
     int? skipCount,
     bool? keepRemindingUntilCompleted,
+    int? linkedSkillId,
+    int? linkedGoalId,
   }) {
     return Reminder(
       id: id,
@@ -463,6 +477,8 @@ class Reminder {
       keepRemindingUntilCompleted: keepRemindingUntilCompleted ?? this.keepRemindingUntilCompleted,
       activityType: activityType ?? this.activityType,
       useSmartTiming: useSmartTiming ?? this.useSmartTiming,
+      linkedSkillId: linkedSkillId ?? this.linkedSkillId,
+      linkedGoalId: linkedGoalId ?? this.linkedGoalId,
     );
   }
 }

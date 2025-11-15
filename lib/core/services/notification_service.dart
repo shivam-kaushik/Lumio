@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -6,6 +7,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../core/constants/app_constants.dart';
 import '../../data/database/database_helper.dart';
 import '../../data/repositories/reminder_repository.dart';
+import '../../data/repositories/growth_repository.dart';
 import '../../data/models/context_event.dart';
 
 /// Notification service for managing local notifications
@@ -109,11 +111,28 @@ class NotificationService {
   }
 
   /// Handle complete action from notification
-  static Future<void> _handleCompleteAction(String reminderId, int notificationId) async {
-    debugPrint('✅ Handling complete action for reminder $reminderId, notification $notificationId');
+  static Future<void> _handleCompleteAction(String payload, int notificationId) async {
+    debugPrint('✅ Handling complete action for payload: $payload, notification $notificationId');
     
     try {
-      // Import repositories here to avoid circular dependencies
+      // Parse payload (can be reminder ID string or JSON)
+      String reminderId;
+      int? skillId;
+      String? notes;
+      String action = 'complete';
+      
+      try {
+        // Try to parse as JSON
+        final data = jsonDecode(payload);
+        action = data['action'] as String? ?? 'complete';
+        reminderId = data['reminder_id'] as String;
+        skillId = data['skill_id'] as int?;
+        notes = data['notes'] as String?;
+      } catch (e) {
+        // Fallback: treat as simple reminder ID
+        reminderId = payload;
+      }
+      
       final reminderRepository = ReminderRepository();
       
       // Mark occurrence as completed by notification ID
@@ -127,6 +146,17 @@ class NotificationService {
           outcome: AppConstants.outcomeCompleted,
         ),
       );
+      
+      // MVP: If skill-linked, log rep
+      if (action == 'log_rep' && skillId != null && notes != null) {
+        try {
+          final growthRepository = GrowthRepository();
+          await growthRepository.addRep(skillId, notes);
+          debugPrint('✅ Auto-logged rep for skill $skillId');
+        } catch (e) {
+          debugPrint('❌ Error logging rep: $e');
+        }
+      }
       
       // Cancel the notification
       final notificationService = NotificationService();

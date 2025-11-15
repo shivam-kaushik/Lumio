@@ -10,6 +10,7 @@ import '../services/local_nlu_preprocessor.dart';
 import '../services/privacy_gpt_service.dart';
 import '../../data/models/reminder.dart';
 import '../../core/services/home_detection_service.dart';
+import 'dart:convert';
 
 /// AI Conversation Service with privacy-first architecture
 /// Supports both GPT Realtime Audio and text chat
@@ -34,6 +35,11 @@ class AiConversationService {
   ReminderDraft? _currentDraft;
   ConversationState _state = ConversationState.idle;
   StreamController<ConversationMessage>? _messageStream;
+  // MVP: Goal setting state
+  String? _currentGoalDescription;
+  Map<String, dynamic>? _currentGoalRoadmap;
+  DateTime? _targetDeadline;
+  double? _hoursPerDay;
 
   // Callbacks
   Function(String)? onUserMessage;
@@ -41,6 +47,8 @@ class AiConversationService {
   Function(Reminder)? onReminderReady;
   Function(String)? onError;
   Function(ConversationState)? onStateChanged;
+  // MVP: Goal setting callback
+  Function(Map<String, dynamic>)? onGoalRoadmapReady; // Goal roadmap from GPT
 
   /// Get current conversation state
   ConversationState get state => _state;
@@ -222,6 +230,67 @@ You: "Perfect! I'll remind you to take your keys every time you leave home. Shou
     );
     _addMessage(userMessage);
     onUserMessage?.call(input);
+
+    // MVP: Check for goal intent first
+    if (_isGoalIntent(input) && 
+        _state != ConversationState.goalSetting && 
+        _state != ConversationState.goalAskingDeadline &&
+        _state != ConversationState.goalAskingCapacity &&
+        _state != ConversationState.goalConfirming) {
+      await _handleGoalIntent(input);
+      return;
+    }
+
+    // MVP: Handle deadline collection
+    if (_state == ConversationState.goalAskingDeadline) {
+      final deadline = _parseDeadline(input);
+      if (deadline != null) {
+        _targetDeadline = deadline;
+        _state = ConversationState.goalAskingCapacity;
+        _updateState();
+        await _sendAiMessage(
+          'Perfect! Target date: ${deadline.toString().split(' ')[0]}. How many hours per day can you commit to this goal? (e.g., "2 hours", "3-4 hours")',
+        );
+        return;
+      } else {
+        await _sendAiMessage(
+          'I didn\'t catch the deadline. Please specify a date, like "December 15th" or "in 3 months".',
+        );
+        return;
+      }
+    }
+
+    // MVP: Handle capacity collection
+    if (_state == ConversationState.goalAskingCapacity) {
+      final hours = _parseHoursPerDay(input);
+      if (hours != null) {
+        _hoursPerDay = hours;
+        await _generateDetailedRoadmap();
+        return;
+      } else {
+        await _sendAiMessage(
+          'I didn\'t catch the hours. Please specify like "2 hours" or "3-4 hours per day".',
+        );
+        return;
+      }
+    }
+
+    // MVP: Handle goal confirmation
+    if (_state == ConversationState.goalConfirming) {
+      final lowerInput = input.toLowerCase();
+      if (lowerInput.contains('yes') || lowerInput.contains('confirm') || lowerInput.contains('create')) {
+        // User confirmed goal roadmap
+        if (onGoalRoadmapReady != null) {
+          onGoalRoadmapReady!(_currentGoalRoadmap!);
+        }
+        _state = ConversationState.completed;
+        _updateState();
+        return;
+      } else if (lowerInput.contains('no') || lowerInput.contains('cancel')) {
+        await _cancelConversation();
+        return;
+      }
+    }
 
     // Check for confirmation/cancellation
     final lowerInput = input.toLowerCase();
@@ -781,11 +850,182 @@ You: "Perfect! I'll remind you to take your keys every time you leave home. Shou
     onStateChanged?.call(_state);
   }
 
+  /// MVP: Check if input is goal intent
+  bool _isGoalIntent(String input) {
+    final lower = input.toLowerCase();
+    return lower.contains('i want to') ||
+           lower.contains('my goal is') ||
+           lower.contains('i need to achieve') ||
+           lower.contains('help me become') ||
+           lower.contains('i want to launch') ||
+           lower.contains('i want to build') ||
+           lower.contains('i want to get');
+  }
+
+  /// MVP: Handle goal intent - ask for deadline first
+  Future<void> _handleGoalIntent(String input) async {
+    _state = ConversationState.goalSetting;
+    _updateState();
+    _currentGoalDescription = input;
+    _targetDeadline = null;
+    _hoursPerDay = null;
+
+    await _sendAiMessage(
+      'Great! I\'ll help you create a complete execution plan for "$input".\n\nFirst, when do you want to achieve this goal? (e.g., "December 15th", "in 3 months", "by end of year")',
+    );
+
+    _state = ConversationState.goalAskingDeadline;
+    _updateState();
+  }
+
+  /// Parse deadline from user input
+  DateTime? _parseDeadline(String input) {
+    final lower = input.toLowerCase();
+    final now = DateTime.now();
+
+    // Try to parse explicit dates
+    try {
+      // Check for "in X days/weeks/months"
+      final inMatch = RegExp(r'in (\d+) (day|week|month|days|weeks|months)').firstMatch(lower);
+      if (inMatch != null) {
+        final amount = int.parse(inMatch.group(1)!);
+        final unit = inMatch.group(2)!.toLowerCase();
+        if (unit.contains('day')) {
+          return now.add(Duration(days: amount));
+        } else if (unit.contains('week')) {
+          return now.add(Duration(days: amount * 7));
+        } else if (unit.contains('month')) {
+          return DateTime(now.year, now.month + amount, now.day);
+        }
+      }
+
+      // Check for month names
+      final months = ['january', 'february', 'march', 'april', 'may', 'june',
+                      'july', 'august', 'september', 'october', 'november', 'december'];
+      for (var i = 0; i < months.length; i++) {
+        if (lower.contains(months[i])) {
+          final dayMatch = RegExp(r'(\d{1,2})(?:st|nd|rd|th)?').firstMatch(lower);
+          final day = dayMatch != null ? int.parse(dayMatch.group(1)!) : 1;
+          var year = now.year;
+          if (i < now.month - 1) year++; // If month has passed, use next year
+          return DateTime(year, i + 1, day);
+        }
+      }
+
+      // Check for "end of year", "end of month"
+      if (lower.contains('end of year')) {
+        return DateTime(now.year, 12, 31);
+      }
+      if (lower.contains('end of month')) {
+        final lastDay = DateTime(now.year, now.month + 1, 0).day;
+        return DateTime(now.year, now.month, lastDay);
+      }
+    } catch (e) {
+      debugPrint('Error parsing deadline: $e');
+    }
+
+    return null;
+  }
+
+  /// Parse hours per day from user input
+  double? _parseHoursPerDay(String input) {
+    final lower = input.toLowerCase();
+    
+    // Try to extract number
+    final match = RegExp(r'(\d+(?:\.\d+)?)\s*(?:-|to)?\s*(\d+(?:\.\d+)?)?\s*hours?').firstMatch(lower);
+    if (match != null) {
+      final first = double.tryParse(match.group(1)!);
+      final second = match.group(2) != null ? double.tryParse(match.group(2)!) : null;
+      if (first != null) {
+        return second != null ? (first + second) / 2 : first; // Average if range
+      }
+    }
+
+    // Try simple number
+    final simpleMatch = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(lower);
+    if (simpleMatch != null) {
+      final hours = double.tryParse(simpleMatch.group(1)!);
+      if (hours != null && hours > 0 && hours <= 24) {
+        return hours;
+      }
+    }
+
+    return null;
+  }
+
+  /// Generate detailed roadmap with deadline and capacity
+  Future<void> _generateDetailedRoadmap() async {
+    _state = ConversationState.goalSetting;
+    _updateState();
+
+    await _sendAiMessage(
+      'Perfect! Creating your execution plan with:\n• Deadline: ${_targetDeadline!.toString().split(' ')[0]}\n• Capacity: $_hoursPerDay hours/day\n\nThis will take a moment...',
+    );
+
+    try {
+      // Generate detailed roadmap using GPT
+      final roadmap = await _privacyGpt.generateDetailedRoadmap(
+        _currentGoalDescription!,
+        targetDeadline: _targetDeadline!,
+        hoursPerDay: _hoursPerDay!,
+      );
+      
+      if (roadmap != null) {
+        _currentGoalRoadmap = roadmap;
+        final subtasks = roadmap['subtasks'] as List?;
+        final goalName = roadmap['goal'] as String? ?? _currentGoalDescription;
+
+        if (subtasks != null && subtasks.isNotEmpty) {
+          final subtaskList = subtasks.take(5).map((s) {
+            final title = (s as Map)['title'] as String? ?? '';
+            return '• $title';
+          }).join('\n');
+
+          final totalHours = roadmap['totalEstimatedHours'] ?? 'N/A';
+          final weeklyGoals = roadmap['weeklyGoals'] as List?;
+          final weeklyGoalsText = weeklyGoals != null && weeklyGoals.isNotEmpty
+              ? '\n\nWeekly Goals:\n${weeklyGoals.take(3).map((g) => '• $g').join('\n')}'
+              : '';
+
+          await _sendAiMessage(
+            '✅ Complete execution plan ready!\n\n📋 ${subtasks.length} subtasks\n⏱️ ~$totalHours total hours\n$weeklyGoalsText\n\nWould you like to review and create this plan?',
+          );
+
+          _state = ConversationState.goalConfirming;
+          _updateState();
+        } else {
+          await _sendAiMessage(
+            'I had trouble creating the plan. Would you like to try again with more details?',
+          );
+          _state = ConversationState.idle;
+          _updateState();
+        }
+      } else {
+        await _sendAiMessage(
+          'I couldn\'t generate the plan. Please try again or describe your goal in more detail.',
+        );
+        _state = ConversationState.idle;
+        _updateState();
+      }
+    } catch (e) {
+      debugPrint('❌ Error generating detailed roadmap: $e');
+      await _sendAiMessage(
+        'Sorry, I encountered an error. Please try again.',
+      );
+      _state = ConversationState.idle;
+      _updateState();
+    }
+  }
+
   /// Reset conversation
   void reset() {
     _messages.clear();
     _currentDraft = ReminderDraft();
     _state = ConversationState.idle;
+    _currentGoalDescription = null;
+    _currentGoalRoadmap = null;
+    _targetDeadline = null;
+    _hoursPerDay = null;
     _updateState();
   }
 

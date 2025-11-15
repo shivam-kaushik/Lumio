@@ -245,6 +245,493 @@ Return JSON:
 ''';
   }
 
+  /// Generate detailed business roadmap with deadline and capacity (Solopreneur Execution Assistant)
+  Future<Map<String, dynamic>?> generateDetailedRoadmap(
+    String goalDescription, {
+    required DateTime targetDeadline,
+    required double hoursPerDay,
+  }) async {
+    try {
+      final apiKey = dotenv.env['OPENAI_API_KEY'];
+
+      if (apiKey == null ||
+          apiKey.isEmpty ||
+          apiKey == 'your_openai_api_key_here') {
+        debugPrint('⚠️ OpenAI API key not configured');
+        return _fallbackDetailedRoadmap(goalDescription, targetDeadline, hoursPerDay);
+      }
+
+      final daysUntilDeadline = targetDeadline.difference(DateTime.now()).inDays;
+      final totalAvailableHours = daysUntilDeadline * hoursPerDay;
+
+      final prompt = '''
+You are Awarely, a private, hands-free execution assistant for solopreneurs. Your purpose is to help entrepreneurs turn spoken intentions into structured business roadmaps.
+
+Goal: $goalDescription
+Target Deadline: ${targetDeadline.toString().split(' ')[0]} (${daysUntilDeadline} days from now)
+Available Hours Per Day: $hoursPerDay hours
+Total Available Hours: ~${totalAvailableHours.toStringAsFixed(0)} hours
+
+Create a COMPLETE business execution plan with:
+
+1. **Skills Required** (3-8 skills):
+   - Identify the core skills needed to achieve this goal
+   - Each skill must have:
+     - name: Short skill name (e.g., "Content Creation", "Sales Outreach")
+     - description: What this skill entails (1-2 sentences)
+
+2. **Subtask Breakdown** (5-12 subtasks):
+   - Each subtask must have:
+     - title: Short, actionable name
+     - description: What to do (specific and clear)
+     - skillName: Which skill this subtask builds (must match a skill from the skills array)
+     - estimatedHours: Realistic hours needed (consider complexity)
+     - priority: "high", "medium", or "low"
+     - dependencies: Array of task titles this depends on (empty if none)
+     - isMilestone: true if this is a major checkpoint
+     - motivationAnchor: Why this task matters for the goal (1 sentence)
+     - estimatedFrequency: "daily", "weekly", "monthly", or "one-time"
+     - suggestedTime: "morning", "afternoon", "evening", or "any"
+     - suggestedLocation: "home", "office", "coffee_shop", or "any"
+
+3. **Weekly Goals** (3-5 weekly milestones):
+   - What should be accomplished each week
+   - Realistic progress markers
+
+4. **Risk Alerts** (2-4 potential issues):
+   - What could derail this plan
+   - How to mitigate risks
+
+5. **Total Estimated Hours**: Sum of all subtask hours
+
+CRITICAL RULES:
+- Total estimated hours MUST fit within available hours (${totalAvailableHours.toStringAsFixed(0)} hours)
+- If it doesn't fit, prioritize and reduce scope realistically
+- Distribute tasks evenly across the timeline
+- Include buffer time (20% of total)
+- Make tasks specific and actionable
+- Consider dependencies (some tasks must come before others)
+- Include milestone checkpoints
+- Each task should have a clear "why" (motivationAnchor)
+
+Return ONLY valid JSON:
+{
+  "goal": "goal name",
+  "totalEstimatedHours": 120,
+  "skills": [
+    {
+      "name": "Content Creation",
+      "description": "Writing and creating engaging content for marketing"
+    },
+    {
+      "name": "Sales Outreach",
+      "description": "Reaching out to potential customers and closing deals"
+    }
+  ],
+  "subtasks": [
+    {
+      "title": "subtask name",
+      "description": "what to do",
+      "skillName": "Content Creation",
+      "estimatedHours": 8.0,
+      "priority": "high",
+      "dependencies": [],
+      "isMilestone": false,
+      "motivationAnchor": "This moves you closer to launching because...",
+      "estimatedFrequency": "weekly",
+      "suggestedTime": "morning",
+      "suggestedLocation": "office"
+    }
+  ],
+  "weeklyGoals": [
+    "Week 1: Complete market research and validate idea",
+    "Week 2: Design core features and create wireframes"
+  ],
+  "riskAlerts": [
+    "Risk: Scope creep could delay launch. Mitigation: Stick to MVP features only.",
+    "Risk: Underestimating development time. Mitigation: Add 20% buffer to estimates."
+  ]
+}
+''';
+
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': [
+            {
+              'role': 'system',
+              'content': 'You are a business execution assistant for solopreneurs. Create realistic, actionable business plans. Always return valid JSON. Be empathetic and practical.',
+            },
+            {
+              'role': 'user',
+              'content': prompt,
+            }
+          ],
+          'temperature': 0.7,
+          'max_tokens': 2000,
+        }),
+      ).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['choices'][0]['message']['content'] as String;
+
+        try {
+          String jsonContent = content.trim();
+          if (jsonContent.contains('```json')) {
+            jsonContent = jsonContent.split('```json')[1].split('```')[0].trim();
+          } else if (jsonContent.contains('```')) {
+            jsonContent = jsonContent.split('```')[1].split('```')[0].trim();
+          }
+
+          final parsed = jsonDecode(jsonContent) as Map<String, dynamic>;
+          
+          // Add deadline and capacity to response
+          parsed['targetDeadline'] = targetDeadline.toIso8601String();
+          parsed['hoursPerDay'] = hoursPerDay;
+          
+          return parsed;
+        } catch (e) {
+          debugPrint('❌ Error parsing GPT roadmap response: $e');
+          debugPrint('Response content: $content');
+          return _fallbackDetailedRoadmap(goalDescription, targetDeadline, hoursPerDay);
+        }
+      } else {
+        debugPrint('❌ GPT API error: ${response.statusCode} - ${response.body}');
+        return _fallbackDetailedRoadmap(goalDescription, targetDeadline, hoursPerDay);
+      }
+    } catch (e) {
+      debugPrint('❌ GPT service error generating detailed roadmap: $e');
+      return _fallbackDetailedRoadmap(goalDescription, targetDeadline, hoursPerDay);
+    }
+  }
+
+  /// Fallback detailed roadmap when GPT is unavailable
+  Map<String, dynamic> _fallbackDetailedRoadmap(
+    String goalDescription,
+    DateTime targetDeadline,
+    double hoursPerDay,
+  ) {
+    final daysUntilDeadline = targetDeadline.difference(DateTime.now()).inDays;
+    return {
+      'goal': goalDescription,
+      'targetDeadline': targetDeadline.toIso8601String(),
+      'hoursPerDay': hoursPerDay,
+      'totalEstimatedHours': (daysUntilDeadline * hoursPerDay * 0.7).round(), // 70% utilization
+      'skills': [
+        {
+          'name': 'Planning & Strategy',
+          'description': 'Strategic thinking and planning for business goals',
+        },
+        {
+          'name': 'Execution',
+          'description': 'Taking action and completing tasks',
+        },
+      ],
+      'subtasks': [
+        {
+          'title': 'Research and plan',
+          'description': 'Research and create a detailed plan for achieving this goal',
+          'skillName': 'Planning & Strategy',
+          'estimatedHours': 8.0,
+          'priority': 'high',
+          'dependencies': [],
+          'isMilestone': true,
+          'motivationAnchor': 'A solid plan is the foundation of successful execution',
+          'estimatedFrequency': 'one-time',
+          'suggestedTime': 'morning',
+          'suggestedLocation': 'any',
+        },
+        {
+          'title': 'Execute core tasks',
+          'description': 'Work on the main tasks required to achieve your goal',
+          'skillName': 'Execution',
+          'estimatedHours': (daysUntilDeadline * hoursPerDay * 0.5).toDouble(),
+          'priority': 'high',
+          'dependencies': ['Research and plan'],
+          'isMilestone': false,
+          'motivationAnchor': 'Consistent daily action compounds into significant progress',
+          'estimatedFrequency': 'daily',
+          'suggestedTime': 'any',
+          'suggestedLocation': 'any',
+        },
+        {
+          'title': 'Review and adjust',
+          'description': 'Weekly review and adjustment of your approach',
+          'estimatedHours': (daysUntilDeadline / 7 * 2).toDouble(),
+          'priority': 'medium',
+          'dependencies': [],
+          'isMilestone': false,
+          'motivationAnchor': 'Regular reviews keep you on track and allow course correction',
+          'estimatedFrequency': 'weekly',
+          'suggestedTime': 'evening',
+          'suggestedLocation': 'any',
+        },
+      ],
+      'weeklyGoals': [
+        'Week 1: Complete initial research and planning',
+        'Week 2: Begin core execution tasks',
+        'Week 3: Continue execution and review progress',
+      ],
+      'riskAlerts': [
+        'Risk: Underestimating time needed. Mitigation: Add buffer time to estimates.',
+        'Risk: Losing momentum. Mitigation: Set daily reminders and track progress.',
+      ],
+    };
+  }
+
+  /// Generate subtasks for a goal (MVP: Goal breakdown) - Legacy method
+  Future<Map<String, dynamic>?> generateSubtasks(String goalDescription) async {
+    try {
+      final apiKey = dotenv.env['OPENAI_API_KEY'];
+
+      if (apiKey == null ||
+          apiKey.isEmpty ||
+          apiKey == 'your_openai_api_key_here') {
+        debugPrint('⚠️ OpenAI API key not configured');
+        return _fallbackSubtasks(goalDescription);
+      }
+
+      final prompt = '''
+Break this business goal into 5-8 actionable subtasks that an entrepreneur can work on daily or weekly.
+
+Goal: $goalDescription
+
+For each subtask, provide:
+- title: Short, actionable task name
+- description: What to do
+- estimatedFrequency: "daily", "weekly", "monthly", or "one-time"
+- suggestedTime: "morning", "afternoon", "evening", or "any"
+- suggestedLocation: "home", "office", "coffee_shop", or "any"
+- priority: "high", "medium", or "low"
+
+Return ONLY valid JSON in this format:
+{
+  "goal": "goal name",
+  "subtasks": [
+    {
+      "title": "subtask name",
+      "description": "what to do",
+      "estimatedFrequency": "daily",
+      "suggestedTime": "morning",
+      "suggestedLocation": "office",
+      "priority": "high"
+    }
+  ]
+}
+''';
+
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': [
+            {
+              'role': 'system',
+              'content': 'You are a business goal breakdown assistant. Break goals into actionable subtasks. Always return valid JSON.',
+            },
+            {
+              'role': 'user',
+              'content': prompt,
+            }
+          ],
+          'temperature': 0.7,
+          'max_tokens': 1000,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['choices'][0]['message']['content'] as String;
+
+        // Parse JSON response
+        try {
+          // Extract JSON from markdown code blocks if present
+          String jsonContent = content.trim();
+          if (jsonContent.contains('```json')) {
+            jsonContent = jsonContent.split('```json')[1].split('```')[0].trim();
+          } else if (jsonContent.contains('```')) {
+            jsonContent = jsonContent.split('```')[1].split('```')[0].trim();
+          }
+
+          final parsed = jsonDecode(jsonContent) as Map<String, dynamic>;
+          return parsed;
+        } catch (e) {
+          debugPrint('❌ Error parsing GPT subtask response: $e');
+          debugPrint('Response content: $content');
+          return _fallbackSubtasks(goalDescription);
+        }
+      } else {
+        debugPrint(
+          '❌ GPT API error: ${response.statusCode} - ${response.body}',
+        );
+        return _fallbackSubtasks(goalDescription);
+      }
+    } catch (e) {
+      debugPrint('❌ GPT service error generating subtasks: $e');
+      return _fallbackSubtasks(goalDescription);
+    }
+  }
+
+  /// Fallback subtasks when GPT is unavailable
+  Map<String, dynamic> _fallbackSubtasks(String goalDescription) {
+    return {
+      'goal': goalDescription,
+      'subtasks': [
+        {
+          'title': 'Research and plan',
+          'description': 'Research and create a plan for achieving this goal',
+          'estimatedFrequency': 'weekly',
+          'suggestedTime': 'morning',
+          'suggestedLocation': 'any',
+          'priority': 'high',
+        },
+        {
+          'title': 'Take action',
+          'description': 'Work on tasks related to this goal',
+          'estimatedFrequency': 'daily',
+          'suggestedTime': 'any',
+          'suggestedLocation': 'any',
+          'priority': 'high',
+        },
+        {
+          'title': 'Review progress',
+          'description': 'Review and adjust your approach',
+          'estimatedFrequency': 'weekly',
+          'suggestedTime': 'evening',
+          'suggestedLocation': 'any',
+          'priority': 'medium',
+        },
+      ],
+    };
+  }
+
+  /// Generate motivational message for reminder (Solopreneur Execution Assistant)
+  Future<String?> generateMotivationalMessage({
+    required String goalName,
+    required String taskDescription,
+    String? skillName,
+    int streakCount = 0,
+    int totalReps = 0,
+    String? motivationAnchor,
+  }) async {
+    try {
+      final apiKey = dotenv.env['OPENAI_API_KEY'];
+
+      if (apiKey == null ||
+          apiKey.isEmpty ||
+          apiKey == 'your_openai_api_key_here') {
+        return _fallbackMotivationalMessage(
+          goalName: goalName,
+          taskDescription: taskDescription,
+          skillName: skillName,
+          streakCount: streakCount,
+          motivationAnchor: motivationAnchor,
+        );
+      }
+
+      final prompt = '''
+You are Awarely, a private execution assistant for solopreneurs. Generate a short, motivational reminder message (max 60 words) that:
+
+1. Acknowledges the task: "$taskDescription"
+2. Connects it to the bigger goal: "$goalName"
+${motivationAnchor != null ? '3. Reinforces why it matters: "$motivationAnchor"' : ''}
+${skillName != null ? '4. Mentions the skill being developed: "$skillName"' : ''}
+${streakCount > 0 ? '5. Celebrates progress: "$streakCount-day streak"' : ''}
+${totalReps > 0 ? '6. Shows momentum: "$totalReps total reps logged"' : ''}
+
+Tone: Empathetic, encouraging, non-judgmental. Focus on progress and momentum, not pressure.
+Style: Personal, like a supportive business partner.
+
+Return ONLY the message text, no quotes, no JSON, just the motivational message.
+''';
+
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': [
+            {
+              'role': 'system',
+              'content': 'You are a motivational assistant for entrepreneurs. Generate short, encouraging messages that help users stay motivated. Be empathetic and practical.',
+            },
+            {
+              'role': 'user',
+              'content': prompt,
+            }
+          ],
+          'temperature': 0.8,
+          'max_tokens': 100,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['choices'][0]['message']['content'] as String;
+        return content.trim().replaceAll('"', '').replaceAll('\n', ' ');
+      } else {
+        return _fallbackMotivationalMessage(
+          goalName: goalName,
+          taskDescription: taskDescription,
+          skillName: skillName,
+          streakCount: streakCount,
+          motivationAnchor: motivationAnchor,
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error generating motivational message: $e');
+      return _fallbackMotivationalMessage(
+        goalName: goalName,
+        taskDescription: taskDescription,
+        skillName: skillName,
+        streakCount: streakCount,
+        motivationAnchor: motivationAnchor,
+      );
+    }
+  }
+
+  /// Fallback motivational message when GPT is unavailable
+  String _fallbackMotivationalMessage({
+    required String goalName,
+    required String taskDescription,
+    String? skillName,
+    int streakCount = 0,
+    String? motivationAnchor,
+  }) {
+    final parts = <String>[];
+    
+    if (motivationAnchor != null) {
+      parts.add(motivationAnchor);
+    } else {
+      parts.add('This task moves you closer to "$goalName"');
+    }
+    
+    if (skillName != null) {
+      parts.add('Keep building your $skillName skills');
+    }
+    
+    if (streakCount > 0) {
+      parts.add('You\'re on a $streakCount-day streak!');
+    }
+    
+    parts.add('Let\'s keep the momentum going.');
+    
+    return parts.join('. ') + ' 💪';
+  }
+
   /// Fallback question when GPT is unavailable
   GptResponse _fallbackQuestion(List<String> missingFields) {
     if (missingFields.isEmpty) {

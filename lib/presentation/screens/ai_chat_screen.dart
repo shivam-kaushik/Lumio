@@ -4,6 +4,7 @@ import '../../core/services/ai_conversation_service.dart';
 import '../../core/models/conversation_models.dart';
 import '../../data/models/reminder.dart';
 import '../../presentation/providers/reminder_provider.dart';
+import '../../presentation/screens/goal_roadmap_screen.dart'; // MVP
 import '../../presentation/theme/app_theme.dart';
 
 /// AI Chat Screen - Conversational reminder creation
@@ -46,6 +47,23 @@ class _AiChatScreenState extends State<AiChatScreen> {
         );
         // Optionally close the screen or reset
         Navigator.of(context).pop(reminder);
+      }
+    };
+
+    // MVP: Handle goal roadmap ready
+    _conversationService.onGoalRoadmapReady = (Map<String, dynamic> roadmapData) async {
+      if (mounted) {
+        // Navigate to goal roadmap screen
+        final result = await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => GoalRoadmapScreen(roadmapData: roadmapData),
+          ),
+        );
+        
+        if (result == true && mounted) {
+          // Goal was created successfully
+          Navigator.of(context).pop();
+        }
       }
     };
 
