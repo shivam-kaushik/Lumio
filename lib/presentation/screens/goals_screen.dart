@@ -64,39 +64,59 @@ class _GoalsScreenState extends State<GoalsScreen> {
           builder: (context) => const Center(child: CircularProgressIndicator()),
         );
 
-        // Create goal first
-        final goalId = await context.read<GrowthProvider>().createGoal(result);
-        
-        // Generate subtasks using GPT
+        // Generate roadmap using GPT (includes skills and subtasks)
         final gptService = PrivacyGptService();
-        final roadmap = await gptService.generateSubtasks(result);
+        
+        // Ask for timeline first (needed for generateDetailedRoadmap)
+        final timeline = await _showTimelineDialog(context);
+        
+        if (timeline == null) {
+          if (mounted) {
+            Navigator.pop(context); // Close loading dialog
+          }
+          return;
+        }
+        
+        final deadline = timeline['deadline'] as DateTime;
+        final hoursPerDay = (timeline['hoursPerDay'] as num?)?.toDouble() ?? 2.0;
+        
+        // Generate detailed roadmap with skills and subtasks
+        final roadmap = await gptService.generateDetailedRoadmap(
+          result,
+          targetDeadline: deadline,
+          hoursPerDay: hoursPerDay,
+        );
         
         if (mounted) {
           Navigator.pop(context); // Close loading dialog
           
           if (roadmap != null && roadmap['subtasks'] != null) {
-            // Ask for timeline
-            final timeline = await _showTimelineDialog(context);
+            // Create goal with deadline and capacity
+            final goalId = await context.read<GrowthProvider>().createGoal(
+              result,
+              targetDeadline: deadline,
+              hoursPerDay: hoursPerDay,
+              totalEstimatedHours: roadmap['totalEstimatedHours'] as int?,
+            );
             
-            if (timeline != null && mounted) {
-              // Navigate to planning screen
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => GoalPlanningScreen(
-                    goalId: goalId,
-                    goalName: result,
-                    initialSubtasks: (roadmap['subtasks'] as List)
-                        .map((s) => Subtask.fromMap(s as Map<String, dynamic>))
-                        .toList(),
-                    timeline: timeline,
-                  ),
+            // Navigate to planning screen with roadmap data
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => GoalPlanningScreen(
+                  goalId: goalId,
+                  goalName: result,
+                  initialSubtasks: (roadmap['subtasks'] as List)
+                      .map((s) => Subtask.fromMap(s as Map<String, dynamic>))
+                      .toList(),
+                  timeline: timeline,
                 ),
-              );
-            }
+              ),
+            );
           } else {
-            // No subtasks generated, just show success
+            // Fallback: create goal without roadmap
+            final goalId = await context.read<GrowthProvider>().createGoal(result);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Goal created!')),
+              const SnackBar(content: Text('Goal created! You can add subtasks manually.')),
             );
           }
         }
@@ -114,36 +134,78 @@ class _GoalsScreenState extends State<GoalsScreen> {
   Future<Map<String, dynamic>?> _showTimelineDialog(BuildContext context) async {
     return showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('When do you want to complete this goal?'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildTimelineOption(dialogContext, '1 day', 1, 'days'),
-              _buildTimelineOption(dialogContext, '1 week', 1, 'weeks'),
-              _buildTimelineOption(dialogContext, '2 weeks', 2, 'weeks'),
-              _buildTimelineOption(dialogContext, '1 month', 1, 'months'),
-              _buildTimelineOption(dialogContext, '2 months', 2, 'months'),
-              _buildTimelineOption(dialogContext, '3 months', 3, 'months'),
-              _buildTimelineOption(dialogContext, '6 months', 6, 'months'),
-              _buildTimelineOption(dialogContext, '1 year', 12, 'months'),
-              const Divider(),
-              _buildCustomTimelineOption(dialogContext),
+      builder: (dialogContext) {
+        double hoursPerDay = 2.0;
+        
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: const Text('Goal Timeline'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'When do you want to complete this goal?',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: AppTheme.spacingMD),
+                  _buildTimelineOption(dialogContext, setState, '1 day', 1, 'days', () => hoursPerDay),
+                  _buildTimelineOption(dialogContext, setState, '1 week', 1, 'weeks', () => hoursPerDay),
+                  _buildTimelineOption(dialogContext, setState, '2 weeks', 2, 'weeks', () => hoursPerDay),
+                  _buildTimelineOption(dialogContext, setState, '1 month', 1, 'months', () => hoursPerDay),
+                  _buildTimelineOption(dialogContext, setState, '2 months', 2, 'months', () => hoursPerDay),
+                  _buildTimelineOption(dialogContext, setState, '3 months', 3, 'months', () => hoursPerDay),
+                  _buildTimelineOption(dialogContext, setState, '6 months', 6, 'months', () => hoursPerDay),
+                  _buildTimelineOption(dialogContext, setState, '1 year', 12, 'months', () => hoursPerDay),
+                  const Divider(),
+                  _buildCustomTimelineOption(dialogContext, setState, () => hoursPerDay),
+                  const Divider(),
+                  const SizedBox(height: AppTheme.spacingSM),
+                  const Text(
+                    'How many hours per day can you dedicate?',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: AppTheme.spacingSM),
+                  Slider(
+                    value: hoursPerDay,
+                    min: 0.5,
+                    max: 8.0,
+                    divisions: 15,
+                    label: '${hoursPerDay.toStringAsFixed(1)} hours/day',
+                    onChanged: (value) {
+                      setState(() {
+                        hoursPerDay = value;
+                      });
+                    },
+                  ),
+                  Text(
+                    '${hoursPerDay.toStringAsFixed(1)} hours per day',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildCustomTimelineOption(BuildContext dialogContext) {
+  Widget _buildCustomTimelineOption(
+    BuildContext dialogContext,
+    StateSetter setState,
+    double Function() getHoursPerDay,
+  ) {
     return ListTile(
       leading: const Icon(Icons.calendar_today_rounded),
       title: const Text('Custom Date'),
@@ -161,6 +223,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
           Navigator.pop(dialogContext, {
             'deadline': selectedDate,
             'label': DateFormat('MMM d, y').format(selectedDate),
+            'hoursPerDay': getHoursPerDay(),
           });
         }
       },
@@ -169,9 +232,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
   Widget _buildTimelineOption(
     BuildContext context,
+    StateSetter setState,
     String label,
     int amount,
     String unit,
+    double Function() getHoursPerDay,
   ) {
     return ListTile(
       title: Text(label),
@@ -188,6 +253,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
         Navigator.pop(context, {
           'deadline': deadline,
           'label': label,
+          'hoursPerDay': getHoursPerDay(),
         });
       },
     );

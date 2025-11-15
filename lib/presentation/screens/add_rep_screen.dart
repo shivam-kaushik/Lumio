@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../providers/growth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/skill_selector_dropdown.dart';
+import '../../core/services/permission_service.dart';
 
 /// Screen for manually logging a skill rep
 class AddRepScreen extends StatefulWidget {
@@ -18,12 +20,76 @@ class _AddRepScreenState extends State<AddRepScreen> {
   final _durationController = TextEditingController();
   int? _selectedSkillId;
   bool _isSaving = false;
+  late stt.SpeechToText _speech;
+  bool _isListening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _speech = stt.SpeechToText();
+  }
 
   @override
   void dispose() {
     _notesController.dispose();
     _durationController.dispose();
+    _speech.stop();
     super.dispose();
+  }
+
+  Future<void> _startVoiceInput() async {
+    // Check microphone permission
+    final permissionService = PermissionService();
+    final hasPermission = await permissionService.requestMicrophonePermission();
+    
+    if (!hasPermission) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Microphone permission is required for voice input'),
+          ),
+        );
+      }
+      return;
+    }
+
+    final available = await _speech.initialize();
+    if (!available) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Speech recognition not available')),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _isListening = true);
+    }
+
+    await _speech.listen(
+      onResult: (result) {
+        if (mounted) {
+          setState(() {
+            _notesController.text = result.recognizedWords;
+            if (result.finalResult) {
+              _isListening = false;
+            }
+          });
+        }
+      },
+      localeId: 'en_US',
+      listenMode: stt.ListenMode.confirmation,
+      cancelOnError: true,
+      partialResults: true,
+    );
+  }
+
+  Future<void> _stopVoiceInput() async {
+    await _speech.stop();
+    if (mounted) {
+      setState(() => _isListening = false);
+    }
   }
 
   Future<void> _saveRep() async {
@@ -99,19 +165,33 @@ class _AddRepScreenState extends State<AddRepScreen> {
 
               const SizedBox(height: AppTheme.spacingLG),
 
-              // Notes field
+              // Notes field with voice input
               TextFormField(
                 controller: _notesController,
                 decoration: InputDecoration(
                   labelText: 'What did you do? *',
-                  hintText: 'Describe what you practiced or worked on',
+                  hintText: _isListening 
+                      ? 'Listening... Speak now' 
+                      : 'Describe what you practiced or worked on',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppTheme.radiusMD),
                   ),
                   filled: true,
                   fillColor: AppTheme.surfaceColor,
+                  suffixIcon: _isListening
+                      ? IconButton(
+                          icon: const Icon(Icons.stop_circle_rounded, color: Colors.red),
+                          onPressed: _stopVoiceInput,
+                          tooltip: 'Stop recording',
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.mic_rounded),
+                          onPressed: _startVoiceInput,
+                          tooltip: 'Start voice input',
+                        ),
                 ),
                 maxLines: 4,
+                enabled: !_isListening,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please describe what you did';
@@ -119,6 +199,27 @@ class _AddRepScreenState extends State<AddRepScreen> {
                   return null;
                 },
               ),
+              if (_isListening)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppTheme.spacingSM),
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: AppTheme.spacingSM),
+                      Text(
+                        'Listening... Speak clearly',
+                        style: TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
               const SizedBox(height: AppTheme.spacingLG),
 

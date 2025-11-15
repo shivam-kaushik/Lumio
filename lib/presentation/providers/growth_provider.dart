@@ -107,9 +107,17 @@ class GrowthProvider with ChangeNotifier {
   }
 
   /// Create a new skill
-  Future<int> createSkill(String name, {int? goalId}) async {
+  Future<int> createSkill(
+    String name, {
+    int? goalId,
+    String? description,
+  }) async {
     try {
-      final id = await _repository.createSkill(name, goalId: goalId);
+      final id = await _repository.createSkill(
+        name,
+        goalId: goalId,
+        description: description,
+      );
       await loadGrowthData(); // Reload to get updated list
       return id;
     } catch (e) {

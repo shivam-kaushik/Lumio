@@ -56,33 +56,132 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
   }
 
   void _scheduleSubtasks() {
-    final daysUntilDeadline = _deadline.difference(DateTime.now()).inDays;
-    final subtasksPerDay = (_subtasks.length / daysUntilDeadline).ceil();
+    final now = DateTime.now();
+    final daysUntilDeadline = _deadline.difference(now).inDays;
     
-    var currentDate = DateTime.now();
-    var subtaskIndex = 0;
+    // Get hours per day from timeline (default to 2 if not set)
+    final hoursPerDay = (widget.timeline['hoursPerDay'] as num?)?.toDouble() ?? 2.0;
+    
+    if (_subtasks.isEmpty || daysUntilDeadline <= 0) {
+      _scheduledSubtasks.clear();
+      setState(() {});
+      return;
+    }
+    
+    // Calculate total estimated hours
+    double totalHours = 0;
+    for (var subtask in _subtasks) {
+      totalHours += subtask.estimatedHours ?? 1.0; // Default 1 hour if not specified
+    }
+    
+    if (totalHours == 0) {
+      totalHours = _subtasks.length.toDouble(); // Fallback: 1 hour per task
+    }
+    
+    // Calculate available hours (leave 20% buffer for flexibility)
+    final availableHours = (daysUntilDeadline * hoursPerDay * 0.8);
+    
+    // Warn if total hours exceed available
+    if (totalHours > availableHours) {
+      debugPrint('⚠️ Warning: Total hours ($totalHours) exceed available ($availableHours). Tasks will be distributed but may be tight.');
+    }
     
     _scheduledSubtasks.clear();
     
-    for (var subtask in _subtasks) {
-      if (subtaskIndex >= daysUntilDeadline) break;
+    // Sort by priority first (high priority tasks should be scheduled earlier)
+    final sortedSubtasks = _sortSubtasksByPriority(_subtasks);
+    
+    // Calculate cumulative hours for percentage-based distribution
+    double cumulativeHours = 0.0;
+    
+    for (var subtask in sortedSubtasks) {
+      final estimatedHours = subtask.estimatedHours ?? 1.0;
       
-      final date = currentDate.add(Duration(days: subtaskIndex ~/ subtasksPerDay));
-      final dateKey = DateTime(date.year, date.month, date.day);
+      // Calculate what percentage of total hours this task represents
+      final taskPercentage = estimatedHours / totalHours;
       
-      if (!_scheduledSubtasks.containsKey(dateKey)) {
-        _scheduledSubtasks[dateKey] = [];
+      // Calculate what percentage of the timeline this should occupy
+      // Use cumulative hours to spread tasks across the timeline
+      final timelinePosition = cumulativeHours / totalHours;
+      
+      // Calculate the target day based on timeline position
+      // Leave 10% buffer at the end for final tasks
+      final effectiveDays = (daysUntilDeadline * 0.9).ceil();
+      final targetDayIndex = (timelinePosition * effectiveDays).floor();
+      
+      // Ensure we don't go beyond deadline
+      final dayIndex = targetDayIndex.clamp(0, daysUntilDeadline - 1);
+      
+      // Calculate the target date
+      var targetDate = now.add(Duration(days: dayIndex));
+      
+      // Ensure we don't schedule beyond deadline
+      if (targetDate.isAfter(_deadline)) {
+        targetDate = _deadline.subtract(const Duration(days: 1));
       }
       
-      // Convert Subtask to GoalSubtask for display
-      // Use suggested time to set a specific time of day
-      DateTime scheduledDateTime = dateKey;
+      // For tasks that might exceed daily capacity, distribute across multiple days
+      // But for now, schedule on the calculated day
+      final dateKey = DateTime(targetDate.year, targetDate.month, targetDate.day);
+      
+      // Check if this day already has too many hours scheduled
+      final existingHoursOnDay = _scheduledSubtasks[dateKey]?.fold<double>(
+        0.0,
+        (sum, task) => sum + (task.estimatedHours ?? 1.0),
+      ) ?? 0.0;
+      
+      // If adding this task would exceed daily capacity, try to find a nearby day
+      DateTime finalDate = dateKey;
+      if (existingHoursOnDay + estimatedHours > hoursPerDay) {
+        // Try to find a nearby day with available capacity
+        bool found = false;
+        for (int offset = 1; offset <= 3 && !found; offset++) {
+          // Try days after
+          final candidateDate = dateKey.add(Duration(days: offset));
+          if (candidateDate.isBefore(_deadline)) {
+            final candidateKey = DateTime(candidateDate.year, candidateDate.month, candidateDate.day);
+            final candidateHours = _scheduledSubtasks[candidateKey]?.fold<double>(
+              0.0,
+              (sum, task) => sum + (task.estimatedHours ?? 1.0),
+            ) ?? 0.0;
+            
+            if (candidateHours + estimatedHours <= hoursPerDay) {
+              finalDate = candidateKey;
+              found = true;
+              break;
+            }
+          }
+          
+          // Try days before
+          final candidateDateBefore = dateKey.subtract(Duration(days: offset));
+          if (candidateDateBefore.isAfter(now) || candidateDateBefore.isAtSameMomentAs(now)) {
+            final candidateKey = DateTime(candidateDateBefore.year, candidateDateBefore.month, candidateDateBefore.day);
+            final candidateHours = _scheduledSubtasks[candidateKey]?.fold<double>(
+              0.0,
+              (sum, task) => sum + (task.estimatedHours ?? 1.0),
+            ) ?? 0.0;
+            
+            if (candidateHours + estimatedHours <= hoursPerDay) {
+              finalDate = candidateKey;
+              found = true;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!_scheduledSubtasks.containsKey(finalDate)) {
+        _scheduledSubtasks[finalDate] = [];
+      }
+      
+      // Apply suggested time
+      DateTime scheduledDateTime = finalDate;
       if (subtask.suggestedTime != 'any') {
         int hour = 9; // Default to 9 AM
         if (subtask.suggestedTime == 'morning') hour = 9;
         else if (subtask.suggestedTime == 'afternoon') hour = 14;
         else if (subtask.suggestedTime == 'evening') hour = 18;
-        scheduledDateTime = DateTime(dateKey.year, dateKey.month, dateKey.day, hour);
+        scheduledDateTime = DateTime(finalDate.year, finalDate.month, finalDate.day, hour);
       }
       
       final goalSubtask = GoalSubtask(
@@ -101,11 +200,34 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         createdAt: DateTime.now(),
       );
       
-      _scheduledSubtasks[dateKey]!.add(goalSubtask);
-      subtaskIndex++;
+      _scheduledSubtasks[finalDate]!.add(goalSubtask);
+      
+      // Update cumulative hours for next iteration
+      cumulativeHours += estimatedHours;
     }
     
+    debugPrint('📅 Scheduled ${_scheduledSubtasks.values.fold(0, (sum, list) => sum + list.length)} tasks across ${_scheduledSubtasks.keys.length} days (deadline: ${daysUntilDeadline} days away)');
+    
     setState(() {});
+  }
+
+  /// Sort subtasks by priority and complexity
+  List<Subtask> _sortSubtasksByPriority(List<Subtask> subtasks) {
+    // Sort by priority: high -> medium -> low
+    final priorityOrder = {'high': 0, 'medium': 1, 'low': 2};
+    final sorted = List<Subtask>.from(subtasks);
+    sorted.sort((a, b) {
+      final aPriority = priorityOrder[a.priority] ?? 1;
+      final bPriority = priorityOrder[b.priority] ?? 1;
+      if (aPriority != bPriority) {
+        return aPriority.compareTo(bPriority);
+      }
+      // If same priority, sort by estimated hours (shorter tasks first for better distribution)
+      final aHours = a.estimatedHours ?? 1.0;
+      final bHours = b.estimatedHours ?? 1.0;
+      return aHours.compareTo(bHours);
+    });
+    return sorted;
   }
 
   List<GoalSubtask> _getSubtasksForDay(DateTime day) {
@@ -118,56 +240,71 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       final growthProvider = context.read<GrowthProvider>();
       final reminderProvider = context.read<ReminderProvider>();
       
-      // Create a map to track skills by subtask title (to avoid duplicates)
-      final skillMap = <String, int>{};
+      // Step 1: Create skills from GPT response (using skillName from subtasks)
+      final skillsFromGpt = <String, int>{}; // skillName -> skillId
       
-      // Save all subtasks to database and create/find skills
+      // Extract unique skill names from subtasks
+      final uniqueSkillNames = <String>{};
+      for (var subtask in _subtasks) {
+        if (subtask.skillName != null && subtask.skillName!.isNotEmpty) {
+          uniqueSkillNames.add(subtask.skillName!);
+        }
+      }
+      
+      debugPrint('📋 Creating ${uniqueSkillNames.length} skills from GPT response...');
+      
+      // Create or find skills
+      for (var skillName in uniqueSkillNames) {
+        final existingSkills = growthProvider.getSkillsForGoal(widget.goalId);
+        final matching = existingSkills.where((s) => s.name == skillName);
+        
+        if (matching.isEmpty) {
+          debugPrint('  ➕ Creating new skill: "$skillName" for goalId: ${widget.goalId}');
+          final skillId = await growthProvider.createSkill(
+            skillName,
+            goalId: widget.goalId,
+            description: 'Skill required for goal: ${widget.goalName}',
+          );
+          skillsFromGpt[skillName] = skillId;
+          debugPrint('  ✅ Created skill "$skillName" with id: $skillId');
+        } else {
+          skillsFromGpt[skillName] = matching.first.id;
+          debugPrint('  ✅ Found existing skill "$skillName" with id: ${matching.first.id}');
+        }
+      }
+      
+      // Step 2: Save subtasks and link them to skills
       for (var dateEntry in _scheduledSubtasks.entries) {
-        for (var subtask in dateEntry.value) {
-          // Save subtask to database
-          await growthProvider.createSubtask(subtask);
+        for (var goalSubtask in dateEntry.value) {
+          // Find the original subtask to get skillName
+          final originalSubtask = _subtasks.firstWhere(
+            (s) => s.title == goalSubtask.title,
+            orElse: () => throw Exception('Subtask not found: ${goalSubtask.title}'),
+          );
           
-          // Create or find skill for this subtask
-          int? skillId = skillMap[subtask.title];
-          if (skillId == null) {
-            debugPrint('🔍 Looking for skill: "${subtask.title}" for goalId: ${widget.goalId}');
-            
-            // Ensure goalId is valid
-            if (widget.goalId <= 0) {
-              debugPrint('❌ Invalid goalId: ${widget.goalId}');
-              throw Exception('Invalid goalId: ${widget.goalId}');
-            }
-            
-            // Check if skill already exists for this goal
-            final existingSkills = growthProvider.getSkillsForGoal(widget.goalId);
-            debugPrint('  Found ${existingSkills.length} existing skills for this goal');
-            
-            final matchingSkills = existingSkills.where(
-              (s) => s.name == subtask.title,
-            );
-            
-            if (matchingSkills.isNotEmpty) {
-              skillId = matchingSkills.first.id;
-              debugPrint('  ✅ Found existing skill: ${matchingSkills.first.name} (id: $skillId)');
+          // Find skill ID for this subtask
+          int? skillId;
+          if (originalSubtask.skillName != null && originalSubtask.skillName!.isNotEmpty) {
+            skillId = skillsFromGpt[originalSubtask.skillName];
+            if (skillId != null) {
+              // Update goalSubtask with skillId before saving
+              final subtaskWithSkill = goalSubtask.copyWith(skillId: skillId);
+              await growthProvider.createSubtask(subtaskWithSkill);
+              debugPrint('  ✅ Saved subtask "${goalSubtask.title}" linked to skill "${originalSubtask.skillName}" (id: $skillId)');
             } else {
-              // Create new skill
-              debugPrint('  ➕ Creating new skill: "${subtask.title}" for goalId: ${widget.goalId}');
-              skillId = await growthProvider.createSkill(
-                subtask.title,
-                goalId: widget.goalId,
-              );
-              debugPrint('  ✅ Created skill with id: $skillId');
+              debugPrint('  ⚠️ Skill "${originalSubtask.skillName}" not found in skills map');
+              await growthProvider.createSubtask(goalSubtask);
             }
-            skillMap[subtask.title] = skillId;
           } else {
-            debugPrint('  ♻️ Reusing skill from cache: "${subtask.title}" (id: $skillId)');
+            debugPrint('  ⚠️ Subtask "${goalSubtask.title}" has no skillName');
+            await growthProvider.createSubtask(goalSubtask);
           }
           
           // Create reminder for subtask, linked to skill and goal
           final reminder = Reminder(
-            text: subtask.description,
-            timeAt: subtask.scheduledDate,
-            priority: _getReminderPriority(subtask.priority),
+            text: goalSubtask.description,
+            timeAt: goalSubtask.scheduledDate,
+            priority: _getReminderPriority(goalSubtask.priority),
             linkedSkillId: skillId,
             linkedGoalId: widget.goalId, // Direct link to goal for categorization
           );
@@ -182,7 +319,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       // Also reload reminders to ensure they're up to date
       await reminderProvider.loadReminders();
       
-      debugPrint('📊 Summary: Created ${skillMap.length} skills, ${_scheduledSubtasks.values.fold(0, (sum, list) => sum + list.length)} reminders');
+      debugPrint('📊 Summary: Created ${skillsFromGpt.length} skills, ${_scheduledSubtasks.values.fold(0, (sum, list) => sum + list.length)} reminders');
       
       if (mounted) {
         Navigator.pop(context, true);

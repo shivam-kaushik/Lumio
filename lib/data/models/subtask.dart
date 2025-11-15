@@ -2,6 +2,7 @@
 class Subtask {
   final String title;
   final String description;
+  final String? skillName; // Skill required for this subtask (from GPT)
   final String frequency; // 'daily', 'weekly', 'monthly', 'one-time'
   final String suggestedTime; // 'morning', 'afternoon', 'evening', 'any'
   final String suggestedLocation; // 'home', 'office', 'coffee_shop', 'any'
@@ -14,6 +15,7 @@ class Subtask {
   Subtask({
     required this.title,
     required this.description,
+    this.skillName,
     this.frequency = 'weekly',
     this.suggestedTime = 'any',
     this.suggestedLocation = 'any',
@@ -29,6 +31,7 @@ class Subtask {
     return Subtask(
       title: map['title'] as String? ?? '',
       description: map['description'] as String? ?? '',
+      skillName: map['skillName'] as String?,
       frequency: map['estimatedFrequency'] as String? ?? 
                  map['frequency'] as String? ?? 'weekly',
       suggestedTime: map['suggestedTime'] as String? ?? 'any',
@@ -52,6 +55,7 @@ class Subtask {
     return {
       'title': title,
       'description': description,
+      'skillName': skillName,
       'frequency': frequency,
       'suggestedTime': suggestedTime,
       'suggestedLocation': suggestedLocation,
@@ -67,6 +71,7 @@ class Subtask {
   Subtask copyWith({
     String? title,
     String? description,
+    String? skillName,
     String? frequency,
     String? suggestedTime,
     String? suggestedLocation,
@@ -79,6 +84,7 @@ class Subtask {
     return Subtask(
       title: title ?? this.title,
       description: description ?? this.description,
+      skillName: skillName ?? this.skillName,
       frequency: frequency ?? this.frequency,
       suggestedTime: suggestedTime ?? this.suggestedTime,
       suggestedLocation: suggestedLocation ?? this.suggestedLocation,
