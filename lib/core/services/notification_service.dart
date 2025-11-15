@@ -85,6 +85,9 @@ class NotificationService {
       if (actionId == 'complete_action' && response.id != null) {
         // Handle complete action
         await _handleCompleteAction(payload, response.id!);
+      } else if (actionId == 'snooze_action' && response.id != null) {
+        // Handle snooze action
+        await _handleSnoozeAction(payload, response.id!);
       } else {
         await _recordNotificationInteraction(payload, 'seen');
       }
@@ -104,9 +107,83 @@ class NotificationService {
       if (actionId == 'complete_action' && response.id != null) {
         // Handle complete action
         await _handleCompleteAction(payload, response.id!);
+      } else if (actionId == 'snooze_action' && response.id != null) {
+        // Handle snooze action
+        await _handleSnoozeAction(payload, response.id!);
       } else {
         await _recordNotificationInteraction(payload, 'seen');
       }
+    }
+  }
+
+  /// Handle snooze action from notification (reschedule for 1 hour later)
+  static Future<void> _handleSnoozeAction(String payload, int notificationId) async {
+    debugPrint('⏰ Handling snooze action for payload: $payload, notification $notificationId');
+    
+    try {
+      // Parse payload (can be reminder ID string or JSON)
+      String reminderId;
+      String? title;
+      String? body;
+      
+      try {
+        // Try to parse as JSON
+        final data = jsonDecode(payload);
+        reminderId = data['reminder_id'] as String;
+        title = data['title'] as String?;
+        body = data['body'] as String?;
+      } catch (e) {
+        // Fallback: treat as simple reminder ID
+        reminderId = payload;
+      }
+      
+      // Get reminder details from repository
+      final reminderRepository = ReminderRepository();
+      final reminder = await reminderRepository.getReminder(reminderId);
+      
+      if (reminder == null) {
+        debugPrint('❌ Reminder $reminderId not found for snooze');
+        return;
+      }
+      
+      // Calculate new scheduled time (1 hour from now)
+      final newScheduledTime = DateTime.now().add(const Duration(hours: 1));
+      
+      // Cancel current notification
+      final notificationService = NotificationService();
+      await notificationService.cancelNotification(notificationId);
+      
+      // Reschedule notification for 1 hour later
+      final notificationTitle = title ?? reminder.text;
+      final notificationBody = body ?? 'Reminder: ${reminder.text}';
+      
+      // Generate new notification ID (use timestamp to ensure uniqueness)
+      final newNotificationId = DateTime.now().millisecondsSinceEpoch % 2147483647;
+      
+      await notificationService.scheduleNotification(
+        id: newNotificationId,
+        title: notificationTitle,
+        body: notificationBody,
+        scheduledTime: newScheduledTime,
+        payload: payload, // Keep same payload
+      );
+      
+      // Create context event for snooze
+      await reminderRepository.createContextEvent(
+        ContextEvent(
+          reminderId: reminderId,
+          contextType: 'notification_action',
+          outcome: 'snoozed',
+          metadata: {
+            'snoozed_until': newScheduledTime.toIso8601String(),
+            'original_notification_id': notificationId,
+          },
+        ),
+      );
+      
+      debugPrint('✅ Successfully snoozed reminder $reminderId until $newScheduledTime');
+    } catch (e) {
+      debugPrint('❌ Error handling snooze action: $e');
     }
   }
 
@@ -237,6 +314,13 @@ class NotificationService {
     debugPrint('Showing notification id=$id title="$title" payload=$payload');
 
     // Create action buttons
+    const snoozeAction = AndroidNotificationAction(
+      'snooze_action',
+      'Snooze',
+      showsUserInterface: false,
+      cancelNotification: false, // Don't cancel, we'll reschedule
+    );
+    
     const completeAction = AndroidNotificationAction(
       'complete_action',
       'Complete',
@@ -244,7 +328,7 @@ class NotificationService {
       cancelNotification: true,
     );
 
-    final androidDetails = AndroidNotificationDetails(
+    const androidDetails = AndroidNotificationDetails(
       AppConstants.notificationChannelId,
       AppConstants.notificationChannelName,
       channelDescription: AppConstants.notificationChannelDesc,
@@ -258,9 +342,10 @@ class NotificationService {
       autoCancel: true,
       ongoing: false,
       fullScreenIntent: true, // Shows notification even when screen is off
-      actions: [completeAction],
+      actions: [snoozeAction, completeAction], // Snooze first, then Complete
     );
 
+    // iOS notification details (actions require separate registration, simplified for now)
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
@@ -294,6 +379,13 @@ class NotificationService {
         '📅 Scheduling notification id=$id title="$title" at $scheduledTime payload=$payload',);
 
     // Create action buttons
+    const snoozeAction = AndroidNotificationAction(
+      'snooze_action',
+      'Snooze',
+      showsUserInterface: false,
+      cancelNotification: false, // Don't cancel, we'll reschedule
+    );
+    
     const completeAction = AndroidNotificationAction(
       'complete_action',
       'Complete',
@@ -301,7 +393,7 @@ class NotificationService {
       cancelNotification: true,
     );
 
-    final androidDetails = AndroidNotificationDetails(
+    const androidDetails = AndroidNotificationDetails(
       AppConstants.notificationChannelId,
       AppConstants.notificationChannelName,
       channelDescription: AppConstants.notificationChannelDesc,
@@ -314,9 +406,10 @@ class NotificationService {
       ongoing: false,
       fullScreenIntent: true, // Critical for showing when screen is off
       visibility: NotificationVisibility.public,
-      actions: [completeAction],
+      actions: [snoozeAction, completeAction], // Snooze first, then Complete
     );
 
+    // iOS notification details (actions require separate registration, simplified for now)
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,

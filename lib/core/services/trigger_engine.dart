@@ -467,20 +467,20 @@ class TriggerEngine {
           motivationAnchor: null, // Could be stored in reminder metadata
         );
         
-        payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}"}';
         title = '🚀 Execution Time!';
         body = motivationalMessage ?? 'Ready to log your rep? (${reminder.text})';
+        payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
       } catch (e) {
         debugPrint('❌ Error generating motivational message: $e');
-        payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}"}';
         title = 'Momentum Rep Ready!';
         body = 'Ready to log your rep? (${reminder.text})';
+        payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
       }
     } else {
       // Standard task
-      payload = '{"action":"complete","reminder_id":"${reminder.id}"}';
       title = 'Task';
       body = reminder.text;
+      payload = '{"action":"complete","reminder_id":"${reminder.id}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
     }
     
     await _notificationService.showNotification(
@@ -518,13 +518,13 @@ class TriggerEngine {
         String body;
         
         if (reminder.linkedSkillId != null) {
-          payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}"}';
           title = 'Momentum Rep Ready!';
           body = 'Ready to log your rep? (${reminder.text})';
+          payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
         } else {
-          payload = '{"action":"complete","reminder_id":"${reminder.id}"}';
           title = 'Task';
           body = reminder.text;
+          payload = '{"action":"complete","reminder_id":"${reminder.id}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
         }
         
         await _notificationService.scheduleNotification(
