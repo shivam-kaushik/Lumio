@@ -1,12 +1,12 @@
 /// Application-wide constants
 class AppConstants {
   // App Info
-  static const String appName = 'Awarely';
+  static const String appName = 'Lumio';
   static const String appTagline = 'Never forget what matters';
   static const String version = '1.0.0';
 
   // Database
-  static const String dbName = 'awarely.db';
+  static const String dbName = 'lumio.db';
   static const int dbVersion = 12; // Removed skills/reps, renamed subtasks to tasks
 
   // Tables
@@ -26,7 +26,7 @@ class AppConstants {
   static const Duration contextCheckInterval = Duration(minutes: 15);
 
   // Notification Channels
-  static const String notificationChannelId = 'awarely_reminders';
+  static const String notificationChannelId = 'lumio_reminders';
   static const String notificationChannelName = 'Reminders';
   static const String notificationChannelDesc =
       'Context-aware reminder notifications';

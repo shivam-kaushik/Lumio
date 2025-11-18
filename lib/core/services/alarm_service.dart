@@ -8,7 +8,7 @@ import 'package:timezone/timezone.dart' as tz;
 /// Android: Uses native AlarmManager for exact timing
 /// iOS: Uses flutter_local_notifications (iOS doesn't have exact alarms)
 class AlarmService {
-  static const _channel = MethodChannel('com.example.awarely/alarms');
+  static const _channel = MethodChannel('com.example.lumio/alarms');
   static final FlutterLocalNotificationsPlugin _iosNotifications = 
       FlutterLocalNotificationsPlugin();
 
@@ -85,7 +85,7 @@ class AlarmService {
                 presentSound: true,
               ),
               android: AndroidNotificationDetails(
-                'awarely_reminders',
+                'lumio_reminders',
                 'Reminders',
                 channelDescription: 'Context-aware reminder notifications',
                 importance: Importance.max,
@@ -119,7 +119,7 @@ class AlarmService {
         debugPrint('🤖 Platform: Android - Using native AlarmManager');
         
         debugPrint('📞 Invoking native method channel:');
-        debugPrint('   Channel: com.example.awarely/alarms');
+        debugPrint('   Channel: com.example.lumio/alarms');
         debugPrint('   Method: scheduleExactAlarm');
         debugPrint('   Arguments:');
         debugPrint('     - id: $id');
@@ -149,7 +149,7 @@ class AlarmService {
           debugPrint('');
           debugPrint('🔍 Possible causes:');
           debugPrint('   1. Exact alarm permission not granted (Android 12+)');
-          debugPrint('   2. Battery optimization enabled for Awarely');
+          debugPrint('   2. Battery optimization enabled for Lumio');
           debugPrint('   3. Device power saving mode active');
           debugPrint('   4. App not whitelisted from battery optimization');
           debugPrint('   5. Android system restrictions');

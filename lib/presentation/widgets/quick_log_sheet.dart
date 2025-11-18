@@ -43,7 +43,7 @@ class QuickLogSheet extends StatelessWidget {
               ),
               const SizedBox(height: AppTheme.spacingSM),
               Text(
-                'Skill tracking and rep logging have been removed from Awarely. '
+                'Skill tracking and rep logging have been removed from Lumio. '
                 'You can still plan and complete goal tasks from the planner.',
                 textAlign: TextAlign.center,
                 style: TextStyle(

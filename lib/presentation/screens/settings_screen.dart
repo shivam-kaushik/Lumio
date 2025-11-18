@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/services/permission_service.dart';
 import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/modern_smart_card.dart';
 
 /// Minimal settings screen for MVP
 class SettingsScreen extends StatefulWidget {
@@ -53,39 +54,48 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Custom AppBar
-        Container(
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top,
-            left: AppTheme.spacingLG,
-            right: AppTheme.spacingMD,
-            bottom: AppTheme.spacingMD,
-          ),
-          decoration: BoxDecoration(
-            color: AppTheme.backgroundColor,
-            border: Border(
-              bottom: BorderSide(
-                color: AppTheme.borderColor,
-                width: 1,
-              ),
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    return Scaffold(
+      backgroundColor: isDark ? Colors.black : AppTheme.backgroundColor,
+      body: Column(
+        children: [
+          // Custom AppBar
+          Container(
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top,
+              left: AppTheme.spacingLG,
+              right: AppTheme.spacingMD,
+              bottom: AppTheme.spacingMD,
             ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Settings',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark 
+                      ? AppTheme.darkBorder 
+                      : AppTheme.borderColor,
+                  width: 1,
                 ),
               ),
-            ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Settings',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isDark 
+                          ? AppTheme.darkTextPrimary 
+                          : AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
         // Body content
         Expanded(
           child: RefreshIndicator(
@@ -113,22 +123,29 @@ class _SettingsScreenState extends State<SettingsScreen>
                 const SizedBox(height: AppTheme.spacingSM),
                 Consumer<ThemeProvider>(
                   builder: (context, themeProvider, child) {
-                    return Card(
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusLG),
-                        side: const BorderSide(color: AppTheme.borderColor, width: 1),
-                      ),
-                      color: AppTheme.surfaceColor,
+                    return ModernSmartCard(
+                      useGradient: true,
+                      elevationLevel: 1,
                       child: SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
                         secondary: Icon(
                           themeProvider.isDarkMode(context)
                               ? Icons.dark_mode
                               : Icons.light_mode,
+                          color: isDark 
+                              ? AppTheme.darkTextPrimary 
+                              : AppTheme.textPrimary,
                         ),
-                        title: Text(themeProvider.isDarkMode(context)
-                            ? 'Dark Mode'
-                            : 'Light Mode'),
+                        title: Text(
+                          themeProvider.isDarkMode(context)
+                              ? 'Dark Mode'
+                              : 'Light Mode',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextPrimary 
+                                : AppTheme.textPrimary,
+                          ),
+                        ),
                         value: themeProvider.themeMode == ThemeMode.dark,
                         onChanged: (value) {
                           themeProvider.setThemeMode(
@@ -152,29 +169,44 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                 ),
                 const SizedBox(height: AppTheme.spacingSM),
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusLG),
-                    side: const BorderSide(color: AppTheme.borderColor, width: 1),
-                  ),
-                  color: AppTheme.surfaceColor,
+                ModernSmartCard(
+                  useGradient: true,
+                  elevationLevel: 1,
                   child: Column(
                     children: [
                       ListTile(
-                        leading: const Icon(Icons.notifications),
-                        title: const Text('Notifications'),
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.notifications,
+                          color: isDark 
+                              ? AppTheme.darkTextPrimary 
+                              : AppTheme.textPrimary,
+                        ),
+                        title: Text(
+                          'Notifications',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextPrimary 
+                                : AppTheme.textPrimary,
+                          ),
+                        ),
                         subtitle: Text(
                           _notificationsEnabled ? 'Enabled' : 'Disabled',
                           style: TextStyle(
                             color: _notificationsEnabled
                                 ? AppTheme.successColor
-                                : AppTheme.textSecondary,
+                                : (isDark 
+                                    ? AppTheme.darkTextSecondary 
+                                    : AppTheme.textSecondary),
                           ),
                         ),
                         trailing: OutlinedButton(
                           style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: AppTheme.borderColor),
+                            side: BorderSide(
+                              color: isDark 
+                                  ? AppTheme.darkBorder 
+                                  : AppTheme.borderColor,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(AppTheme.radiusSM),
                             ),
@@ -190,24 +222,55 @@ class _SettingsScreenState extends State<SettingsScreen>
                               _refreshStatuses();
                             }
                           },
-                          child: const Text('Manage'),
+                          child: Text(
+                            'Manage',
+                            style: TextStyle(
+                              color: isDark 
+                                  ? AppTheme.darkTextPrimary 
+                                  : AppTheme.textPrimary,
+                            ),
+                          ),
                         ),
                       ),
-                      const Divider(height: 1),
+                      Divider(
+                        height: 1,
+                        color: isDark 
+                            ? AppTheme.darkDivider 
+                            : AppTheme.dividerColor,
+                      ),
                       ListTile(
-                        leading: const Icon(Icons.schedule),
-                        title: const Text('Exact Alarms'),
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.schedule,
+                          color: isDark 
+                              ? AppTheme.darkTextPrimary 
+                              : AppTheme.textPrimary,
+                        ),
+                        title: Text(
+                          'Exact Alarms',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextPrimary 
+                                : AppTheme.textPrimary,
+                          ),
+                        ),
                         subtitle: Text(
                           _exactAlarmEnabled ? 'Enabled' : 'Disabled',
                           style: TextStyle(
                             color: _exactAlarmEnabled
                                 ? AppTheme.successColor
-                                : AppTheme.textSecondary,
+                                : (isDark 
+                                    ? AppTheme.darkTextSecondary 
+                                    : AppTheme.textSecondary),
                           ),
                         ),
                         trailing: OutlinedButton(
                           style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: AppTheme.borderColor),
+                            side: BorderSide(
+                              color: isDark 
+                                  ? AppTheme.darkBorder 
+                                  : AppTheme.borderColor,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(AppTheme.radiusSM),
                             ),
@@ -223,7 +286,14 @@ class _SettingsScreenState extends State<SettingsScreen>
                               _refreshStatuses();
                             }
                           },
-                          child: const Text('Manage'),
+                          child: Text(
+                            'Manage',
+                            style: TextStyle(
+                              color: isDark 
+                                  ? AppTheme.darkTextPrimary 
+                                  : AppTheme.textPrimary,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -231,18 +301,39 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
                 const SizedBox(height: AppTheme.spacingLG),
                 // App Settings
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusLG),
-                    side: const BorderSide(color: AppTheme.borderColor, width: 1),
-                  ),
-                  color: AppTheme.surfaceColor,
+                ModernSmartCard(
+                  useGradient: true,
+                  elevationLevel: 1,
                   child: ListTile(
-                    leading: const Icon(Icons.settings),
-                    title: const Text('App Settings'),
-                    subtitle: const Text('Open system app settings'),
-                    trailing: const Icon(Icons.chevron_right),
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      Icons.settings,
+                      color: isDark 
+                          ? AppTheme.darkTextPrimary 
+                          : AppTheme.textPrimary,
+                    ),
+                    title: Text(
+                      'App Settings',
+                      style: TextStyle(
+                        color: isDark 
+                            ? AppTheme.darkTextPrimary 
+                            : AppTheme.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Open system app settings',
+                      style: TextStyle(
+                        color: isDark 
+                            ? AppTheme.darkTextSecondary 
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                    trailing: Icon(
+                      Icons.chevron_right,
+                      color: isDark 
+                          ? AppTheme.darkTextSecondary 
+                          : AppTheme.textSecondary,
+                    ),
                     onTap: () async {
                       await _permissionService.openSettings();
                     },
@@ -253,6 +344,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
         ),
       ],
+    ),
     );
   }
 }

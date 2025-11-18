@@ -94,7 +94,7 @@ class PrivacyGptService {
 
   /// Build system instructions for GPT
   String _buildSystemInstructions() {
-    return '''You are Awarely, a privacy-focused reminder assistant.
+    return '''You are Lumio, a privacy-focused reminder assistant.
 
 CRITICAL RULES:
 1. ONLY ask about REQUIRED fields - never ask about optional fields
@@ -265,7 +265,7 @@ Return JSON:
       final totalAvailableHours = daysUntilDeadline * hoursPerDay;
 
       final prompt = '''
-You are Awarely, a private, hands-free execution assistant for solopreneurs. Your purpose is to help entrepreneurs turn spoken intentions into structured business roadmaps.
+You are Lumio, a private, hands-free execution assistant for solopreneurs. Your purpose is to help entrepreneurs turn spoken intentions into structured business roadmaps.
 
 Goal: $goalDescription
 Target Deadline: ${targetDeadline.toString().split(' ')[0]} (${daysUntilDeadline} days from now)
@@ -609,7 +609,7 @@ Return ONLY valid JSON in this format:
       }
 
       final prompt = '''
-You are Awarely, a private execution assistant for solopreneurs. Generate a short, motivational reminder message (max 60 words) that:
+You are Lumio, a private execution assistant for solopreneurs. Generate a short, motivational reminder message (max 60 words) that:
 
 1. Acknowledges the task: "$taskDescription"
 2. Connects it to the bigger goal: "$goalName"

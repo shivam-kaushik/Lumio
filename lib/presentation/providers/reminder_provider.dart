@@ -136,7 +136,7 @@ class ReminderProvider with ChangeNotifier {
         debugPrint('⚠️⚠️⚠️ WARNING: EXACT ALARM PERMISSION NOT GRANTED! ⚠️⚠️⚠️');
         debugPrint('   Notifications may not work reliably!');
         debugPrint('   User needs to grant permission:');
-        debugPrint('   Settings → Apps → Awarely → Alarms & Reminders');
+        debugPrint('   Settings → Apps → Lumio → Alarms & Reminders');
       } else {
         debugPrint('✅ Exact alarm permission granted (or not required on this platform)');
       }

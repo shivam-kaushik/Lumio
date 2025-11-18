@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/reminder.dart';
@@ -8,6 +8,7 @@ import '../../data/repositories/reminder_repository.dart';
 import '../theme/app_theme.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../providers/reminder_provider.dart';
+import 'modern_smart_card.dart';
 
 /// Premium reminder card widget with minimal, elegant design
 /// Includes smooth animations and interactive feedback
@@ -52,128 +53,102 @@ class _ReminderCardState extends State<ReminderCard>
     super.dispose();
   }
 
-  void _handleTapDown(TapDownDetails details) {
-    _controller.forward();
-    HapticFeedback.lightImpact();
-  }
-
-  void _handleTapUp(TapUpDetails details) {
-    _controller.reverse();
-  }
-
-  void _handleTapCancel() {
-    _controller.reverse();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
     
     return ScaleTransition(
       scale: _scaleAnimation,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 6), // Further reduced
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(AppTheme.radiusLG),
-          border: Border.all(
-            color: widget.reminder.enabled 
-                ? AppTheme.primaryColor.withOpacity(0.1)
-                : AppTheme.borderColor,
-            width: 1,
-          ),
-          boxShadow: widget.reminder.enabled 
-              ? AppTheme.getElevationShadow(1)
-              : null,
+      child: ModernSmartCard(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
         ),
-        child: Material(
-          color: Colors.transparent,
-      child: InkWell(
-            onTap: widget.onTap,
-            onTapDown: _handleTapDown,
-            onTapUp: _handleTapUp,
-            onTapCancel: _handleTapCancel,
-            borderRadius: BorderRadius.circular(AppTheme.radiusLG),
-        child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12, // Reduced from spacingMD
-                vertical: 8, // Further reduced
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Complete checkbox - Leftmost
-                  Consumer<ReminderProvider>(
-                    builder: (context, provider, child) {
-                      final isCompleted = !widget.reminder.enabled;
-                      return GestureDetector(
-                        onTap: () {
-                          HapticFeedback.mediumImpact();
-                          if (!isCompleted) {
-                            provider.completeReminder(widget.reminder.id);
-                          }
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 20, // Reduced from 24
-                          height: 20, // Reduced from 24
+        elevationLevel: widget.reminder.enabled ? 1 : 0,
+        borderColor: widget.reminder.enabled 
+            ? AppTheme.primaryColor.withOpacity(0.1)
+            : null,
+        onTap: widget.onTap,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Complete checkbox - Leftmost
+            Consumer<ReminderProvider>(
+              builder: (context, provider, child) {
+                final isCompleted = !widget.reminder.enabled;
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    if (!isCompleted) {
+                      provider.completeReminder(widget.reminder.id);
+                    }
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 20, // Reduced from 24
+                    height: 20, // Reduced from 24
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                            border: Border.all(
-                              color: isCompleted
-                                  ? AppTheme.successColor
-                                  : AppTheme.borderColor,
-                              width: 2,
-                            ),
-                            color: isCompleted
-                                ? AppTheme.successColor
-                                : Colors.transparent,
-                          ),
-                          child: isCompleted
-                              ? const Icon(
-                                  Icons.check_rounded,
-                                  color: Colors.white,
-                                  size: 14, // Reduced from 16
-                                )
-                              : null,
-                        ),
-                      );
-                    },
-                  ),
-                  
-                  const SizedBox(width: 10), // Reduced from spacingMD
-                  
-                  // Reminder text - Center (expanded)
-                  Expanded(
-                    child: Text(
-                      widget.reminder.text,
-                      style: theme.textTheme.bodyMedium?.copyWith( // Changed from bodyLarge
-                        fontWeight: FontWeight.w500,
-                        height: 1.3, // Reduced from 1.4
-                        fontSize: 14, // Explicit smaller font
-                        decoration: !widget.reminder.enabled
-                            ? TextDecoration.lineThrough
-                            : TextDecoration.none,
-                        color: !widget.reminder.enabled
-                            ? AppTheme.textTertiary
-                            : AppTheme.textPrimary,
+                      border: Border.all(
+                        color: isCompleted
+                            ? AppTheme.successColor
+                            : AppTheme.borderColor,
+                        width: 2,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      color: isCompleted
+                          ? AppTheme.successColor
+                          : Colors.transparent,
                     ),
+                    child: isCompleted
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 14, // Reduced from 16
+                          )
+                        : null,
                   ),
-                  
-                  const SizedBox(width: 10), // Reduced from spacingMD
-                  
-                  // Date and time - Rightmost
-                  _buildDateTime(context, widget.reminder),
-                ],
+                );
+              },
+            ),
+            
+            const SizedBox(width: 10), // Reduced from spacingMD
+            
+            // Reminder text - Center (expanded)
+            Expanded(
+              child: Text(
+                widget.reminder.text,
+                style: theme.textTheme.bodyMedium?.copyWith( // Changed from bodyLarge
+                  fontWeight: FontWeight.w500,
+                  height: 1.3, // Reduced from 1.4
+                  fontSize: 14, // Explicit smaller font
+                  decoration: !widget.reminder.enabled
+                      ? TextDecoration.lineThrough
+                      : TextDecoration.none,
+                  color: !widget.reminder.enabled
+                      ? (theme.brightness == Brightness.dark
+                          ? AppTheme.darkTextTertiary
+                          : AppTheme.textTertiary)
+                      : (theme.brightness == Brightness.dark
+                          ? AppTheme.darkTextPrimary
+                          : AppTheme.textPrimary),
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ),
+            
+            const SizedBox(width: 10), // Reduced from spacingMD
+            
+            // Date and time - Rightmost
+            _buildDateTime(context, widget.reminder),
+          ],
         ),
-      ),
+      )
+        .animate()
+        .fadeIn(duration: 500.ms, delay: 50.ms)
+        .slideX(begin: -0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic)
+        .scale(begin: const Offset(0.98, 0.98), end: const Offset(1.0, 1.0), duration: 500.ms, curve: Curves.easeOutCubic),
     );
   }
 
@@ -210,18 +185,22 @@ class _ReminderCardState extends State<ReminderCard>
               children: [
               Text(
                   'Recurring',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                    fontSize: 11, // Reduced from 12
-                    fontWeight: FontWeight.w500,
-                  ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.brightness == Brightness.dark
+                      ? AppTheme.darkTextSecondary
+                      : AppTheme.textSecondary,
+                  fontSize: 11, // Reduced from 12
+                  fontWeight: FontWeight.w500,
+                ),
                   textAlign: TextAlign.right,
                 ),
                 const SizedBox(height: 2),
                     Icon(
                   Icons.repeat_rounded,
                   size: 12,
-                  color: AppTheme.textTertiary,
+                  color: theme.brightness == Brightness.dark
+                    ? AppTheme.darkTextTertiary
+                    : AppTheme.textTertiary,
                 ),
               ],
             );
@@ -254,7 +233,9 @@ class _ReminderCardState extends State<ReminderCard>
               Text(
                 dateText,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
+                  color: theme.brightness == Brightness.dark
+                      ? AppTheme.darkTextSecondary
+                      : AppTheme.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   height: 1.3,
@@ -265,7 +246,9 @@ class _ReminderCardState extends State<ReminderCard>
               Icon(
                 Icons.repeat_rounded,
                 size: 12,
-                color: AppTheme.textTertiary,
+                color: theme.brightness == Brightness.dark
+                    ? AppTheme.darkTextTertiary
+                    : AppTheme.textTertiary,
               ),
             ],
           );

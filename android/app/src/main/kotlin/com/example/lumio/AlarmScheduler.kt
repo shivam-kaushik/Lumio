@@ -1,4 +1,4 @@
-package com.example.awarely
+package com.example.lumio
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -38,7 +38,7 @@ class AlarmScheduler(private val context: Context) {
                 if (!canSchedule) {
                     Log.e(TAG, "❌ CANNOT SCHEDULE EXACT ALARMS - PERMISSION NOT GRANTED")
                     Log.e(TAG, "   User needs to grant 'Alarms & Reminders' permission")
-                    Log.e(TAG, "   Go to: Settings → Apps → Awarely → Alarms & Reminders")
+                    Log.e(TAG, "   Go to: Settings → Apps → Lumio → Alarms & Reminders")
                     return false
                 }
             } else {

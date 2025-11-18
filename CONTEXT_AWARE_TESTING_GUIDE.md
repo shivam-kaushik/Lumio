@@ -24,8 +24,8 @@ Ensure the app has requested:
 - **Location** (While in Use or Always)
 - **Notifications**
 - **Microphone** (for voice input)
-- **Battery optimization disabled** (Settings → Battery → Awarely → Don't optimize)
-- **Exact alarm permission** (Android 12+, Settings → Apps → Awarely → Schedule exact alarms)
+- **Battery optimization disabled** (Settings → Battery → Lumio → Don't optimize)
+- **Exact alarm permission** (Android 12+, Settings → Apps → Lumio → Schedule exact alarms)
 
 ### 3. Enable Logging
 All context-aware features have comprehensive logging. View logs using:
@@ -220,7 +220,7 @@ adb logcat | grep DeviceState
 
 #### Test: Background monitoring continues
 1. **Setup:**
-   - Disable battery optimization (Settings → Battery → Awarely)
+   - Disable battery optimization (Settings → Battery → Lumio)
    - Create location-based reminder
    - Minimize app
 
@@ -319,9 +319,9 @@ Look for these log tags:
 ```bash
 # Access database on device
 adb shell
-run-as com.example.awarely
+run-as com.example.lumio
 cd databases
-sqlite3 awarely.db
+sqlite3 lumio.db
 
 # Check reminders
 SELECT id, text, activityType, onArriveContext, onLeaveContext FROM reminders;
@@ -339,16 +339,16 @@ SELECT * FROM learning_patterns;
 Monitor battery impact:
 ```bash
 # Check battery stats
-adb shell dumpsys batterystats | grep awarely
+adb shell dumpsys batterystats | grep lumio
 
 # Monitor CPU usage
-adb shell top -n 1 | grep awarely
+adb shell top -n 1 | grep lumio
 ```
 
 ### Memory Usage
 ```bash
 # Check memory
-adb shell dumpsys meminfo com.example.awarely
+adb shell dumpsys meminfo com.example.lumio
 ```
 
 ## Expected Log Output Examples

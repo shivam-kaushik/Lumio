@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../data/models/reminder.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../../core/utils/reminder_context_status.dart';
 import '../theme/app_theme.dart';
 import 'reminder_card.dart';
+import 'modern_smart_card.dart';
 
 /// Premium context group card with elegant section header and live status
 class ContextGroupCard extends StatelessWidget {
@@ -90,7 +92,7 @@ class ContextGroupCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      // Icon badge
+                      // Icon badge with animation
                       Container(
                         width: 32,
                         height: 32,
@@ -104,7 +106,10 @@ class ContextGroupCard extends StatelessWidget {
                             style: const TextStyle(fontSize: 16),
                           ),
                         ),
-                      ),
+                      )
+                        .animate()
+                        .scale(delay: 100.ms, duration: 500.ms, curve: Curves.elasticOut)
+                        .shimmer(delay: 600.ms, duration: 1500.ms, color: _getContextColor(contextTitle).withOpacity(0.3)),
                       const SizedBox(width: AppTheme.spacingSM),
                       // Title and count
                       Expanded(
@@ -116,13 +121,18 @@ class ContextGroupCard extends StatelessWidget {
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: -0.2,
+                                color: theme.brightness == Brightness.dark
+                                    ? AppTheme.darkTextPrimary
+                                    : AppTheme.textPrimary,
                               ),
                             ),
                             if (description.isNotEmpty)
                               Text(
                                 description,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: AppTheme.textSecondary,
+                                  color: theme.brightness == Brightness.dark
+                                      ? AppTheme.darkTextSecondary
+                                      : AppTheme.textSecondary,
                                   fontSize: 12,
                                 ),
                               ),
@@ -159,8 +169,10 @@ class ContextGroupCard extends StatelessWidget {
               ),
             ),
 
-            // Reminders list
-            ...reminders.map((reminder) {
+            // Reminders list with staggered animations
+            ...reminders.asMap().entries.map((entry) {
+              final index = entry.key;
+              final reminder = entry.value;
               final status = statuses.firstWhere(
                 (s) => s.reminder.id == reminder.id,
                 orElse: () => ReminderContextStatus(
@@ -180,7 +192,11 @@ class ContextGroupCard extends StatelessWidget {
                 onDelete: onDelete != null
                     ? () => onDelete!(reminder.id)
                     : null,
-              );
+              )
+                .animate()
+                .fadeIn(duration: 500.ms, delay: (index * 80).ms)
+                .slideX(begin: -0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic)
+                .scale(begin: const Offset(0.95, 0.95), end: const Offset(1.0, 1.0), duration: 500.ms, curve: Curves.easeOutCubic);
             }),
           ],
         );
@@ -222,13 +238,18 @@ class ContextGroupCard extends StatelessWidget {
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.2,
+                    color: theme.brightness == Brightness.dark
+                        ? AppTheme.darkTextPrimary
+                        : AppTheme.textPrimary,
                   ),
                 ),
                 if (description.isNotEmpty)
                   Text(
                     description,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: theme.brightness == Brightness.dark
+                          ? AppTheme.darkTextSecondary
+                          : AppTheme.textSecondary,
                       fontSize: 12,
                     ),
                   ),

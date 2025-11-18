@@ -119,7 +119,7 @@ class _SplashScreenState extends State<SplashScreen>
 
                     // App Name
                     Text(
-                      'Awarely',
+                      'Lumio',
                       style: Theme.of(context).textTheme.displayLarge?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,

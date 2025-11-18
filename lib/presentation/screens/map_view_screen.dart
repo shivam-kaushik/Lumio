@@ -992,7 +992,7 @@ class _MapViewScreenState extends State<MapViewScreen> {
                               '2. API key restrictions are too strict\n'
                               '   → Check Google Cloud Console\n'
                               '   → Ensure Maps SDK for Android is enabled\n'
-                              '   → Verify package name: com.example.awarely\n\n'
+                              '   → Verify package name: com.example.lumio\n\n'
                               '3. Billing not enabled\n'
                               '   → Enable billing in Google Cloud Console\n\n'
                               'After fixing, run: flutter clean && flutter run',

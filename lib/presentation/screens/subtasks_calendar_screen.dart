@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/growth_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/modern_smart_card.dart';
 import '../../data/models/goal_task.dart';
 import '../../data/models/goal.dart';
 
@@ -52,11 +53,14 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: isDark ? Colors.black : AppTheme.backgroundColor,
       appBar: AppBar(
         title: const Text('Calendar'),
-        backgroundColor: AppTheme.surfaceColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: Consumer<GrowthProvider>(
@@ -70,7 +74,12 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.chevron_left_rounded),
+                      icon: Icon(
+                        Icons.chevron_left_rounded,
+                        color: isDark 
+                            ? AppTheme.darkTextPrimary 
+                            : AppTheme.textPrimary,
+                      ),
                       onPressed: () {
                         setState(() {
                           _focusedDay = DateTime(
@@ -83,10 +92,20 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
                     ),
                     Text(
                       DateFormat('MMMM yyyy').format(_focusedDay),
-                      style: Theme.of(context).textTheme.titleLarge,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: isDark 
+                            ? AppTheme.darkTextPrimary 
+                            : AppTheme.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.chevron_right_rounded),
+                      icon: Icon(
+                        Icons.chevron_right_rounded,
+                        color: isDark 
+                            ? AppTheme.darkTextPrimary 
+                            : AppTheme.textPrimary,
+                      ),
                       onPressed: () {
                         setState(() {
                           _focusedDay = DateTime(
@@ -102,7 +121,11 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
               ),
               // Calendar grid
               _buildCalendarGrid(),
-              const Divider(),
+              Divider(
+                color: isDark 
+                    ? AppTheme.darkDivider 
+                    : AppTheme.dividerColor,
+              ),
               // Selected day's tasks
               Expanded(
                 child: _buildTasksList(),
@@ -115,6 +138,8 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
   }
 
   Widget _buildCalendarGrid() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final firstDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
     final lastDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
     final firstWeekday = firstDayOfMonth.weekday;
@@ -158,7 +183,9 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
                           day,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: AppTheme.textSecondary,
+                            color: isDark 
+                                ? AppTheme.darkTextSecondary 
+                                : AppTheme.textSecondary,
                             fontSize: 12,
                           ),
                         ),
@@ -207,7 +234,9 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
                               style: TextStyle(
                                 color: isSelected
                                     ? Colors.white
-                                    : AppTheme.textPrimary,
+                                    : (isDark 
+                                        ? AppTheme.darkTextPrimary 
+                                        : AppTheme.textPrimary),
                                 fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
                                 fontSize: 14,
                               ),
@@ -239,6 +268,8 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
   Widget _buildTasksList() {
     final tasks = _getTasksForDay(_selectedDay);
     final growthProvider = context.read<GrowthProvider>();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     
     if (tasks.isEmpty) {
       return Center(
@@ -248,12 +279,18 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
             Icon(
               Icons.calendar_today_rounded,
               size: 64,
-              color: AppTheme.textSecondary.withOpacity(0.5),
+              color: (isDark 
+                  ? AppTheme.darkTextSecondary 
+                  : AppTheme.textSecondary).withOpacity(0.5),
             ),
             const SizedBox(height: AppTheme.spacingMD),
             Text(
               'No tasks scheduled for ${DateFormat('MMM d, y').format(_selectedDay)}',
-              style: TextStyle(color: AppTheme.textSecondary),
+              style: TextStyle(
+                color: isDark 
+                    ? AppTheme.darkTextSecondary 
+                    : AppTheme.textSecondary,
+              ),
             ),
           ],
         ),
@@ -274,61 +311,121 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
           ),
         );
         
-        return Card(
-          margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
-          child: ListTile(
-            leading: task.isMilestone
-                ? Icon(Icons.flag_rounded, color: AppTheme.primaryColor)
-                : Icon(Icons.check_circle_outline_rounded),
-            title: Text(
-              task.title,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(task.description),
-                const SizedBox(height: 4),
-                Text(
-                  'Goal: ${goal.name}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.w600,
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        
+        return ModernSmartCard(
+          margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
+          useGradient: true,
+          elevationLevel: 1,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Checkbox/Icon
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: task.isCompleted
+                            ? AppTheme.successColor
+                            : (isDark ? AppTheme.darkBorder : AppTheme.borderColor),
+                        width: 2,
+                      ),
+                      color: task.isCompleted
+                          ? AppTheme.successColor
+                          : Colors.transparent,
+                    ),
+                    child: task.isCompleted
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          )
+                        : null,
                   ),
-                ),
-                if (task.estimatedHours != null)
-                  Text(
-                    'Estimated: ${task.estimatedHours!.toStringAsFixed(1)} hours',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
+                  const SizedBox(width: AppTheme.spacingMD),
+                  // Title and content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          task.title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: isDark 
+                                ? AppTheme.darkTextPrimary 
+                                : AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          task.description,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: isDark 
+                                ? AppTheme.darkTextSecondary 
+                                : AppTheme.textSecondary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Goal: ${goal.name}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.primaryColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (task.estimatedHours != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Estimated: ${task.estimatedHours!.toStringAsFixed(1)} hours',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark 
+                                  ? AppTheme.darkTextTertiary 
+                                  : AppTheme.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-              ],
-            ),
-            trailing: IconButton(
-              icon: Icon(
-                task.isCompleted
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                color: task.isCompleted ? Colors.green : AppTheme.textSecondary,
+                  // Complete button
+                  IconButton(
+                    icon: Icon(
+                      task.isCompleted
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      color: task.isCompleted 
+                          ? AppTheme.successColor 
+                          : (isDark 
+                              ? AppTheme.darkTextSecondary 
+                              : AppTheme.textSecondary),
+                    ),
+                    onPressed: () async {
+                      if (!task.isCompleted) {
+                        final message = await growthProvider.completeTask(task.id);
+                        if (mounted && message != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(message),
+                              backgroundColor: Colors.green,
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ],
               ),
-              onPressed: () async {
-                if (!task.isCompleted) {
-                  final message = await growthProvider.completeTask(task.id);
-                  if (mounted && message != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(message),
-                        backgroundColor: Colors.green,
-                        duration: const Duration(seconds: 4),
-                      ),
-                    );
-                  }
-                }
-              },
-            ),
+            ],
           ),
         );
       },

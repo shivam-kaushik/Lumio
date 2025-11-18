@@ -108,18 +108,18 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  runApp(const AwarelyApp());
+  runApp(const LumioApp());
 }
 
 /// Main application widget
-class AwarelyApp extends StatefulWidget {
-  const AwarelyApp({super.key});
+class LumioApp extends StatefulWidget {
+  const LumioApp({super.key});
 
   @override
-  State<AwarelyApp> createState() => _AwarelyAppState();
+  State<LumioApp> createState() => _LumioAppState();
 }
 
-class _AwarelyAppState extends State<AwarelyApp> {
+class _LumioAppState extends State<LumioApp> {
   TriggerEngine? _triggerEngine;
 
   @override
@@ -183,7 +183,7 @@ class _AwarelyAppState extends State<AwarelyApp> {
           const useDevicePreview = false;
           
           final app = MaterialApp(
-            title: 'Awarely',
+            title: 'Lumio',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,

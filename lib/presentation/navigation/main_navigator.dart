@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../screens/home_screen.dart';
 import '../screens/goals_screen.dart';
 import '../screens/subtasks_calendar_screen.dart';
@@ -118,8 +119,11 @@ class _MainNavigatorState extends State<MainNavigator>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: isDark ? Colors.black : AppTheme.backgroundColor,
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
@@ -131,7 +135,7 @@ class _MainNavigatorState extends State<MainNavigator>
     );
   }
 
-  /// Build floating action button for quick actions
+  /// Build floating action button for quick actions with animations
   Widget _buildFloatingActionButton(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 75), // Position above navigation bar
@@ -168,24 +172,44 @@ class _MainNavigatorState extends State<MainNavigator>
             ),
           ),
         ),
-      ),
+      )
+        .animate()
+        .scale(delay: 500.ms, duration: 600.ms, curve: Curves.elasticOut)
+        .shimmer(delay: 1100.ms, duration: 2000.ms, color: Colors.white.withOpacity(0.4)),
     );
   }
 
   Widget _buildBottomNavBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
+        gradient: isDark
+            ? LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFF0F0F0F).withOpacity(0.98),
+                  Colors.black.withOpacity(0.98),
+                ],
+              )
+            : null,
+        color: isDark ? null : Theme.of(context).scaffoldBackgroundColor,
         boxShadow: [
           BoxShadow(
-            color: AppTheme.shadowColor,
+            color: isDark
+                ? Colors.black.withOpacity(0.3)
+                : AppTheme.shadowColor,
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
         ],
         border: Border(
           top: BorderSide(
-            color: AppTheme.borderColor,
+            color: isDark
+                ? const Color(0xFF2A2A2A).withOpacity(0.6)
+                : AppTheme.borderColor,
             width: 1,
           ),
         ),
@@ -217,7 +241,7 @@ class _MainNavigatorState extends State<MainNavigator>
     );
   }
 
-  /// Build center record button (Strava-style)
+  /// Build center record button (Strava-style) with animations
   Widget _buildCenterRecordButton(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXS),
@@ -252,7 +276,10 @@ class _MainNavigatorState extends State<MainNavigator>
             ),
           ),
         ),
-      ),
+      )
+        .animate()
+        .scale(delay: 300.ms, duration: 600.ms, curve: Curves.elasticOut)
+        .shimmer(delay: 900.ms, duration: 1500.ms, color: Colors.white.withOpacity(0.3)),
     );
   }
 
@@ -339,11 +366,21 @@ class _InteractiveTabButtonState extends State<_InteractiveTabButton>
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                curve: Curves.easeInOut,
+                curve: Curves.easeInOutCubic,
                 padding: const EdgeInsets.all(AppTheme.spacingXS),
                 decoration: BoxDecoration(
+                  gradient: widget.isActive
+                      ? LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppTheme.primaryColor.withOpacity(0.15),
+                            AppTheme.primaryLight.withOpacity(0.1),
+                          ],
+                        )
+                      : null,
                   color: widget.isActive
-                      ? AppTheme.primaryColor.withOpacity(0.1)
+                      ? null
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(AppTheme.radiusSM),
                 ),
@@ -351,9 +388,18 @@ class _InteractiveTabButtonState extends State<_InteractiveTabButton>
                   widget.icon,
                   color: widget.isActive
                       ? AppTheme.primaryColor
-                      : AppTheme.textSecondary,
-                  size: 24,
-                ),
+                      : (Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.darkTextPrimary.withOpacity(0.85)
+                          : AppTheme.textPrimary.withOpacity(0.65)),
+                  size: 26,
+                )
+                  .animate(target: widget.isActive ? 1 : 0)
+                  .scale(duration: 200.ms, curve: Curves.easeOutCubic)
+                  .then()
+                  .shimmer(
+                    duration: 1000.ms,
+                    color: AppTheme.primaryColor.withOpacity(0.3),
+                  ),
               ),
               const SizedBox(height: 4),
               AnimatedDefaultTextStyle(
@@ -363,7 +409,9 @@ class _InteractiveTabButtonState extends State<_InteractiveTabButton>
                   fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.w500,
                   color: widget.isActive
                       ? AppTheme.primaryColor
-                      : AppTheme.textSecondary,
+                      : (Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.darkTextPrimary.withOpacity(0.7)
+                          : AppTheme.textPrimary.withOpacity(0.7)),
                 ),
                 child: Text(widget.label),
               ),

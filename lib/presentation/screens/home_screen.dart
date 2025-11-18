@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../providers/reminder_provider.dart';
 import '../providers/growth_provider.dart';
 import '../widgets/context_group_card.dart';
 import '../widgets/smart_reminder_dialog.dart';
+import '../widgets/modern_smart_card.dart';
 import '../theme/app_theme.dart';
 import 'add_reminder_screen.dart';
 import '../../data/models/reminder.dart';
@@ -215,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(
         children: [
-          // Logo/Icon with subtle gradient
+          // Logo/Icon with subtle gradient and 3D effect
           Container(
             width: 48,
             height: 48,
@@ -229,14 +231,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               borderRadius: BorderRadius.circular(AppTheme.radiusMD),
-              boxShadow: AppTheme.getElevationShadow(2),
+              boxShadow: AppTheme.getElevationShadow(2, isDark: isDark),
             ),
             child: const Icon(
               Icons.notifications_active_rounded,
               color: Colors.white,
               size: 24,
             ),
-          ),
+          )
+            .animate()
+            .scale(delay: 200.ms, duration: 600.ms, curve: Curves.elasticOut)
+            .shimmer(delay: 800.ms, duration: 2000.ms, color: Colors.white.withOpacity(0.4)),
           
           const SizedBox(width: AppTheme.spacingMD),
           
@@ -246,12 +251,15 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Awarely',
+                  'Lumio',
                   style: theme.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.5,
                   ),
-                ),
+                )
+                  .animate()
+                  .fadeIn(duration: 600.ms, delay: 100.ms)
+                  .slideX(begin: -0.2, end: 0, duration: 600.ms, curve: Curves.easeOutCubic),
                 const SizedBox(height: 2),
                 Text(
                   'Never forget what matters',
@@ -259,7 +267,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: AppTheme.textSecondary,
                     fontSize: 13,
                   ),
-                ),
+                )
+                  .animate()
+                  .fadeIn(duration: 600.ms, delay: 200.ms)
+                  .slideX(begin: -0.2, end: 0, duration: 600.ms, curve: Curves.easeOutCubic),
               ],
             ),
           ),
@@ -278,24 +289,22 @@ class _HomeScreenState extends State<HomeScreen> {
     
     if (total == 0) return const SizedBox.shrink();
     
-    return Container(
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    return ModernSmartCard(
       margin: const EdgeInsets.fromLTRB(
         AppTheme.spacingMD,
         AppTheme.spacingSM,
         AppTheme.spacingMD,
         AppTheme.spacingMD,
       ),
-      padding: const EdgeInsets.all(AppTheme.spacingMD),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLG),
-        border: Border.all(color: AppTheme.borderColor, width: 1),
-        boxShadow: AppTheme.getElevationShadow(1),
-      ),
+      useGradient: true,
+      elevationLevel: 2,
       child: Row(
         children: [
           Expanded(
-            child: _buildStatItem(context, '$active', 'Active'),
+            child: _buildStatItem(context, '$active', 'Active', isDark),
           ),
           Container(
             width: 1,
@@ -307,22 +316,29 @@ class _HomeScreenState extends State<HomeScreen> {
               context,
               '$completionRate%',
               'Completed',
+              isDark,
             ),
           ),
           Container(
             width: 1,
             height: 40,
-            color: AppTheme.dividerColor,
+            color: isDark 
+                ? const Color(0xFF1E1E20)
+                : AppTheme.dividerColor,
           ),
           Expanded(
-            child: _buildStatItem(context, '$total', 'Total'),
+            child: _buildStatItem(context, '$total', 'Total', isDark),
           ),
         ],
       ),
-    );
+    )
+      .animate()
+      .fadeIn(duration: 600.ms, delay: 100.ms)
+      .slideY(begin: -0.2, end: 0, duration: 600.ms, curve: Curves.easeOutCubic)
+      .scale(begin: const Offset(0.95, 0.95), end: const Offset(1.0, 1.0), duration: 600.ms, curve: Curves.easeOutCubic);
   }
 
-  Widget _buildStatItem(BuildContext context, String value, String label) {
+  Widget _buildStatItem(BuildContext context, String value, String label, bool isDark) {
     return Column(
       children: [
         Text(

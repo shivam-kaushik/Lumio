@@ -32,6 +32,16 @@ class AppTheme {
   static const Color borderColor = Color(0xFFE2E8F0); // Very light gray
   static const Color dividerColor = Color(0xFFF1F5F9); // Subtle divider
   
+  // Dark Mode Colors - Material 3 baseline
+  static const Color darkBackground = Color(0xFF000000); // Pure black for maximum contrast
+  static const Color darkSurface = Color(0xFF0F0F0F); // Card surface - slightly lighter than background
+  static const Color darkSurfaceElevated = Color(0xFF1A1A1A); // Elevated cards
+  static const Color darkTextPrimary = Color(0xFFFFFFFF); // White with 87% opacity in practice
+  static const Color darkTextSecondary = Color(0xFF94A3B8); // Muted text (60% opacity)
+  static const Color darkTextTertiary = Color(0xFF64748B); // Very muted (38% opacity)
+  static const Color darkBorder = Color(0xFF2A2A2A); // Subtle border
+  static const Color darkDivider = Color(0xFF1A1A1A); // Divider
+  
   // Shadow Colors - Soft, modern shadows
   static const Color shadowColor = Color(0x1A000000); // 10% opacity
   
@@ -229,17 +239,18 @@ class AppTheme {
     );
   }
 
-  /// Dark theme - Premium dark mode
+  /// Dark theme - Premium dark mode (Material 3 baseline)
   static ThemeData get darkTheme {
-    const darkBackground = Color(0xFF0F172A); // Deep dark blue-gray
-    const darkSurface = Color(0xFF1E293B); // Elevated surface
-    const darkTextPrimary = Color(0xFFF1F5F9); // Near white
-    const darkTextSecondary = Color(0xFF94A3B8); // Muted text
-    const darkBorder = Color(0xFF334155); // Subtle border
+    // Use static constants defined above
+    
+    // Neon accent colors for highlights
+    const neonBlue = Color(0xFF3B82F6);
+    const neonPurple = Color(0xFF8B5CF6);
+    const neonMint = Color(0xFF10B981);
     
     final textTheme = GoogleFonts.interTextTheme(ThemeData.dark().textTheme).apply(
-      bodyColor: darkTextPrimary,
-      displayColor: darkTextPrimary,
+      bodyColor: AppTheme.darkTextPrimary,
+      displayColor: AppTheme.darkTextPrimary,
     );
     
     return ThemeData(
@@ -251,37 +262,45 @@ class AppTheme {
         secondary: secondaryColor,
         tertiary: accentColor,
         error: errorColor,
-        surface: darkSurface,
+        surface: AppTheme.darkSurface,
+        background: AppTheme.darkBackground, // Ensure background is set
       ),
-      scaffoldBackgroundColor: darkBackground,
+      scaffoldBackgroundColor: AppTheme.darkBackground, // Force dark background
+      canvasColor: AppTheme.darkBackground, // Canvas color
+      cardColor: AppTheme.darkSurface, // Card color
+      dialogBackgroundColor: AppTheme.darkSurface, // Dialog background
       textTheme: textTheme.copyWith(
         displayLarge: textTheme.displayLarge?.copyWith(
           fontWeight: FontWeight.w700,
           letterSpacing: -0.5,
-          color: darkTextPrimary,
+          color: AppTheme.darkTextPrimary.withOpacity(0.87), // 87% opacity
         ),
         displayMedium: textTheme.displayMedium?.copyWith(
           fontWeight: FontWeight.w700,
           letterSpacing: -0.5,
-          color: darkTextPrimary,
+          color: darkTextPrimary.withOpacity(0.87),
         ),
         headlineLarge: textTheme.headlineLarge?.copyWith(
           fontWeight: FontWeight.w600,
           letterSpacing: -0.3,
-          color: darkTextPrimary,
+          color: darkTextPrimary.withOpacity(0.87),
         ),
         titleLarge: textTheme.titleLarge?.copyWith(
           fontWeight: FontWeight.w600,
           letterSpacing: -0.2,
-          color: darkTextPrimary,
+          color: darkTextPrimary.withOpacity(0.87),
         ),
         bodyLarge: textTheme.bodyLarge?.copyWith(
           fontWeight: FontWeight.w400,
-          color: darkTextPrimary,
+          color: darkTextPrimary.withOpacity(0.87),
         ),
         bodyMedium: textTheme.bodyMedium?.copyWith(
           fontWeight: FontWeight.w400,
-          color: darkTextSecondary,
+          color: AppTheme.darkTextSecondary, // 60% opacity
+        ),
+        bodySmall: textTheme.bodySmall?.copyWith(
+          fontWeight: FontWeight.w400,
+          color: AppTheme.darkTextTertiary, // 38% opacity
         ),
       ),
       appBarTheme: AppBarTheme(
@@ -289,15 +308,15 @@ class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         backgroundColor: Colors.transparent,
-        foregroundColor: darkTextPrimary,
+        foregroundColor: AppTheme.darkTextPrimary,
         titleTextStyle: GoogleFonts.inter(
           fontSize: 28,
           fontWeight: FontWeight.w700,
-          color: darkTextPrimary,
+          color: AppTheme.darkTextPrimary,
           letterSpacing: -0.5,
         ),
         iconTheme: const IconThemeData(
-          color: darkTextPrimary,
+          color: AppTheme.darkTextPrimary,
           size: 24,
         ),
       ),
@@ -306,9 +325,10 @@ class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusLG),
-          side: const BorderSide(color: darkBorder, width: 1),
+          side: BorderSide(color: AppTheme.darkBorder.withOpacity(0.5), width: 1),
         ),
-        color: darkSurface,
+        color: AppTheme.darkSurface,
+        shadowColor: Colors.black.withOpacity(0.3),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: primaryColor,
@@ -322,18 +342,18 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: darkSurface,
+        fillColor: AppTheme.darkSurface,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: spacingMD,
           vertical: spacingMD,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusMD),
-          borderSide: const BorderSide(color: darkBorder, width: 1),
+          borderSide: const BorderSide(color: AppTheme.darkBorder, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusMD),
-          borderSide: const BorderSide(color: darkBorder, width: 1),
+          borderSide: const BorderSide(color: AppTheme.darkBorder, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusMD),
@@ -346,7 +366,7 @@ class AppTheme {
         ),
         hintStyle: GoogleFonts.inter(
           fontSize: 14,
-          color: darkTextSecondary.withOpacity(0.6),
+          color: AppTheme.darkTextSecondary.withOpacity(0.6),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -387,13 +407,13 @@ class AppTheme {
         ),
       ),
       dividerTheme: DividerThemeData(
-        color: darkBorder,
+        color: AppTheme.darkDivider,
         thickness: 1,
         space: 1,
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: darkSurface,
-        deleteIconColor: darkTextSecondary,
+        backgroundColor: AppTheme.darkSurface,
+        deleteIconColor: AppTheme.darkTextSecondary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusRound),
         ),
@@ -406,16 +426,139 @@ class AppTheme {
   }
   
   /// Helper method to get shadow for elevated surfaces
-  static List<BoxShadow> getElevationShadow(int level) {
-    const shadows = [
-      [], // level 0
-      [BoxShadow(color: shadowColor, blurRadius: 2, offset: Offset(0, 1))], // level 1
-      [BoxShadow(color: shadowColor, blurRadius: 4, offset: Offset(0, 2))], // level 2
-      [BoxShadow(color: shadowColor, blurRadius: 8, offset: Offset(0, 4))], // level 3
-      [BoxShadow(color: shadowColor, blurRadius: 16, offset: Offset(0, 8))], // level 4
-    ];
-    return level >= 0 && level < shadows.length 
-        ? shadows[level] as List<BoxShadow>
-        : shadows[2] as List<BoxShadow>;
+  static List<BoxShadow> getElevationShadow(int level, {bool isDark = false}) {
+    // Clamp level to valid range
+    final clampedLevel = level.clamp(0, 4);
+    
+    if (isDark) {
+      // Dark mode shadows - softer, more subtle
+      switch (clampedLevel) {
+        case 0:
+          return <BoxShadow>[];
+        case 1:
+          return [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ];
+        case 2:
+          return [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ];
+        case 3:
+          return [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ];
+        case 4:
+          return [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.35),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ];
+        default:
+          return [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ];
+      }
+    } else {
+      // Light mode shadows
+      switch (clampedLevel) {
+        case 0:
+          return <BoxShadow>[];
+        case 1:
+          return const [
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 2,
+              offset: Offset(0, 1),
+            ),
+          ];
+        case 2:
+          return const [
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            ),
+          ];
+        case 3:
+          return const [
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 8,
+              offset: Offset(0, 4),
+            ),
+          ];
+        case 4:
+          return const [
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 16,
+              offset: Offset(0, 8),
+            ),
+          ];
+        default:
+          return const [
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            ),
+          ];
+      }
+    }
+  }
+  
+  /// Get gradient for cards (subtle, never flat)
+  static LinearGradient getCardGradient({bool isDark = false}) {
+    if (isDark) {
+      return LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          const Color(0xFF1A1A1A),
+          const Color(0xFF0F0F0F),
+        ],
+      );
+    } else {
+      return LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Colors.white,
+          const Color(0xFFFAFBFC),
+        ],
+      );
+    }
+  }
+  
+  /// Get neon accent color for highlights
+  static Color getNeonAccent({String type = 'blue'}) {
+    switch (type) {
+      case 'blue':
+        return const Color(0xFF3B82F6);
+      case 'purple':
+        return const Color(0xFF8B5CF6);
+      case 'mint':
+        return const Color(0xFF10B981);
+      default:
+        return primaryColor;
+    }
   }
 }

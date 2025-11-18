@@ -1,4 +1,4 @@
-package com.example.awarely
+package com.example.lumio
 
 import android.app.AlarmManager
 import android.content.BroadcastReceiver
@@ -16,10 +16,10 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
-    private val CHANNEL = "com.example.awarely/permissions"
-    private val ALARM_CHANNEL = "com.example.awarely/alarms"
-    private val WIFI_CHANNEL = "com.example.awarely/wifi"
-    private val DEVICE_STATE_CHANNEL = "com.example.awarely/device_state"
+    private val CHANNEL = "com.example.lumio/permissions"
+    private val ALARM_CHANNEL = "com.example.lumio/alarms"
+    private val WIFI_CHANNEL = "com.example.lumio/wifi"
+    private val DEVICE_STATE_CHANNEL = "com.example.lumio/device_state"
     private lateinit var alarmScheduler: AlarmScheduler
     private var batteryReceiver: BroadcastReceiver? = null
     private lateinit var flutterEngine: FlutterEngine

@@ -1,4 +1,4 @@
-package com.example.awarely
+package com.example.lumio
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -16,8 +16,8 @@ class AlarmReceiver : BroadcastReceiver() {
         const val EXTRA_TITLE = "title"
         const val EXTRA_BODY = "body"
         const val EXTRA_PAYLOAD = "payload"
-        const val CHANNEL_ID = "awarely_reminders"
-        const val CHANNEL_NAME = "Awarely Reminders"
+        const val CHANNEL_ID = "lumio_reminders"
+        const val CHANNEL_NAME = "Lumio Reminders"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -82,7 +82,7 @@ class AlarmReceiver : BroadcastReceiver() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val importance = NotificationManager.IMPORTANCE_HIGH
             val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
-                description = "Notifications for Awarely reminders"
+                description = "Notifications for Lumio reminders"
                 enableVibration(true)
                 enableLights(true)
                 setShowBadge(true)
