@@ -10,7 +10,6 @@ import '../widgets/context_group_card.dart';
 import '../widgets/smart_reminder_dialog.dart';
 import '../theme/app_theme.dart';
 import 'add_reminder_screen.dart';
-import 'ai_chat_screen.dart';
 import '../../data/models/reminder.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../../core/services/home_detection_service.dart';
@@ -167,108 +166,30 @@ class _HomeScreenState extends State<HomeScreen> {
       );
   }
 
-  /// Group tasks by goals (via skill linkage)
+  /// Group tasks by goals (using linkedGoalId)
   Map<String, List<Reminder>> _groupTasksByGoals(
     List<Reminder> reminders,
     GrowthProvider growthProvider,
   ) {
     final groups = <String, List<Reminder>>{};
-    
-    debugPrint('🔍 Categorizing ${reminders.length} reminders...');
-    debugPrint('📊 Available skills: ${growthProvider.skills.length}');
-    debugPrint('📊 Available goals: ${growthProvider.goals.length}');
-    
-    // Log all skills and their goalIds
-    for (var skill in growthProvider.skills) {
-      debugPrint('  Skill: ${skill.name} (id: ${skill.id}, goalId: ${skill.goalId})');
-    }
-    
-    // Log all goals
-    for (var goal in growthProvider.goals) {
-      debugPrint('  Goal: ${goal.name} (id: ${goal.id})');
-    }
-    
-    // Ensure we have skills and goals loaded
-    if (growthProvider.skills.isEmpty && growthProvider.goals.isEmpty) {
-      debugPrint('⚠️ No growth data available - putting all in General Tasks');
-      // If no growth data, put everything in General Tasks
-      for (var reminder in reminders) {
-        groups.putIfAbsent('General Tasks', () => []).add(reminder);
-      }
-      return groups;
-    }
-    
+    final goalMap = {
+      for (var goal in growthProvider.goals) goal.id: goal.name,
+    };
+
     for (var reminder in reminders) {
       String groupName = 'General Tasks';
-      
-      debugPrint('🔍 Processing reminder: "${reminder.text}" (linkedGoalId: ${reminder.linkedGoalId}, linkedSkillId: ${reminder.linkedSkillId})');
-      
-      // Priority 1: Use linkedGoalId if available (direct link)
+
       if (reminder.linkedGoalId != null) {
-        try {
-          final matchingGoals = growthProvider.goals.where(
-            (g) => g.id == reminder.linkedGoalId,
-          );
-          
-          if (matchingGoals.isNotEmpty) {
-            groupName = matchingGoals.first.name;
-            debugPrint('  ✅ Task "${reminder.text}" categorized under goal (via linkedGoalId): $groupName');
-          } else {
-            debugPrint('  ⚠️ Goal not found for linkedGoalId: ${reminder.linkedGoalId}');
-            debugPrint('  Available goal IDs: ${growthProvider.goals.map((g) => g.id).join(", ")}');
-          }
-        } catch (e) {
-          debugPrint('  ❌ Error categorizing task via linkedGoalId: $e');
+        final linkedGoalName = goalMap[reminder.linkedGoalId!];
+        if (linkedGoalName != null) {
+          groupName = linkedGoalName;
         }
       }
-      // Priority 2: Fallback to skill-based lookup if no direct goal link
-      else if (reminder.linkedSkillId != null) {
-        try {
-          // Find the skill
-          final matchingSkills = growthProvider.skills.where(
-            (s) => s.id == reminder.linkedSkillId,
-          );
-          
-          if (matchingSkills.isNotEmpty) {
-            final skill = matchingSkills.first;
-            debugPrint('  ✅ Found skill: ${skill.name} (id: ${skill.id}, goalId: ${skill.goalId})');
-            
-            // Find the goal for this skill
-            if (skill.goalId != null) {
-              final matchingGoals = growthProvider.goals.where(
-                (g) => g.id == skill.goalId,
-              );
-              
-              if (matchingGoals.isNotEmpty) {
-                groupName = matchingGoals.first.name;
-                debugPrint('  ✅ Task "${reminder.text}" categorized under goal (via skill): $groupName');
-              } else {
-                debugPrint('  ⚠️ Goal not found for skill ${skill.id} (goalId: ${skill.goalId})');
-                debugPrint('  Available goal IDs: ${growthProvider.goals.map((g) => g.id).join(", ")}');
-              }
-            } else {
-              debugPrint('  ⚠️ Skill ${skill.id} has no goalId');
-            }
-          } else {
-            debugPrint('  ⚠️ Skill not found: ${reminder.linkedSkillId}');
-            debugPrint('  Available skill IDs: ${growthProvider.skills.map((s) => s.id).join(", ")}');
-          }
-        } catch (e) {
-          debugPrint('  ❌ Error categorizing task via skill: $e');
-        }
-      } else {
-        debugPrint('  ℹ️ Task "${reminder.text}" has no linkedGoalId or linkedSkillId - going to General Tasks');
-      }
-      
+
       groups.putIfAbsent(groupName, () => []).add(reminder);
     }
-    
-    debugPrint('📋 Final groups: ${groups.keys.join(", ")}');
-    for (var entry in groups.entries) {
-      debugPrint('  ${entry.key}: ${entry.value.length} tasks');
-    }
-    
-    // Sort groups: Goals first (alphabetically), then "General Tasks" at the end
+
+    // Sort groups: Goals first (alphabetically), then "General Tasks"
     final sortedGroups = <String, List<Reminder>>{};
     final goalNames = groups.keys.where((k) => k != 'General Tasks').toList()
       ..sort();
@@ -278,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (groups.containsKey('General Tasks')) {
       sortedGroups['General Tasks'] = groups['General Tasks']!;
     }
-    
+
     return sortedGroups;
   }
 
@@ -341,22 +262,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-          ),
-          
-          // AI Assistant button
-          IconButton(
-            icon: Icon(
-              Icons.smart_toy_rounded,
-              color: AppTheme.primaryColor,
-            ),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const AiChatScreen(),
-                ),
-              );
-            },
-            tooltip: 'AI Assistant',
           ),
         ],
       ),

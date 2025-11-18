@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/growth_provider.dart';
 import '../theme/app_theme.dart';
 import '../../data/models/goal.dart';
-import '../../data/models/goal_subtask.dart';
+import '../../data/models/goal_task.dart';
 
 /// Roadmap/Timeline view for phased projects
 class RoadmapView extends StatelessWidget {
@@ -24,9 +24,9 @@ class RoadmapView extends StatelessWidget {
           orElse: () => throw Exception('Goal not found'),
         );
         
-        final subtasks = growthProvider.getSubtasksForGoal(goalId);
+        final tasks = growthProvider.getTasksForGoal(goalId);
         
-        if (subtasks.isEmpty) {
+        if (tasks.isEmpty) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(AppTheme.spacingXL),
@@ -45,7 +45,7 @@ class RoadmapView extends StatelessWidget {
                   ),
                   const SizedBox(height: AppTheme.spacingSM),
                   Text(
-                    'Create subtasks to see your project roadmap',
+                    'Create tasks to see your project roadmap',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppTheme.textSecondary),
                   ),
@@ -55,8 +55,8 @@ class RoadmapView extends StatelessWidget {
           );
         }
 
-        // Group subtasks by phase (week or month based on deadline)
-        final phases = _groupSubtasksByPhase(subtasks, goal);
+        // Group tasks by phase (week or month based on deadline)
+        final phases = _groupTasksByPhase(tasks, goal);
         
         return ListView.builder(
           padding: const EdgeInsets.all(AppTheme.spacingMD),
@@ -70,8 +70,8 @@ class RoadmapView extends StatelessWidget {
     );
   }
 
-  List<Phase> _groupSubtasksByPhase(
-    List<GoalSubtask> subtasks,
+  List<Phase> _groupTasksByPhase(
+    List<GoalTask> tasks,
     Goal goal,
   ) {
     final phases = <Phase>[];
@@ -80,7 +80,7 @@ class RoadmapView extends StatelessWidget {
       // No deadline - single phase
       phases.add(Phase(
         name: 'All Tasks',
-        subtasks: subtasks,
+        tasks: tasks,
         startDate: DateTime.now(),
         endDate: DateTime.now().add(const Duration(days: 30)),
       ));
@@ -100,16 +100,16 @@ class RoadmapView extends StatelessWidget {
           ? goal.targetDeadline!
           : phaseEndDate;
       
-      final phaseSubtasks = subtasks.where((subtask) {
-        if (subtask.scheduledDate == null) return false;
-        return subtask.scheduledDate!.isAfter(currentDate.subtract(const Duration(days: 1))) &&
-               subtask.scheduledDate!.isBefore(phaseEnd.add(const Duration(days: 1)));
+      final phaseTasks = tasks.where((task) {
+        if (task.scheduledDate == null) return false;
+        return task.scheduledDate!.isAfter(currentDate.subtract(const Duration(days: 1))) &&
+               task.scheduledDate!.isBefore(phaseEnd.add(const Duration(days: 1)));
       }).toList();
       
-      if (phaseSubtasks.isNotEmpty || i == 0) {
+      if (phaseTasks.isNotEmpty || i == 0) {
         phases.add(Phase(
           name: 'Phase $phaseIndex',
-          subtasks: phaseSubtasks,
+          tasks: phaseTasks,
           startDate: currentDate,
           endDate: phaseEnd,
         ));
@@ -123,8 +123,8 @@ class RoadmapView extends StatelessWidget {
   }
 
   Widget _buildPhaseCard(BuildContext context, Phase phase, int phaseNumber) {
-    final completedCount = phase.subtasks.where((s) => s.isCompleted).length;
-    final totalCount = phase.subtasks.length;
+    final completedCount = phase.tasks.where((s) => s.isCompleted).length;
+    final totalCount = phase.tasks.length;
     final progress = totalCount > 0 ? completedCount / totalCount : 0.0;
     
     return Card(
@@ -196,15 +196,15 @@ class RoadmapView extends StatelessWidget {
               minHeight: 8,
             ),
             const SizedBox(height: AppTheme.spacingMD),
-            ...phase.subtasks.map((subtask) => Padding(
+            ...phase.tasks.map((task) => Padding(
                   padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),
                   child: Row(
                     children: [
                       Icon(
-                        subtask.isCompleted
+                        task.isCompleted
                             ? Icons.check_circle_rounded
                             : Icons.radio_button_unchecked_rounded,
-                        color: subtask.isCompleted
+                        color: task.isCompleted
                             ? Colors.green
                             : AppTheme.textSecondary,
                         size: 20,
@@ -212,18 +212,18 @@ class RoadmapView extends StatelessWidget {
                       const SizedBox(width: AppTheme.spacingSM),
                       Expanded(
                         child: Text(
-                          subtask.title,
+                          task.title,
                           style: TextStyle(
-                            decoration: subtask.isCompleted
+                            decoration: task.isCompleted
                                 ? TextDecoration.lineThrough
                                 : null,
                             fontSize: 14,
                           ),
                         ),
                       ),
-                      if (subtask.scheduledDate != null)
+                      if (task.scheduledDate != null)
                         Text(
-                          DateFormat('MMM d').format(subtask.scheduledDate!),
+                          DateFormat('MMM d').format(task.scheduledDate!),
                           style: TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 12,
@@ -241,13 +241,13 @@ class RoadmapView extends StatelessWidget {
 
 class Phase {
   final String name;
-  final List<GoalSubtask> subtasks;
+  final List<GoalTask> tasks;
   final DateTime startDate;
   final DateTime endDate;
 
   Phase({
     required this.name,
-    required this.subtasks,
+    required this.tasks,
     required this.startDate,
     required this.endDate,
   });

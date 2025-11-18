@@ -9,6 +9,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/permission_service.dart';
 import 'core/services/trigger_engine.dart';
+import 'core/services/smart_nudge_service.dart';
 import 'data/database/database_helper.dart';
 import 'data/repositories/reminder_repository.dart';
 import 'data/repositories/growth_repository.dart';
@@ -40,6 +41,10 @@ void callbackDispatcher() {
       );
 
       await triggerEngine.runBackgroundChecks();
+
+      // Check for streak protection nudges
+      final smartNudgeService = SmartNudgeService();
+      await smartNudgeService.checkAndSendStreakProtectionNudges();
 
       // Check context and trigger reminders
       // This will be implemented by the TriggerEngine

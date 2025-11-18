@@ -115,7 +115,6 @@ class DatabaseHelper {
         keepRemindingUntilCompleted INTEGER DEFAULT 0,
         activityType TEXT,
         useSmartTiming INTEGER DEFAULT 0,
-        linked_skill_id INTEGER,
         linked_goal_id INTEGER
       )
     ''');
@@ -220,60 +219,11 @@ class DatabaseHelper {
       )
     ''');
 
-    // Core Features: Create skills table with progress tracking
+    // Create tasks table (renamed from subtasks)
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS ${AppConstants.skillsTable} (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        goal_id INTEGER,
-        name TEXT NOT NULL,
-        description TEXT,
-        total_reps INTEGER DEFAULT 0,
-        current_streak INTEGER DEFAULT 0,
-        last_rep_date TEXT,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (goal_id) REFERENCES ${AppConstants.goalsTable} (id)
-          ON DELETE CASCADE
-      )
-    ''');
-
-    // Core Features: Create reps table with subtask linking
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS ${AppConstants.repsTable} (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        skill_id INTEGER NOT NULL,
-        subtask_id INTEGER,
-        notes TEXT NOT NULL,
-        timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        duration_minutes INTEGER,
-        FOREIGN KEY (skill_id) REFERENCES ${AppConstants.skillsTable} (id)
-          ON DELETE CASCADE,
-        FOREIGN KEY (subtask_id) REFERENCES ${AppConstants.subtasksTable} (id)
-          ON DELETE SET NULL
-      )
-    ''');
-
-    // MVP: Create indexes for skills and reps
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_skills_goal 
-      ON ${AppConstants.skillsTable} (goal_id)
-    ''');
-
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_reps_skill 
-      ON ${AppConstants.repsTable} (skill_id)
-    ''');
-
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_reps_timestamp 
-      ON ${AppConstants.repsTable} (timestamp)
-    ''');
-
-    // Core Features: Create subtasks table
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS ${AppConstants.subtasksTable} (
+      CREATE TABLE IF NOT EXISTS ${AppConstants.tasksTable} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         goal_id INTEGER NOT NULL,
-        skill_id INTEGER,
         title TEXT NOT NULL,
         description TEXT NOT NULL,
         estimated_hours REAL,
@@ -288,25 +238,18 @@ class DatabaseHelper {
         completed_at TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (goal_id) REFERENCES ${AppConstants.goalsTable} (id)
-          ON DELETE CASCADE,
-        FOREIGN KEY (skill_id) REFERENCES ${AppConstants.skillsTable} (id)
-          ON DELETE SET NULL
+          ON DELETE CASCADE
       )
     ''');
 
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_subtasks_goal 
-      ON ${AppConstants.subtasksTable} (goal_id)
+      CREATE INDEX IF NOT EXISTS idx_tasks_goal 
+      ON ${AppConstants.tasksTable} (goal_id)
     ''');
 
     await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_subtasks_skill 
-      ON ${AppConstants.subtasksTable} (skill_id)
-    ''');
-
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_subtasks_scheduled 
-      ON ${AppConstants.subtasksTable} (scheduled_date)
+      CREATE INDEX IF NOT EXISTS idx_tasks_scheduled 
+      ON ${AppConstants.tasksTable} (scheduled_date)
     ''');
 
     await db.execute('''
@@ -519,38 +462,7 @@ class DatabaseHelper {
         print('total_estimated_hours column already exists or error: $e');
       }
 
-      // Create skills table
-      try {
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS ${AppConstants.skillsTable} (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            goal_id INTEGER,
-            name TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (goal_id) REFERENCES ${AppConstants.goalsTable} (id)
-              ON DELETE CASCADE
-          )
-        ''');
-      } catch (e) {
-        print('skills table already exists or error: $e');
-      }
-
-      // Create reps table
-      try {
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS ${AppConstants.repsTable} (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            skill_id INTEGER NOT NULL,
-            notes TEXT NOT NULL,
-            timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            duration_minutes INTEGER,
-            FOREIGN KEY (skill_id) REFERENCES ${AppConstants.skillsTable} (id)
-              ON DELETE CASCADE
-          )
-        ''');
-      } catch (e) {
-        print('reps table already exists or error: $e');
-      }
+      // Skills and reps tables removed in version 12
     }
 
     if (oldVersion < 9) {
@@ -584,13 +496,12 @@ class DatabaseHelper {
     }
 
     if (oldVersion < 10) {
-      // Create subtasks table for goal planning
+      // Create tasks table for goal planning (renamed from subtasks in v12)
       try {
         await db.execute('''
-          CREATE TABLE IF NOT EXISTS ${AppConstants.subtasksTable} (
+          CREATE TABLE IF NOT EXISTS ${AppConstants.tasksTable} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             goal_id INTEGER NOT NULL,
-            skill_id INTEGER,
             title TEXT NOT NULL,
             description TEXT NOT NULL,
             estimated_hours REAL,
@@ -605,133 +516,35 @@ class DatabaseHelper {
             completed_at TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (goal_id) REFERENCES ${AppConstants.goalsTable} (id)
-              ON DELETE CASCADE,
-            FOREIGN KEY (skill_id) REFERENCES ${AppConstants.skillsTable} (id)
-              ON DELETE SET NULL
+              ON DELETE CASCADE
           )
         ''');
-        print('✅ Created subtasks table');
+        print('✅ Created tasks table');
       } catch (e) {
-        print('⚠️ subtasks table already exists or error: $e');
+        print('⚠️ tasks table already exists or error: $e');
       }
 
       try {
         await db.execute('''
-          CREATE INDEX IF NOT EXISTS idx_subtasks_goal 
-          ON ${AppConstants.subtasksTable} (goal_id)
+          CREATE INDEX IF NOT EXISTS idx_tasks_goal 
+          ON ${AppConstants.tasksTable} (goal_id)
         ''');
       } catch (e) {
-        print('⚠️ idx_subtasks_goal index already exists or error: $e');
+        print('⚠️ idx_tasks_goal index already exists or error: $e');
       }
 
       try {
         await db.execute('''
-          CREATE INDEX IF NOT EXISTS idx_subtasks_scheduled 
-          ON ${AppConstants.subtasksTable} (scheduled_date)
+          CREATE INDEX IF NOT EXISTS idx_tasks_scheduled 
+          ON ${AppConstants.tasksTable} (scheduled_date)
         ''');
       } catch (e) {
-        print('⚠️ idx_subtasks_scheduled index already exists or error: $e');
-      }
-
-      // Create indexes
-      try {
-        await db.execute('''
-          CREATE INDEX IF NOT EXISTS idx_skills_goal 
-          ON ${AppConstants.skillsTable} (goal_id)
-        ''');
-      } catch (e) {
-        print('idx_skills_goal index already exists or error: $e');
-      }
-
-      try {
-        await db.execute('''
-          CREATE INDEX IF NOT EXISTS idx_reps_skill 
-          ON ${AppConstants.repsTable} (skill_id)
-        ''');
-      } catch (e) {
-        print('idx_reps_skill index already exists or error: $e');
-      }
-
-      try {
-        await db.execute('''
-          CREATE INDEX IF NOT EXISTS idx_reps_timestamp 
-          ON ${AppConstants.repsTable} (timestamp)
-        ''');
-      } catch (e) {
-        print('idx_reps_timestamp index already exists or error: $e');
-      }
-
-      try {
-        await db.execute('''
-          CREATE INDEX IF NOT EXISTS idx_reminders_skill 
-          ON ${AppConstants.remindersTable} (linked_skill_id)
-        ''');
-      } catch (e) {
-        print('idx_reminders_skill index already exists or error: $e');
+        print('⚠️ idx_tasks_scheduled index already exists or error: $e');
       }
     }
 
-    // Migration to version 11: Core Features - Enhanced Skills, Subtasks, Reps, and Goal linking
+    // Migration to version 11: Core Features - Goal linking
     if (oldVersion < 11) {
-      // Add new columns to skills table
-      try {
-        await db.execute(
-          'ALTER TABLE ${AppConstants.skillsTable} ADD COLUMN description TEXT',
-        );
-      } catch (e) {
-        print('description column already exists or error: $e');
-      }
-
-      try {
-        await db.execute(
-          'ALTER TABLE ${AppConstants.skillsTable} ADD COLUMN total_reps INTEGER DEFAULT 0',
-        );
-      } catch (e) {
-        print('total_reps column already exists or error: $e');
-      }
-
-      try {
-        await db.execute(
-          'ALTER TABLE ${AppConstants.skillsTable} ADD COLUMN current_streak INTEGER DEFAULT 0',
-        );
-      } catch (e) {
-        print('current_streak column already exists or error: $e');
-      }
-
-      try {
-        await db.execute(
-          'ALTER TABLE ${AppConstants.skillsTable} ADD COLUMN last_rep_date TEXT',
-        );
-      } catch (e) {
-        print('last_rep_date column already exists or error: $e');
-      }
-
-      // Add skill_id to subtasks table
-      try {
-        await db.execute(
-          'ALTER TABLE ${AppConstants.subtasksTable} ADD COLUMN skill_id INTEGER',
-        );
-        await db.execute('''
-          CREATE INDEX IF NOT EXISTS idx_subtasks_skill 
-          ON ${AppConstants.subtasksTable} (skill_id)
-        ''');
-      } catch (e) {
-        print('skill_id column already exists or error: $e');
-      }
-
-      // Add subtask_id to reps table
-      try {
-        await db.execute(
-          'ALTER TABLE ${AppConstants.repsTable} ADD COLUMN subtask_id INTEGER',
-        );
-        await db.execute('''
-          CREATE INDEX IF NOT EXISTS idx_reps_subtask 
-          ON ${AppConstants.repsTable} (subtask_id)
-        ''');
-      } catch (e) {
-        print('subtask_id column already exists or error: $e');
-      }
-
       // Add linked_goal_id to reminders table
       try {
         await db.execute(
@@ -746,6 +559,127 @@ class DatabaseHelper {
       }
 
       print('✅ Migration to version 11 completed');
+    }
+
+    // Migration to version 12: Remove skills/reps, rename subtasks to tasks
+    if (oldVersion < 12) {
+      try {
+        // Drop skills and reps tables if they exist
+        await db.execute('DROP TABLE IF EXISTS reps');
+        await db.execute('DROP TABLE IF EXISTS skills');
+        print('✅ Dropped skills and reps tables');
+      } catch (e) {
+        print('⚠️ Error dropping skills/reps tables: $e');
+      }
+
+      // Rename subtasks table to tasks if it exists
+      try {
+        // Check if subtasks table exists (old name)
+        final result = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+          ['subtasks'],
+        );
+        
+        if (result.isNotEmpty) {
+          // Rename table
+          await db.execute(
+            'ALTER TABLE subtasks RENAME TO ${AppConstants.tasksTable}',
+          );
+          print('✅ Renamed subtasks table to tasks');
+        } else {
+          // Create tasks table if subtasks doesn't exist
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS ${AppConstants.tasksTable} (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              goal_id INTEGER NOT NULL,
+              title TEXT NOT NULL,
+              description TEXT NOT NULL,
+              estimated_hours REAL,
+              priority TEXT DEFAULT 'medium',
+              frequency TEXT DEFAULT 'one-time',
+              suggested_time TEXT DEFAULT 'any',
+              suggested_location TEXT DEFAULT 'any',
+              is_milestone INTEGER DEFAULT 0,
+              motivation_anchor TEXT,
+              scheduled_date TEXT,
+              is_completed INTEGER DEFAULT 0,
+              completed_at TEXT,
+              created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (goal_id) REFERENCES ${AppConstants.goalsTable} (id)
+                ON DELETE CASCADE
+            )
+          ''');
+          print('✅ Created tasks table');
+        }
+
+        // Remove skill_id column from tasks (SQLite doesn't support DROP COLUMN, so we'll recreate)
+        // For existing data, we'll need to copy data to new table
+        try {
+          // Check if skill_id column exists
+          final tableInfo = await db.rawQuery('PRAGMA table_info(${AppConstants.tasksTable})');
+          final hasSkillId = tableInfo.any((col) => col['name'] == 'skill_id');
+          
+          if (hasSkillId) {
+            // Create new table without skill_id
+            await db.execute('''
+              CREATE TABLE IF NOT EXISTS ${AppConstants.tasksTable}_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                goal_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                estimated_hours REAL,
+                priority TEXT DEFAULT 'medium',
+                frequency TEXT DEFAULT 'one-time',
+                suggested_time TEXT DEFAULT 'any',
+                suggested_location TEXT DEFAULT 'any',
+                is_milestone INTEGER DEFAULT 0,
+                motivation_anchor TEXT,
+                scheduled_date TEXT,
+                is_completed INTEGER DEFAULT 0,
+                completed_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (goal_id) REFERENCES ${AppConstants.goalsTable} (id)
+                  ON DELETE CASCADE
+              )
+            ''');
+
+            // Copy data (excluding skill_id)
+            await db.execute('''
+              INSERT INTO ${AppConstants.tasksTable}_new 
+              (id, goal_id, title, description, estimated_hours, priority, frequency, 
+               suggested_time, suggested_location, is_milestone, motivation_anchor, 
+               scheduled_date, is_completed, completed_at, created_at)
+              SELECT id, goal_id, title, description, estimated_hours, priority, frequency,
+                     suggested_time, suggested_location, is_milestone, motivation_anchor,
+                     scheduled_date, is_completed, completed_at, created_at
+              FROM ${AppConstants.tasksTable}
+            ''');
+
+            // Drop old table and rename new one
+            await db.execute('DROP TABLE ${AppConstants.tasksTable}');
+            await db.execute('ALTER TABLE ${AppConstants.tasksTable}_new RENAME TO ${AppConstants.tasksTable}');
+            print('✅ Removed skill_id column from tasks table');
+          }
+        } catch (e) {
+          print('⚠️ Error removing skill_id column: $e');
+        }
+
+        // Recreate indexes
+        await db.execute('''
+          CREATE INDEX IF NOT EXISTS idx_tasks_goal 
+          ON ${AppConstants.tasksTable} (goal_id)
+        ''');
+        await db.execute('''
+          CREATE INDEX IF NOT EXISTS idx_tasks_scheduled 
+          ON ${AppConstants.tasksTable} (scheduled_date)
+        ''');
+
+        // Remove linked_skill_id from reminders (SQLite limitation - can't drop column easily)
+        // We'll just ignore it in queries
+        print('✅ Migration to version 12 completed');
+      } catch (e) {
+        print('⚠️ Error in version 12 migration: $e');
+      }
     }
   }
 

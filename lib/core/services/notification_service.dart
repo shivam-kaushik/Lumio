@@ -88,6 +88,9 @@ class NotificationService {
       } else if (actionId == 'snooze_action' && response.id != null) {
         // Handle snooze action
         await _handleSnoozeAction(payload, response.id!);
+      } else if (actionId == 'quick_log_action' && response.id != null) {
+        // Handle quick log action
+        await _handleQuickLogAction(payload, response.id!);
       } else {
         await _recordNotificationInteraction(payload, 'seen');
       }
@@ -110,6 +113,9 @@ class NotificationService {
       } else if (actionId == 'snooze_action' && response.id != null) {
         // Handle snooze action
         await _handleSnoozeAction(payload, response.id!);
+      } else if (actionId == 'quick_log_action' && response.id != null) {
+        // Handle quick log action
+        await _handleQuickLogAction(payload, response.id!);
       } else {
         await _recordNotificationInteraction(payload, 'seen');
       }
@@ -224,16 +230,7 @@ class NotificationService {
         ),
       );
       
-      // MVP: If skill-linked, log rep
-      if (action == 'log_rep' && skillId != null && notes != null) {
-        try {
-          final growthRepository = GrowthRepository();
-          await growthRepository.addRep(skillId, notes);
-          debugPrint('✅ Auto-logged rep for skill $skillId');
-        } catch (e) {
-          debugPrint('❌ Error logging rep: $e');
-        }
-      }
+      // Skills/reps removed - no longer logging reps
       
       // Cancel the notification
       final notificationService = NotificationService();
@@ -242,6 +239,46 @@ class NotificationService {
       debugPrint('✅ Successfully completed reminder $reminderId from notification');
     } catch (e) {
       debugPrint('❌ Error handling complete action: $e');
+    }
+  }
+
+  /// Handle quick log action from notification (deprecated - skills removed)
+  @pragma('vm:entry-point')
+  static Future<void> _handleQuickLogAction(String payload, int notificationId) async {
+    debugPrint('🚀 Handling quick log action (deprecated - skills removed)');
+    
+    try {
+      // Parse payload
+      String reminderId;
+      
+      try {
+        final data = jsonDecode(payload);
+        reminderId = data['reminder_id'] as String;
+      } catch (e) {
+        debugPrint('❌ Error parsing payload for quick log: $e');
+        return;
+      }
+      
+      // Mark reminder as completed
+      final reminderRepository = ReminderRepository();
+      await reminderRepository.completeOccurrenceByNotificationId(notificationId);
+      
+      // Create context event
+      await reminderRepository.createContextEvent(
+        ContextEvent(
+          reminderId: reminderId,
+          contextType: 'notification_action',
+          outcome: 'quick_logged',
+        ),
+      );
+      
+      // Cancel the notification
+      final notificationService = NotificationService();
+      await notificationService.cancelNotification(notificationId);
+      
+      debugPrint('✅ Successfully quick-logged rep from notification');
+    } catch (e) {
+      debugPrint('❌ Error handling quick log action: $e');
     }
   }
 
@@ -313,7 +350,30 @@ class NotificationService {
   }) async {
     debugPrint('Showing notification id=$id title="$title" payload=$payload');
 
-    // Create action buttons
+    // Parse payload to check if it's skill-linked
+    List<AndroidNotificationAction> actions = [];
+    try {
+      if (payload != null) {
+        final data = jsonDecode(payload);
+        final action = data['action'] as String?;
+        final skillId = data['skill_id'] as int?;
+        
+        // If skill-linked, add "Quick Log" action
+        if (action == 'log_rep' && skillId != null) {
+          const quickLogAction = AndroidNotificationAction(
+            'quick_log_action',
+            'Quick Log',
+            showsUserInterface: false,
+            cancelNotification: true,
+          );
+          actions.add(quickLogAction);
+        }
+      }
+    } catch (e) {
+      // If parsing fails, use default actions
+    }
+    
+    // Always add Snooze and Complete actions
     const snoozeAction = AndroidNotificationAction(
       'snooze_action',
       'Snooze',
@@ -327,8 +387,15 @@ class NotificationService {
       showsUserInterface: false,
       cancelNotification: true,
     );
+    
+    // If no quick log action was added, use default actions
+    if (actions.isEmpty) {
+      actions = [snoozeAction, completeAction];
+    } else {
+      actions.addAll([snoozeAction, completeAction]);
+    }
 
-    const androidDetails = AndroidNotificationDetails(
+    final androidDetails = AndroidNotificationDetails(
       AppConstants.notificationChannelId,
       AppConstants.notificationChannelName,
       channelDescription: AppConstants.notificationChannelDesc,
@@ -342,7 +409,7 @@ class NotificationService {
       autoCancel: true,
       ongoing: false,
       fullScreenIntent: true, // Shows notification even when screen is off
-      actions: [snoozeAction, completeAction], // Snooze first, then Complete
+      actions: actions,
     );
 
     // iOS notification details (actions require separate registration, simplified for now)
@@ -378,7 +445,30 @@ class NotificationService {
     debugPrint(
         '📅 Scheduling notification id=$id title="$title" at $scheduledTime payload=$payload',);
 
-    // Create action buttons
+    // Parse payload to check if it's skill-linked
+    List<AndroidNotificationAction> actions = [];
+    try {
+      if (payload != null) {
+        final data = jsonDecode(payload);
+        final action = data['action'] as String?;
+        final skillId = data['skill_id'] as int?;
+        
+        // If skill-linked, add "Quick Log" action
+        if (action == 'log_rep' && skillId != null) {
+          const quickLogAction = AndroidNotificationAction(
+            'quick_log_action',
+            'Quick Log',
+            showsUserInterface: false,
+            cancelNotification: true,
+          );
+          actions.add(quickLogAction);
+        }
+      }
+    } catch (e) {
+      // If parsing fails, use default actions
+    }
+    
+    // Always add Snooze and Complete actions
     const snoozeAction = AndroidNotificationAction(
       'snooze_action',
       'Snooze',
@@ -392,8 +482,15 @@ class NotificationService {
       showsUserInterface: false,
       cancelNotification: true,
     );
+    
+    // If no quick log action was added, use default actions
+    if (actions.isEmpty) {
+      actions = [snoozeAction, completeAction];
+    } else {
+      actions.addAll([snoozeAction, completeAction]);
+    }
 
-    const androidDetails = AndroidNotificationDetails(
+    final androidDetails = AndroidNotificationDetails(
       AppConstants.notificationChannelId,
       AppConstants.notificationChannelName,
       channelDescription: AppConstants.notificationChannelDesc,
@@ -406,7 +503,7 @@ class NotificationService {
       ongoing: false,
       fullScreenIntent: true, // Critical for showing when screen is off
       visibility: NotificationVisibility.public,
-      actions: [snoozeAction, completeAction], // Snooze first, then Complete
+      actions: actions,
     );
 
     // iOS notification details (actions require separate registration, simplified for now)

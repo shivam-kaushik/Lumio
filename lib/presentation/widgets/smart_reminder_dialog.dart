@@ -3,7 +3,6 @@ import '../../data/models/reminder.dart' as model;
 import 'priority_selector.dart';
 import 'category_selector.dart';
 import 'time_selectors.dart';
-import 'skill_selector_dropdown.dart'; // MVP
 import '../screens/home_setup_screen.dart';
 import '../screens/map_view_screen.dart';
 import '../../core/services/home_detection_service.dart';
@@ -53,8 +52,6 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
   DateTime? _timeRangeEnd;
   model.TimeOfDay? _preferredTimeOfDay;
 
-  // MVP: Skill linking
-  int? _linkedSkillId;
 
   bool _showAdvanced = false;
 
@@ -88,8 +85,6 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
     _geofenceLng = reminder?.geofenceLng;
     _geofenceRadius = reminder?.geofenceRadius;
     _locationContext = reminder?.geofenceId; // may be 'home' or other id
-    // MVP: Initialize skill link
-    _linkedSkillId = reminder?.linkedSkillId;
     // If a suggestion is provided and no geofence is set, store suggestion but keep disabled
     if (!_enableLocation && widget.locationSuggestion != null) {
       _locationContext = widget.locationSuggestion!['context'] as String?;
@@ -228,7 +223,6 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
       geofenceRadius: _enableLocation ? _geofenceRadius : null,
       onLeaveContext: _onLeaveContext,
       onArriveContext: _onArriveContext,
-      linkedSkillId: _linkedSkillId, // MVP
     );
 
     Navigator.of(context).pop(reminder);
@@ -388,14 +382,6 @@ class _SmartReminderDialogState extends State<SmartReminderDialog> {
 
                     const SizedBox(height: 24),
 
-                    // MVP: Skill linking
-                    SkillSelectorDropdown(
-                      selectedSkillId: _linkedSkillId,
-                      onChanged: (skillId) => setState(() => _linkedSkillId = skillId),
-                      required: false,
-                    ),
-
-                    const SizedBox(height: 24),
                     const Divider(),
                     const SizedBox(height: 16),
 

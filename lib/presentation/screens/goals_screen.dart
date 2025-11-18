@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:intl/intl.dart';
 import '../providers/growth_provider.dart';
-import '../providers/reminder_provider.dart';
 import '../theme/app_theme.dart';
+import '../../core/services/permission_service.dart';
 import 'goal_details_screen.dart';
 import 'goal_planning_screen.dart';
 import '../../data/models/goal.dart';
 import '../../core/services/privacy_gpt_service.dart';
-import '../../data/models/subtask.dart';
+import '../../data/models/subtask.dart' show Task;
 
 /// Goals screen showing all business goals
 class GoalsScreen extends StatefulWidget {
@@ -19,6 +20,8 @@ class GoalsScreen extends StatefulWidget {
 }
 
 class _GoalsScreenState extends State<GoalsScreen> {
+  final stt.SpeechToText _speech = stt.SpeechToText();
+
   @override
   void initState() {
     super.initState();
@@ -27,31 +30,108 @@ class _GoalsScreenState extends State<GoalsScreen> {
     });
   }
 
+  Future<void> _transcribeVoiceInput(
+    TextEditingController controller,
+    StateSetter setDialogState,
+    VoidCallback onStopListening,
+  ) async {
+    final permissionService = PermissionService();
+    final hasPermission = await permissionService.requestMicrophonePermission();
+    
+    if (!hasPermission) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission is required')),
+        );
+      }
+      onStopListening();
+      return;
+    }
+
+    final available = await _speech.initialize();
+    if (!available) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Speech recognition not available')),
+        );
+      }
+      onStopListening();
+      return;
+    }
+
+    bool isFinal = false;
+    await _speech.listen(
+      onResult: (result) {
+        setDialogState(() {
+          controller.text = result.recognizedWords;
+          if (result.finalResult) {
+            isFinal = true;
+            _speech.stop();
+            onStopListening();
+          }
+        });
+      },
+      localeId: 'en_US',
+      listenOptions: stt.SpeechListenOptions(
+        listenMode: stt.ListenMode.confirmation,
+        cancelOnError: true,
+        partialResults: true,
+      ),
+    );
+
+    // Auto-stop after 5 seconds if no final result
+    await Future.delayed(const Duration(seconds: 5));
+    if (!isFinal) {
+      await _speech.stop();
+      onStopListening();
+    }
+  }
+
   Future<void> _createGoal() async {
     final controller = TextEditingController();
+    
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create Goal'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Describe your goal (e.g., Launch my SaaS product)',
-            border: OutlineInputBorder(),
-          ),
-          maxLines: 3,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Create'),
-          ),
-        ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          bool isListening = false;
+          
+          return AlertDialog(
+            title: const Text('Create Goal'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Describe your goal (e.g., Launch my SaaS product)',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                    color: isListening ? Colors.red : null,
+                  ),
+                  onPressed: () async {
+                    setDialogState(() => isListening = true);
+                    await _transcribeVoiceInput(controller, setDialogState, () {
+                      setDialogState(() => isListening = false);
+                    });
+                  },
+                  tooltip: 'Voice input',
+                ),
+              ),
+              maxLines: 3,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, controller.text),
+                child: const Text('Create'),
+              ),
+            ],
+          );
+        },
       ),
     );
 
@@ -64,7 +144,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
           builder: (context) => const Center(child: CircularProgressIndicator()),
         );
 
-        // Generate roadmap using GPT (includes skills and subtasks)
+        // Generate roadmap using GPT (includes tasks)
         final gptService = PrivacyGptService();
         
         // Ask for timeline first (needed for generateDetailedRoadmap)
@@ -80,7 +160,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
         final deadline = timeline['deadline'] as DateTime;
         final hoursPerDay = (timeline['hoursPerDay'] as num?)?.toDouble() ?? 2.0;
         
-        // Generate detailed roadmap with skills and subtasks
+        // Generate detailed roadmap with tasks
         final roadmap = await gptService.generateDetailedRoadmap(
           result,
           targetDeadline: deadline,
@@ -90,7 +170,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
         if (mounted) {
           Navigator.pop(context); // Close loading dialog
           
-          if (roadmap != null && roadmap['subtasks'] != null) {
+          if (roadmap != null && roadmap['tasks'] != null) {
             // Create goal with deadline and capacity
             final goalId = await context.read<GrowthProvider>().createGoal(
               result,
@@ -105,8 +185,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 builder: (context) => GoalPlanningScreen(
                   goalId: goalId,
                   goalName: result,
-                  initialSubtasks: (roadmap['subtasks'] as List)
-                      .map((s) => Subtask.fromMap(s as Map<String, dynamic>))
+                  initialTasks: (roadmap['tasks'] as List)
+                      .map((s) => Task.fromMap(s as Map<String, dynamic>))
                       .toList(),
                   timeline: timeline,
                 ),
@@ -325,13 +405,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
               itemCount: goals.length,
               itemBuilder: (context, index) {
                 final goal = goals[index];
-                final skills = growthProvider.getSkillsForGoal(goal.id);
-                final totalReps = skills.fold<int>(
-                  0,
-                  (sum, skill) => sum + growthProvider.getRepsForSkill(skill.id).length,
-                );
+                final tasks = growthProvider.getTasksForGoal(goal.id);
+                final completedTasks = tasks.where((t) => t.isCompleted).length;
 
-                return _buildGoalCard(context, goal, skills.length, totalReps);
+                return _buildGoalCard(context, goal, tasks.length, completedTasks);
               },
             ),
           );
@@ -343,8 +420,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
   Widget _buildGoalCard(
     BuildContext context,
     Goal goal,
-    int skillCount,
-    int totalReps,
+    int taskCount,
+    int completedTasks,
   ) {
     return Card(
       margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
@@ -402,20 +479,20 @@ class _GoalsScreenState extends State<GoalsScreen> {
                             Icon(Icons.track_changes_rounded, size: 16, color: AppTheme.textSecondary),
                             const SizedBox(width: 4),
                             Text(
-                              '$skillCount skills',
+                              '$taskCount tasks',
                               style: TextStyle(
                                 color: AppTheme.textSecondary,
                                 fontSize: 14,
                               ),
                             ),
-                            if (totalReps > 0) ...[
+                            if (completedTasks > 0) ...[
                               const SizedBox(width: AppTheme.spacingMD),
-                              Icon(Icons.repeat_rounded, size: 16, color: AppTheme.textSecondary),
+                              Icon(Icons.check_circle_rounded, size: 16, color: AppTheme.primaryColor),
                               const SizedBox(width: 4),
                               Text(
-                                '$totalReps reps',
+                                '$completedTasks completed',
                                 style: TextStyle(
-                                  color: AppTheme.textSecondary,
+                                  color: AppTheme.primaryColor,
                                   fontSize: 14,
                                 ),
                               ),

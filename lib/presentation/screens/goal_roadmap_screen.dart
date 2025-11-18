@@ -4,10 +4,10 @@ import '../providers/growth_provider.dart';
 import '../providers/reminder_provider.dart';
 import '../theme/app_theme.dart';
 import '../../data/models/goal_roadmap.dart';
-import '../../data/models/subtask.dart';
+import '../../data/models/subtask.dart' show Task;
 import '../../data/models/reminder.dart';
 
-/// Screen for reviewing AI-generated goal roadmap and scheduling subtasks
+/// Screen for reviewing AI-generated goal roadmap and scheduling tasks
 class GoalRoadmapScreen extends StatefulWidget {
   final Map<String, dynamic> roadmapData;
 
@@ -18,7 +18,7 @@ class GoalRoadmapScreen extends StatefulWidget {
 }
 
 class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
-  final List<Subtask> _subtasks = [];
+  final List<Task> _tasks = [];
   String _goalName = '';
   DateTime? _targetDeadline;
   double? _hoursPerDay;
@@ -36,7 +36,7 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
   void _parseRoadmap() {
     final roadmap = GoalRoadmap.fromGptResponse(widget.roadmapData);
     _goalName = roadmap.goalName;
-    _subtasks.addAll(roadmap.subtasks);
+    _tasks.addAll(roadmap.tasks);
     _targetDeadline = roadmap.targetDeadline;
     _hoursPerDay = roadmap.hoursPerDay;
     _totalEstimatedHours = roadmap.totalEstimatedHours;
@@ -61,20 +61,10 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
         totalEstimatedHours: _totalEstimatedHours,
       );
 
-      // 2. Create skills from subtasks (one skill per subtask)
-      final skillIds = <int>[];
-      for (var subtask in _subtasks) {
-        final skillId = await growthProvider.createSkill(
-          subtask.title,
-          goalId: goalId,
-        );
-        skillIds.add(skillId);
-      }
-
-      // 3. Schedule reminders based on capacity and deadline (Solopreneur Execution Assistant)
+      // 2. Schedule reminders based on capacity and deadline
       final scheduledReminders = _scheduleRemindersBasedOnCapacity(
-        _subtasks,
-        skillIds,
+        _tasks,
+        goalId,
         _targetDeadline ?? DateTime.now().add(const Duration(days: 30)),
         _hoursPerDay ?? 2.0,
       );
@@ -105,10 +95,10 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
     }
   }
 
-  /// Schedule reminders based on capacity and deadline (Solopreneur Execution Assistant)
+  /// Schedule reminders based on capacity and deadline
   List<Map<String, dynamic>> _scheduleRemindersBasedOnCapacity(
-    List<Subtask> subtasks,
-    List<int> skillIds,
+    List<Task> tasks,
+    int goalId,
     DateTime deadline,
     double hoursPerDay,
   ) {
@@ -116,18 +106,17 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
     final now = DateTime.now();
     final daysUntilDeadline = deadline.difference(now).inDays;
     
-    // Sort subtasks by priority and dependencies
-    final sortedSubtasks = _sortSubtasksByDependencies(subtasks);
+    // Sort tasks by priority and dependencies
+    final sortedTasks = _sortTasksByDependencies(tasks);
     
     // Distribute tasks across timeline
     var currentDate = DateTime(now.year, now.month, now.day);
     var dailyHoursUsed = 0.0;
     var dayIndex = 0;
     
-    for (var i = 0; i < sortedSubtasks.length; i++) {
-      final subtask = sortedSubtasks[i];
-      final skillId = skillIds[subtasks.indexOf(subtask)];
-      final estimatedHours = subtask.estimatedHours ?? 1.0;
+    for (var i = 0; i < sortedTasks.length; i++) {
+      final task = sortedTasks[i];
+      final estimatedHours = task.estimatedHours ?? 1.0;
       
       // Check if we need to move to next day
       if (dailyHoursUsed + estimatedHours > hoursPerDay && dailyHoursUsed > 0) {
@@ -142,22 +131,22 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
       }
       
       // Determine time based on suggested time
-      final timeAt = _getTimeForSuggestedTime(subtask.suggestedTime, currentDate);
+      final timeAt = _getTimeForSuggestedTime(task.suggestedTime, currentDate);
       
       // Determine frequency and scheduling
       DateTime? reminderTime;
       int? repeatInterval;
       String? repeatUnit;
       
-      if (subtask.frequency == 'daily') {
+      if (task.frequency == 'daily') {
         repeatInterval = 1;
         repeatUnit = 'days';
         reminderTime = timeAt;
-      } else if (subtask.frequency == 'weekly') {
+      } else if (task.frequency == 'weekly') {
         repeatInterval = 1;
         repeatUnit = 'weeks';
         reminderTime = timeAt;
-      } else if (subtask.frequency == 'monthly') {
+      } else if (task.frequency == 'monthly') {
         repeatInterval = 1;
         repeatUnit = 'months';
         reminderTime = timeAt;
@@ -168,17 +157,17 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
       
       // Create reminder
       final reminder = Reminder(
-        text: subtask.description,
+        text: task.description,
         timeAt: reminderTime,
         repeatInterval: repeatInterval,
         repeatUnit: repeatUnit,
-        priority: _getPriorityFromString(subtask.priority),
-        linkedSkillId: skillId,
+        priority: _getPriorityFromString(task.priority),
+        linkedGoalId: goalId,
       );
       
       scheduledReminders.add({
         'reminder': reminder,
-        'subtask': subtask,
+        'task': task,
       });
       
       dailyHoursUsed += estimatedHours;
@@ -187,29 +176,29 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
     return scheduledReminders;
   }
 
-  /// Sort subtasks respecting dependencies
-  List<Subtask> _sortSubtasksByDependencies(List<Subtask> subtasks) {
-    final sorted = <Subtask>[];
+  /// Sort tasks respecting dependencies
+  List<Task> _sortTasksByDependencies(List<Task> tasks) {
+    final sorted = <Task>[];
     final added = <String>{};
     
     // Add tasks with no dependencies first
-    for (var subtask in subtasks) {
-      if (subtask.dependencies.isEmpty) {
-        sorted.add(subtask);
-        added.add(subtask.title);
+    for (var task in tasks) {
+      if (task.dependencies.isEmpty) {
+        sorted.add(task);
+        added.add(task.title);
       }
     }
     
     // Add dependent tasks
     var changed = true;
-    while (changed && sorted.length < subtasks.length) {
+    while (changed && sorted.length < tasks.length) {
       changed = false;
-      for (var subtask in subtasks) {
-        if (!added.contains(subtask.title)) {
-          final allDepsMet = subtask.dependencies.every((dep) => added.contains(dep));
+      for (var task in tasks) {
+        if (!added.contains(task.title)) {
+          final allDepsMet = task.dependencies.every((dep) => added.contains(dep));
           if (allDepsMet) {
-            sorted.add(subtask);
-            added.add(subtask.title);
+            sorted.add(task);
+            added.add(task.title);
             changed = true;
           }
         }
@@ -217,9 +206,9 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
     }
     
     // Add any remaining tasks
-    for (var subtask in subtasks) {
-      if (!added.contains(subtask.title)) {
-        sorted.add(subtask);
+    for (var task in tasks) {
+      if (!added.contains(task.title)) {
+        sorted.add(task);
       }
     }
     
@@ -359,7 +348,7 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
                             ),
                           const SizedBox(height: AppTheme.spacingSM),
                           Text(
-                            '${_subtasks.length} subtasks • ${_weeklyGoals.length} weekly goals',
+                            '${_tasks.length} tasks • ${_weeklyGoals.length} weekly goals',
                             style: TextStyle(
                               color: AppTheme.textSecondary,
                               fontSize: 14,
@@ -445,19 +434,19 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
 
                   const SizedBox(height: AppTheme.spacingLG),
 
-                  // Subtasks
+                  // Tasks
                   Text(
-                    'Subtasks',
+                    'Tasks',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                   ),
                   const SizedBox(height: AppTheme.spacingMD),
 
-                  ..._subtasks.asMap().entries.map((entry) {
+                  ..._tasks.asMap().entries.map((entry) {
                     final index = entry.key;
-                    final subtask = entry.value;
-                    return _buildSubtaskCard(context, index + 1, subtask);
+                    final task = entry.value;
+                    return _buildTaskCard(context, index + 1, task);
                   }),
                 ],
               ),
@@ -510,15 +499,15 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
     );
   }
 
-  Widget _buildSubtaskCard(BuildContext context, int index, Subtask subtask) {
+  Widget _buildTaskCard(BuildContext context, int index, Task task) {
     return Card(
       margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppTheme.radiusMD),
         side: BorderSide(
-          color: subtask.isMilestone ? AppTheme.primaryColor : AppTheme.borderColor,
-          width: subtask.isMilestone ? 2 : 1,
+          color: task.isMilestone ? AppTheme.primaryColor : AppTheme.borderColor,
+          width: task.isMilestone ? 2 : 1,
         ),
       ),
       child: Padding(
@@ -532,13 +521,13 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: subtask.isMilestone
+                    color: task.isMilestone
                         ? AppTheme.primaryColor
                         : AppTheme.primaryColor.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
-                    child: subtask.isMilestone
+                    child: task.isMilestone
                         ? Icon(
                             Icons.flag_rounded,
                             color: Colors.white,
@@ -560,12 +549,12 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        subtask.title,
+                        task.title,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
                       ),
-                      if (subtask.isMilestone)
+                      if (task.isMilestone)
                         Text(
                           'Milestone',
                           style: TextStyle(
@@ -581,13 +570,13 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
             ),
             const SizedBox(height: AppTheme.spacingSM),
             Text(
-              subtask.description,
+              task.description,
               style: TextStyle(
                 color: AppTheme.textSecondary,
                 fontSize: 14,
               ),
             ),
-            if (subtask.motivationAnchor != null) ...[
+            if (task.motivationAnchor != null) ...[
               const SizedBox(height: AppTheme.spacingSM),
               Container(
                 padding: const EdgeInsets.all(AppTheme.spacingSM),
@@ -601,7 +590,7 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        subtask.motivationAnchor!,
+                        task.motivationAnchor!,
                         style: TextStyle(
                           color: AppTheme.primaryColor,
                           fontSize: 12,
@@ -618,13 +607,13 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
               spacing: AppTheme.spacingSM,
               runSpacing: AppTheme.spacingSM,
               children: [
-                _buildChip('${subtask.frequency}ly', Icons.repeat_rounded),
-                _buildChip(subtask.suggestedTime, Icons.access_time_rounded),
-                _buildChip(subtask.priority, Icons.flag_rounded),
-                if (subtask.estimatedHours != null)
-                  _buildChip('${subtask.estimatedHours!.toStringAsFixed(1)}h', Icons.timer_rounded),
-                if (subtask.dependencies.isNotEmpty)
-                  _buildChip('${subtask.dependencies.length} deps', Icons.link_rounded),
+                _buildChip('${task.frequency}ly', Icons.repeat_rounded),
+                _buildChip(task.suggestedTime, Icons.access_time_rounded),
+                _buildChip(task.priority, Icons.flag_rounded),
+                if (task.estimatedHours != null)
+                  _buildChip('${task.estimatedHours!.toStringAsFixed(1)}h', Icons.timer_rounded),
+                if (task.dependencies.isNotEmpty)
+                  _buildChip('${task.dependencies.length} deps', Icons.link_rounded),
               ],
             ),
           ],

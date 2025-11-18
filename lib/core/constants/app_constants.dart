@@ -7,17 +7,15 @@ class AppConstants {
 
   // Database
   static const String dbName = 'awarely.db';
-  static const int dbVersion = 11; // Core Features: Enhanced Skills, Subtasks, Reps, and Goal linking
+  static const int dbVersion = 12; // Removed skills/reps, renamed subtasks to tasks
 
   // Tables
   static const String remindersTable = 'reminders';
   static const String contextEventsTable = 'context_events';
   static const String locationsTable = 'locations';
   static const String reminderOccurrencesTable = 'reminder_occurrences';
-  static const String skillsTable = 'skills';
-  static const String repsTable = 'reps';
   static const String goalsTable = 'goals';
-  static const String subtasksTable = 'subtasks';
+  static const String tasksTable = 'tasks';
 
   // Geofence
   static const double defaultGeofenceRadius = 100.0; // meters

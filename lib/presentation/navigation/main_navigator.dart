@@ -5,7 +5,6 @@ import '../screens/goals_screen.dart';
 import '../screens/subtasks_calendar_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/add_reminder_screen.dart';
-import '../screens/add_rep_screen.dart';
 import '../theme/app_theme.dart';
 
 /// Main navigation wrapper with bottom tab bar
@@ -108,77 +107,11 @@ class _MainNavigatorState extends State<MainNavigator>
     });
   }
 
-  void _onFabPressed() {
+  void _onRecordButtonPressed() {
     HapticFeedback.mediumImpact();
-    // MVP: Show bottom sheet with options
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceColor,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppTheme.radiusLG),
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: AppTheme.spacingMD),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.borderColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: AppTheme.spacingLG),
-              ListTile(
-                leading: const Icon(Icons.alarm_rounded, color: AppTheme.primaryColor),
-                title: const Text('Schedule a Task'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.of(context).push(
-                    PageRouteBuilder(
-                      pageBuilder: (context, animation, secondaryAnimation) =>
-                          const AddReminderScreen(),
-                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                        return SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0.0, 1.0),
-                            end: Offset.zero,
-                          ).animate(
-                            CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOutCubic,
-                            ),
-                          ),
-                          child: child,
-                        );
-                      },
-                      transitionDuration: const Duration(milliseconds: 300),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.track_changes_rounded, color: AppTheme.primaryColor),
-                title: const Text('Log a Rep'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const AddRepScreen(),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: AppTheme.spacingMD),
-            ],
-          ),
-        ),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const AddReminderScreen(),
       ),
     );
   }
@@ -193,13 +126,12 @@ class _MainNavigatorState extends State<MainNavigator>
       ),
       bottomNavigationBar: _buildBottomNavBar(context),
       floatingActionButton: _buildFloatingActionButton(context),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endDocked, // Positioned above nav bar
-      extendBody: true, // Allow FAB to extend above nav bar
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      extendBody: true,
     );
   }
 
-  /// Build floating action button similar to Daylio app design
-  /// Circular button with gradient, positioned above navigation bar
+  /// Build floating action button for quick actions
   Widget _buildFloatingActionButton(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 75), // Position above navigation bar
@@ -222,7 +154,7 @@ class _MainNavigatorState extends State<MainNavigator>
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: _onFabPressed,
+              onTap: _onRecordButtonPressed,
               customBorder: const CircleBorder(),
               child: const SizedBox(
                 width: 64,
@@ -268,14 +200,56 @@ class _MainNavigatorState extends State<MainNavigator>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Navigation tabs - flexible sizing
-              ...List.generate(
-                _tabs.length,
-                (index) => Expanded(
-                  child: _buildNavItem(context, index),
-                ),
-              ),
+              // First 2 tabs
+              Expanded(child: _buildNavItem(context, 0)),
+              Expanded(child: _buildNavItem(context, 1)),
+              
+              // Center record button (Strava-style)
+              _buildCenterRecordButton(context),
+              
+              // Last 2 tabs
+              Expanded(child: _buildNavItem(context, 2)),
+              Expanded(child: _buildNavItem(context, 3)),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build center record button (Strava-style)
+  Widget _buildCenterRecordButton(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXS),
+      child: Material(
+        elevation: 8,
+        shadowColor: AppTheme.primaryColor.withOpacity(0.4),
+        shape: const CircleBorder(),
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.primaryColor,
+                AppTheme.primaryLight,
+              ],
+            ),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _onRecordButtonPressed,
+              customBorder: const CircleBorder(),
+              child: const Icon(
+                Icons.fiber_manual_record_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
           ),
         ),
       ),

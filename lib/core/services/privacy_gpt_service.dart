@@ -274,17 +274,10 @@ Total Available Hours: ~${totalAvailableHours.toStringAsFixed(0)} hours
 
 Create a COMPLETE business execution plan with:
 
-1. **Skills Required** (3-8 skills):
-   - Identify the core skills needed to achieve this goal
-   - Each skill must have:
-     - name: Short skill name (e.g., "Content Creation", "Sales Outreach")
-     - description: What this skill entails (1-2 sentences)
-
-2. **Subtask Breakdown** (5-12 subtasks):
-   - Each subtask must have:
+1. **Task Breakdown** (5-12 tasks):
+   - Each task must have:
      - title: Short, actionable name
      - description: What to do (specific and clear)
-     - skillName: Which skill this subtask builds (must match a skill from the skills array)
      - estimatedHours: Realistic hours needed (consider complexity)
      - priority: "high", "medium", or "low"
      - dependencies: Array of task titles this depends on (empty if none)
@@ -318,21 +311,10 @@ Return ONLY valid JSON:
 {
   "goal": "goal name",
   "totalEstimatedHours": 120,
-  "skills": [
+  "tasks": [
     {
-      "name": "Content Creation",
-      "description": "Writing and creating engaging content for marketing"
-    },
-    {
-      "name": "Sales Outreach",
-      "description": "Reaching out to potential customers and closing deals"
-    }
-  ],
-  "subtasks": [
-    {
-      "title": "subtask name",
+      "title": "task name",
       "description": "what to do",
-      "skillName": "Content Creation",
       "estimatedHours": 8.0,
       "priority": "high",
       "dependencies": [],
@@ -423,21 +405,10 @@ Return ONLY valid JSON:
       'targetDeadline': targetDeadline.toIso8601String(),
       'hoursPerDay': hoursPerDay,
       'totalEstimatedHours': (daysUntilDeadline * hoursPerDay * 0.7).round(), // 70% utilization
-      'skills': [
-        {
-          'name': 'Planning & Strategy',
-          'description': 'Strategic thinking and planning for business goals',
-        },
-        {
-          'name': 'Execution',
-          'description': 'Taking action and completing tasks',
-        },
-      ],
-      'subtasks': [
+      'tasks': [
         {
           'title': 'Research and plan',
           'description': 'Research and create a detailed plan for achieving this goal',
-          'skillName': 'Planning & Strategy',
           'estimatedHours': 8.0,
           'priority': 'high',
           'dependencies': [],
@@ -450,7 +421,6 @@ Return ONLY valid JSON:
         {
           'title': 'Execute core tasks',
           'description': 'Work on the main tasks required to achieve your goal',
-          'skillName': 'Execution',
           'estimatedHours': (daysUntilDeadline * hoursPerDay * 0.5).toDouble(),
           'priority': 'high',
           'dependencies': ['Research and plan'],
@@ -619,9 +589,9 @@ Return ONLY valid JSON in this format:
   Future<String?> generateMotivationalMessage({
     required String goalName,
     required String taskDescription,
-    String? skillName,
-    int streakCount = 0,
-    int totalReps = 0,
+    String? skillName, // Deprecated, kept for compatibility
+    int streakCount = 0, // Deprecated, kept for compatibility
+    int totalReps = 0, // Deprecated, kept for compatibility
     String? motivationAnchor,
   }) async {
     try {
@@ -633,8 +603,7 @@ Return ONLY valid JSON in this format:
         return _fallbackMotivationalMessage(
           goalName: goalName,
           taskDescription: taskDescription,
-          skillName: skillName,
-          streakCount: streakCount,
+          // skillName deprecated
           motivationAnchor: motivationAnchor,
         );
       }
@@ -645,9 +614,6 @@ You are Awarely, a private execution assistant for solopreneurs. Generate a shor
 1. Acknowledges the task: "$taskDescription"
 2. Connects it to the bigger goal: "$goalName"
 ${motivationAnchor != null ? '3. Reinforces why it matters: "$motivationAnchor"' : ''}
-${skillName != null ? '4. Mentions the skill being developed: "$skillName"' : ''}
-${streakCount > 0 ? '5. Celebrates progress: "$streakCount-day streak"' : ''}
-${totalReps > 0 ? '6. Shows momentum: "$totalReps total reps logged"' : ''}
 
 Tone: Empathetic, encouraging, non-judgmental. Focus on progress and momentum, not pressure.
 Style: Personal, like a supportive business partner.
@@ -686,8 +652,6 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
         return _fallbackMotivationalMessage(
           goalName: goalName,
           taskDescription: taskDescription,
-          skillName: skillName,
-          streakCount: streakCount,
           motivationAnchor: motivationAnchor,
         );
       }
@@ -696,8 +660,6 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
       return _fallbackMotivationalMessage(
         goalName: goalName,
         taskDescription: taskDescription,
-        skillName: skillName,
-        streakCount: streakCount,
         motivationAnchor: motivationAnchor,
       );
     }
@@ -707,8 +669,6 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
   String _fallbackMotivationalMessage({
     required String goalName,
     required String taskDescription,
-    String? skillName,
-    int streakCount = 0,
     String? motivationAnchor,
   }) {
     final parts = <String>[];
@@ -717,14 +677,6 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
       parts.add(motivationAnchor);
     } else {
       parts.add('This task moves you closer to "$goalName"');
-    }
-    
-    if (skillName != null) {
-      parts.add('Keep building your $skillName skills');
-    }
-    
-    if (streakCount > 0) {
-      parts.add('You\'re on a $streakCount-day streak!');
     }
     
     parts.add('Let\'s keep the momentum going.');

@@ -4,23 +4,23 @@ import 'package:intl/intl.dart';
 import '../providers/growth_provider.dart';
 import '../providers/reminder_provider.dart';
 import '../theme/app_theme.dart';
-import '../../data/models/subtask.dart';
-import '../../data/models/goal_subtask.dart';
+import '../../data/models/subtask.dart' show Task;
+import '../../data/models/goal_task.dart';
 import '../../data/models/reminder.dart' hide TimeOfDay;
 import '../../core/services/privacy_gpt_service.dart';
 
-/// Screen for planning and editing goal subtasks with calendar view
+/// Screen for planning and editing goal tasks with calendar view
 class GoalPlanningScreen extends StatefulWidget {
   final int goalId;
   final String goalName;
-  final List<Subtask> initialSubtasks;
+  final List<Task> initialTasks;
   final Map<String, dynamic> timeline;
 
   const GoalPlanningScreen({
     super.key,
     required this.goalId,
     required this.goalName,
-    required this.initialSubtasks,
+    required this.initialTasks,
     required this.timeline,
   });
 
@@ -31,22 +31,22 @@ class GoalPlanningScreen extends StatefulWidget {
 class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<Subtask> _subtasks = [];
+  List<Task> _tasks = [];
   DateTime _selectedDay = DateTime.now();
   DateTime _focusedDay = DateTime.now();
   late DateTime _deadline;
-  Map<DateTime, List<GoalSubtask>> _scheduledSubtasks = {};
+  Map<DateTime, List<GoalTask>> _scheduledTasks = {};
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _subtasks = List.from(widget.initialSubtasks);
+    _tasks = List.from(widget.initialTasks);
     _deadline = (widget.timeline['deadline'] as DateTime?) ??
         DateTime.now().add(const Duration(days: 30));
     
-    // Schedule subtasks across timeline
-    _scheduleSubtasks();
+    // Schedule tasks across timeline
+    _scheduleTasks();
   }
 
   @override
@@ -55,27 +55,54 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     super.dispose();
   }
 
-  void _scheduleSubtasks() {
+  void _scheduleTasks() {
     final now = DateTime.now();
     final daysUntilDeadline = _deadline.difference(now).inDays;
     
     // Get hours per day from timeline (default to 2 if not set)
     final hoursPerDay = (widget.timeline['hoursPerDay'] as num?)?.toDouble() ?? 2.0;
     
-    if (_subtasks.isEmpty || daysUntilDeadline <= 0) {
-      _scheduledSubtasks.clear();
+    if (_tasks.isEmpty) {
+      _scheduledTasks.clear();
+      setState(() {});
+      return;
+    }
+    
+    // For very short deadlines (1 day or less), schedule all tasks on the deadline day
+    if (daysUntilDeadline <= 1) {
+      _scheduledTasks.clear();
+      final deadlineDate = DateTime(_deadline.year, _deadline.month, _deadline.day);
+      
+      for (var task in _tasks) {
+        final goalTask = GoalTask(
+          id: 0, // Will be assigned on save
+          goalId: widget.goalId,
+          title: task.title,
+          description: task.description,
+          priority: task.priority,
+          estimatedHours: task.estimatedHours ?? 1.0,
+          scheduledDate: deadlineDate,
+          isCompleted: false,
+          isMilestone: task.isMilestone,
+          motivationAnchor: task.motivationAnchor,
+          createdAt: DateTime.now(),
+        );
+        
+        _scheduledTasks.putIfAbsent(deadlineDate, () => []).add(goalTask);
+      }
+      
       setState(() {});
       return;
     }
     
     // Calculate total estimated hours
     double totalHours = 0;
-    for (var subtask in _subtasks) {
-      totalHours += subtask.estimatedHours ?? 1.0; // Default 1 hour if not specified
+    for (var task in _tasks) {
+      totalHours += task.estimatedHours ?? 1.0; // Default 1 hour if not specified
     }
     
     if (totalHours == 0) {
-      totalHours = _subtasks.length.toDouble(); // Fallback: 1 hour per task
+      totalHours = _tasks.length.toDouble(); // Fallback: 1 hour per task
     }
     
     // Calculate available hours (leave 20% buffer for flexibility)
@@ -86,16 +113,16 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       debugPrint('⚠️ Warning: Total hours ($totalHours) exceed available ($availableHours). Tasks will be distributed but may be tight.');
     }
     
-    _scheduledSubtasks.clear();
+    _scheduledTasks.clear();
     
     // Sort by priority first (high priority tasks should be scheduled earlier)
-    final sortedSubtasks = _sortSubtasksByPriority(_subtasks);
+    final sortedTasks = _sortTasksByPriority(_tasks);
     
     // Calculate cumulative hours for percentage-based distribution
     double cumulativeHours = 0.0;
     
-    for (var subtask in sortedSubtasks) {
-      final estimatedHours = subtask.estimatedHours ?? 1.0;
+    for (var task in sortedTasks) {
+      final estimatedHours = task.estimatedHours ?? 1.0;
       
       // Calculate what percentage of total hours this task represents
       final taskPercentage = estimatedHours / totalHours;
@@ -125,9 +152,9 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       final dateKey = DateTime(targetDate.year, targetDate.month, targetDate.day);
       
       // Check if this day already has too many hours scheduled
-      final existingHoursOnDay = _scheduledSubtasks[dateKey]?.fold<double>(
+      final existingHoursOnDay = _scheduledTasks[dateKey]?.fold<double>(
         0.0,
-        (sum, task) => sum + (task.estimatedHours ?? 1.0),
+        (sum, t) => sum + (t.estimatedHours ?? 1.0),
       ) ?? 0.0;
       
       // If adding this task would exceed daily capacity, try to find a nearby day
@@ -140,9 +167,9 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           final candidateDate = dateKey.add(Duration(days: offset));
           if (candidateDate.isBefore(_deadline)) {
             final candidateKey = DateTime(candidateDate.year, candidateDate.month, candidateDate.day);
-            final candidateHours = _scheduledSubtasks[candidateKey]?.fold<double>(
+            final candidateHours = _scheduledTasks[candidateKey]?.fold<double>(
               0.0,
-              (sum, task) => sum + (task.estimatedHours ?? 1.0),
+              (sum, t) => sum + (t.estimatedHours ?? 1.0),
             ) ?? 0.0;
             
             if (candidateHours + estimatedHours <= hoursPerDay) {
@@ -156,9 +183,9 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           final candidateDateBefore = dateKey.subtract(Duration(days: offset));
           if (candidateDateBefore.isAfter(now) || candidateDateBefore.isAtSameMomentAs(now)) {
             final candidateKey = DateTime(candidateDateBefore.year, candidateDateBefore.month, candidateDateBefore.day);
-            final candidateHours = _scheduledSubtasks[candidateKey]?.fold<double>(
+            final candidateHours = _scheduledTasks[candidateKey]?.fold<double>(
               0.0,
-              (sum, task) => sum + (task.estimatedHours ?? 1.0),
+              (sum, t) => sum + (t.estimatedHours ?? 1.0),
             ) ?? 0.0;
             
             if (candidateHours + estimatedHours <= hoursPerDay) {
@@ -170,52 +197,52 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         }
       }
       
-      if (!_scheduledSubtasks.containsKey(finalDate)) {
-        _scheduledSubtasks[finalDate] = [];
+      if (!_scheduledTasks.containsKey(finalDate)) {
+        _scheduledTasks[finalDate] = [];
       }
       
       // Apply suggested time
       DateTime scheduledDateTime = finalDate;
-      if (subtask.suggestedTime != 'any') {
+      if (task.suggestedTime != 'any') {
         int hour = 9; // Default to 9 AM
-        if (subtask.suggestedTime == 'morning') hour = 9;
-        else if (subtask.suggestedTime == 'afternoon') hour = 14;
-        else if (subtask.suggestedTime == 'evening') hour = 18;
+        if (task.suggestedTime == 'morning') hour = 9;
+        else if (task.suggestedTime == 'afternoon') hour = 14;
+        else if (task.suggestedTime == 'evening') hour = 18;
         scheduledDateTime = DateTime(finalDate.year, finalDate.month, finalDate.day, hour);
       }
       
-      final goalSubtask = GoalSubtask(
+      final goalTask = GoalTask(
         id: 0,
         goalId: widget.goalId,
-        title: subtask.title,
-        description: subtask.description,
-        estimatedHours: subtask.estimatedHours,
-        priority: subtask.priority,
-        frequency: subtask.frequency,
-        suggestedTime: subtask.suggestedTime,
-        suggestedLocation: subtask.suggestedLocation,
-        isMilestone: subtask.isMilestone,
-        motivationAnchor: subtask.motivationAnchor,
+        title: task.title,
+        description: task.description,
+        estimatedHours: task.estimatedHours,
+        priority: task.priority,
+        frequency: task.frequency,
+        suggestedTime: task.suggestedTime,
+        suggestedLocation: task.suggestedLocation,
+        isMilestone: task.isMilestone,
+        motivationAnchor: task.motivationAnchor,
         scheduledDate: scheduledDateTime,
         createdAt: DateTime.now(),
       );
       
-      _scheduledSubtasks[finalDate]!.add(goalSubtask);
+      _scheduledTasks[finalDate]!.add(goalTask);
       
       // Update cumulative hours for next iteration
       cumulativeHours += estimatedHours;
     }
     
-    debugPrint('📅 Scheduled ${_scheduledSubtasks.values.fold(0, (sum, list) => sum + list.length)} tasks across ${_scheduledSubtasks.keys.length} days (deadline: ${daysUntilDeadline} days away)');
+    debugPrint('📅 Scheduled ${_scheduledTasks.values.fold(0, (sum, list) => sum + list.length)} tasks across ${_scheduledTasks.keys.length} days (deadline: ${daysUntilDeadline} days away)');
     
     setState(() {});
   }
 
-  /// Sort subtasks by priority and complexity
-  List<Subtask> _sortSubtasksByPriority(List<Subtask> subtasks) {
+  /// Sort tasks by priority and complexity
+  List<Task> _sortTasksByPriority(List<Task> tasks) {
     // Sort by priority: high -> medium -> low
     final priorityOrder = {'high': 0, 'medium': 1, 'low': 2};
-    final sorted = List<Subtask>.from(subtasks);
+    final sorted = List<Task>.from(tasks);
     sorted.sort((a, b) {
       final aPriority = priorityOrder[a.priority] ?? 1;
       final bPriority = priorityOrder[b.priority] ?? 1;
@@ -230,9 +257,9 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     return sorted;
   }
 
-  List<GoalSubtask> _getSubtasksForDay(DateTime day) {
+  List<GoalTask> _getTasksForDay(DateTime day) {
     final dateKey = DateTime(day.year, day.month, day.day);
-    return _scheduledSubtasks[dateKey] ?? [];
+    return _scheduledTasks[dateKey] ?? [];
   }
 
   Future<void> _saveAndSchedule() async {
@@ -240,92 +267,38 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       final growthProvider = context.read<GrowthProvider>();
       final reminderProvider = context.read<ReminderProvider>();
       
-      // Step 1: Create skills from GPT response (using skillName from subtasks)
-      final skillsFromGpt = <String, int>{}; // skillName -> skillId
-      
-      // Extract unique skill names from subtasks
-      final uniqueSkillNames = <String>{};
-      for (var subtask in _subtasks) {
-        if (subtask.skillName != null && subtask.skillName!.isNotEmpty) {
-          uniqueSkillNames.add(subtask.skillName!);
-        }
-      }
-      
-      debugPrint('📋 Creating ${uniqueSkillNames.length} skills from GPT response...');
-      
-      // Create or find skills
-      for (var skillName in uniqueSkillNames) {
-        final existingSkills = growthProvider.getSkillsForGoal(widget.goalId);
-        final matching = existingSkills.where((s) => s.name == skillName);
-        
-        if (matching.isEmpty) {
-          debugPrint('  ➕ Creating new skill: "$skillName" for goalId: ${widget.goalId}');
-          final skillId = await growthProvider.createSkill(
-            skillName,
-            goalId: widget.goalId,
-            description: 'Skill required for goal: ${widget.goalName}',
-          );
-          skillsFromGpt[skillName] = skillId;
-          debugPrint('  ✅ Created skill "$skillName" with id: $skillId');
-        } else {
-          skillsFromGpt[skillName] = matching.first.id;
-          debugPrint('  ✅ Found existing skill "$skillName" with id: ${matching.first.id}');
-        }
-      }
-      
-      // Step 2: Save subtasks and link them to skills
-      for (var dateEntry in _scheduledSubtasks.entries) {
-        for (var goalSubtask in dateEntry.value) {
-          // Find the original subtask to get skillName
-          final originalSubtask = _subtasks.firstWhere(
-            (s) => s.title == goalSubtask.title,
-            orElse: () => throw Exception('Subtask not found: ${goalSubtask.title}'),
-          );
+      // Save tasks and create reminders
+      for (var dateEntry in _scheduledTasks.entries) {
+        for (var goalTask in dateEntry.value) {
+          // Save task
+          await growthProvider.createTask(goalTask);
+          debugPrint('  ✅ Saved task "${goalTask.title}"');
           
-          // Find skill ID for this subtask
-          int? skillId;
-          if (originalSubtask.skillName != null && originalSubtask.skillName!.isNotEmpty) {
-            skillId = skillsFromGpt[originalSubtask.skillName];
-            if (skillId != null) {
-              // Update goalSubtask with skillId before saving
-              final subtaskWithSkill = goalSubtask.copyWith(skillId: skillId);
-              await growthProvider.createSubtask(subtaskWithSkill);
-              debugPrint('  ✅ Saved subtask "${goalSubtask.title}" linked to skill "${originalSubtask.skillName}" (id: $skillId)');
-            } else {
-              debugPrint('  ⚠️ Skill "${originalSubtask.skillName}" not found in skills map');
-              await growthProvider.createSubtask(goalSubtask);
-            }
-          } else {
-            debugPrint('  ⚠️ Subtask "${goalSubtask.title}" has no skillName');
-            await growthProvider.createSubtask(goalSubtask);
-          }
-          
-          // Create reminder for subtask, linked to skill and goal
+          // Create reminder for task, linked to goal
           final reminder = Reminder(
-            text: goalSubtask.description,
-            timeAt: goalSubtask.scheduledDate,
-            priority: _getReminderPriority(goalSubtask.priority),
-            linkedSkillId: skillId,
+            text: goalTask.description,
+            timeAt: goalTask.scheduledDate,
+            priority: _getReminderPriority(goalTask.priority),
             linkedGoalId: widget.goalId, // Direct link to goal for categorization
           );
-          debugPrint('📝 Creating reminder: "${reminder.text}" with linkedSkillId: $skillId, linkedGoalId: ${widget.goalId}');
+          debugPrint('📝 Creating reminder: "${reminder.text}" with linkedGoalId: ${widget.goalId}');
           await reminderProvider.createReminder(reminder);
           debugPrint('✅ Reminder created with ID: ${reminder.id}');
         }
       }
       
-      // Reload growth data to refresh skills
+      // Reload growth data
       await growthProvider.loadGrowthData();
       // Also reload reminders to ensure they're up to date
       await reminderProvider.loadReminders();
       
-      debugPrint('📊 Summary: Created ${skillsFromGpt.length} skills, ${_scheduledSubtasks.values.fold(0, (sum, list) => sum + list.length)} reminders');
+      debugPrint('📊 Summary: Created ${_scheduledTasks.values.fold(0, (sum, list) => sum + list.length)} tasks and reminders');
       
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Goal planned! Subtasks scheduled.'),
+            content: Text('Goal planned! Tasks scheduled.'),
             backgroundColor: Colors.green,
           ),
         );
@@ -350,11 +323,11 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     }
   }
 
-  Future<void> _addNewSubtask() async {
-    final result = await showDialog<Subtask>(
+  Future<void> _addNewTask() async {
+    final result = await showDialog<Task>(
       context: context,
-      builder: (context) => _EditSubtaskDialog(
-        subtask: Subtask(
+      builder: (context) => _EditTaskDialog(
+        task: Task(
           title: '',
           description: '',
           priority: 'medium',
@@ -366,18 +339,18 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     
     if (result != null && result.title.isNotEmpty) {
       setState(() {
-        _subtasks.add(result);
-        _scheduleSubtasks();
+        _tasks.add(result);
+        _scheduleTasks();
       });
     }
   }
 
-  Future<void> _deleteSubtask(int index) async {
+  Future<void> _deleteTask(int index) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Task'),
-        content: Text('Are you sure you want to delete "${_subtasks[index].title}"?'),
+        content: Text('Are you sure you want to delete "${_tasks[index].title}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -394,36 +367,36 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     
     if (confirmed == true) {
       setState(() {
-        _subtasks.removeAt(index);
-        _scheduleSubtasks();
+        _tasks.removeAt(index);
+        _scheduleTasks();
       });
     }
   }
 
-  Future<void> _editSubtask(int index) async {
-    final subtask = _subtasks[index];
-    final result = await showDialog<Subtask>(
+  Future<void> _editTask(int index) async {
+    final task = _tasks[index];
+    final result = await showDialog<Task>(
       context: context,
-      builder: (context) => _EditSubtaskDialog(subtask: subtask),
+      builder: (context) => _EditTaskDialog(task: task),
     );
     
     if (result != null) {
       setState(() {
-        _subtasks[index] = result;
-        _scheduleSubtasks();
+        _tasks[index] = result;
+        _scheduleTasks();
       });
     }
   }
 
-  Future<void> _editSubtaskTime(int index) async {
-    final subtask = _subtasks[index];
+  Future<void> _editTaskTime(int index) async {
+    final task = _tasks[index];
     
     // Find current scheduled date
     DateTime? currentDate;
-    for (var entry in _scheduledSubtasks.entries) {
+    for (var entry in _scheduledTasks.entries) {
       final found = entry.value.firstWhere(
-        (s) => s.title == subtask.title && s.description == subtask.description,
-        orElse: () => GoalSubtask(
+        (t) => t.title == task.title && t.description == task.description,
+        orElse: () => GoalTask(
           id: 0,
           goalId: widget.goalId,
           title: '',
@@ -460,38 +433,38 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         );
         
         setState(() {
-          // Update scheduled date in _scheduledSubtasks
+          // Update scheduled date in _scheduledTasks
           final dateKey = DateTime(newDateTime.year, newDateTime.month, newDateTime.day);
           
           // Remove from old date
-          for (var entry in _scheduledSubtasks.entries) {
+          for (var entry in _scheduledTasks.entries) {
             entry.value.removeWhere(
-              (s) => s.title == subtask.title && s.description == subtask.description,
+              (t) => t.title == task.title && t.description == task.description,
             );
           }
           
           // Add to new date
-          if (!_scheduledSubtasks.containsKey(dateKey)) {
-            _scheduledSubtasks[dateKey] = [];
+          if (!_scheduledTasks.containsKey(dateKey)) {
+            _scheduledTasks[dateKey] = [];
           }
           
-          final goalSubtask = GoalSubtask(
+          final goalTask = GoalTask(
             id: 0,
             goalId: widget.goalId,
-            title: subtask.title,
-            description: subtask.description,
-            estimatedHours: subtask.estimatedHours,
-            priority: subtask.priority,
-            frequency: subtask.frequency,
-            suggestedTime: subtask.suggestedTime,
-            suggestedLocation: subtask.suggestedLocation,
-            isMilestone: subtask.isMilestone,
-            motivationAnchor: subtask.motivationAnchor,
+            title: task.title,
+            description: task.description,
+            estimatedHours: task.estimatedHours,
+            priority: task.priority,
+            frequency: task.frequency,
+            suggestedTime: task.suggestedTime,
+            suggestedLocation: task.suggestedLocation,
+            isMilestone: task.isMilestone,
+            motivationAnchor: task.motivationAnchor,
             scheduledDate: newDateTime,
             createdAt: DateTime.now(),
           );
           
-          _scheduledSubtasks[dateKey]!.add(goalSubtask);
+          _scheduledTasks[dateKey]!.add(goalTask);
         });
       }
     }
@@ -508,14 +481,14 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         actions: [
           IconButton(
             icon: const Icon(Icons.add_rounded),
-            onPressed: _addNewSubtask,
+            onPressed: _addNewTask,
             tooltip: 'Add Task',
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(text: 'Subtasks', icon: Icon(Icons.list_rounded)),
+            Tab(text: 'Tasks', icon: Icon(Icons.list_rounded)),
             Tab(text: 'Calendar', icon: Icon(Icons.calendar_today_rounded)),
           ],
         ),
@@ -523,7 +496,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildSubtasksTab(),
+          _buildTasksTab(),
           _buildCalendarTab(),
         ],
       ),
@@ -535,18 +508,18 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     );
   }
 
-  Widget _buildSubtasksTab() {
+  Widget _buildTasksTab() {
     return ListView.builder(
       padding: const EdgeInsets.all(AppTheme.spacingMD),
-      itemCount: _subtasks.length,
+      itemCount: _tasks.length,
       itemBuilder: (context, index) {
-        final subtask = _subtasks[index];
-        // Find scheduled date for this subtask
+        final task = _tasks[index];
+        // Find scheduled date for this task
         DateTime? scheduledDate;
-        for (var entry in _scheduledSubtasks.entries) {
+        for (var entry in _scheduledTasks.entries) {
           final found = entry.value.firstWhere(
-            (s) => s.title == subtask.title && s.description == subtask.description,
-            orElse: () => GoalSubtask(
+            (t) => t.title == task.title && t.description == task.description,
+            orElse: () => GoalTask(
               id: 0,
               goalId: widget.goalId,
               title: '',
@@ -571,24 +544,24 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
               ),
             ),
             title: Text(
-              subtask.title,
+              task.title,
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(subtask.description),
+                Text(task.description),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 8,
                   children: [
                     Chip(
-                      label: Text(subtask.priority),
+                      label: Text(task.priority),
                       avatar: const Icon(Icons.flag_rounded, size: 16),
                     ),
-                    if (subtask.estimatedHours != null)
+                    if (task.estimatedHours != null)
                       Chip(
-                        label: Text('${subtask.estimatedHours!.toStringAsFixed(1)}h'),
+                        label: Text('${task.estimatedHours!.toStringAsFixed(1)}h'),
                         avatar: const Icon(Icons.timer_rounded, size: 16),
                       ),
                     if (scheduledDate != null)
@@ -608,18 +581,18 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
               children: [
                 IconButton(
                   icon: const Icon(Icons.access_time_rounded, size: 20),
-                  onPressed: () => _editSubtaskTime(index),
+                  onPressed: () => _editTaskTime(index),
                   tooltip: 'Edit Time',
                 ),
                 IconButton(
                   icon: const Icon(Icons.edit_rounded, size: 20),
-                  onPressed: () => _editSubtask(index),
+                  onPressed: () => _editTask(index),
                   tooltip: 'Edit',
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_rounded, size: 20),
                   color: Colors.red,
-                  onPressed: () => _deleteSubtask(index),
+                  onPressed: () => _deleteTask(index),
                   tooltip: 'Delete',
                 ),
               ],
@@ -679,15 +652,15 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(AppTheme.spacingMD),
-            itemCount: _getSubtasksForDay(_selectedDay).length,
+            itemCount: _getTasksForDay(_selectedDay).length,
             itemBuilder: (context, index) {
-              final subtask = _getSubtasksForDay(_selectedDay)[index];
+              final task = _getTasksForDay(_selectedDay)[index];
               return Card(
                 margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
                 child: ListTile(
-                  title: Text(subtask.title),
-                  subtitle: Text(subtask.description),
-                  trailing: subtask.isMilestone
+                  title: Text(task.title),
+                  subtitle: Text(task.description),
+                  trailing: task.isMilestone
                       ? Icon(Icons.flag_rounded, color: AppTheme.primaryColor)
                       : null,
                 ),
@@ -762,7 +735,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
                 final isToday = day.year == DateTime.now().year &&
                     day.month == DateTime.now().month &&
                     day.day == DateTime.now().day;
-                final hasSubtasks = _getSubtasksForDay(day).isNotEmpty;
+                final hasTasks = _getTasksForDay(day).isNotEmpty;
                 final dateKey = DateTime(day.year, day.month, day.day);
                 
                 return Expanded(
@@ -794,7 +767,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
                               fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
-                          if (hasSubtasks)
+                          if (hasTasks)
                             Container(
                               width: 4,
                               height: 4,
@@ -818,20 +791,20 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
   }
 }
 
-class _EditSubtaskDialog extends StatefulWidget {
-  final Subtask subtask;
+class _EditTaskDialog extends StatefulWidget {
+  final Task task;
   final bool isNew;
 
-  const _EditSubtaskDialog({
-    required this.subtask,
+  const _EditTaskDialog({
+    required this.task,
     this.isNew = false,
   });
 
   @override
-  State<_EditSubtaskDialog> createState() => _EditSubtaskDialogState();
+  State<_EditTaskDialog> createState() => _EditTaskDialogState();
 }
 
-class _EditSubtaskDialogState extends State<_EditSubtaskDialog> {
+class _EditTaskDialogState extends State<_EditTaskDialog> {
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
   late TextEditingController _hoursController;
@@ -841,13 +814,13 @@ class _EditSubtaskDialogState extends State<_EditSubtaskDialog> {
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.subtask.title);
-    _descriptionController = TextEditingController(text: widget.subtask.description);
+    _titleController = TextEditingController(text: widget.task.title);
+    _descriptionController = TextEditingController(text: widget.task.description);
     _hoursController = TextEditingController(
-      text: widget.subtask.estimatedHours?.toStringAsFixed(1) ?? '',
+      text: widget.task.estimatedHours?.toStringAsFixed(1) ?? '',
     );
-    _priority = widget.subtask.priority;
-    _frequency = widget.subtask.frequency;
+    _priority = widget.task.priority;
+    _frequency = widget.task.frequency;
   }
 
   @override
@@ -909,7 +882,7 @@ class _EditSubtaskDialogState extends State<_EditSubtaskDialog> {
             }
             Navigator.pop(
               context,
-              widget.subtask.copyWith(
+              widget.task.copyWith(
                 title: _titleController.text.trim(),
                 description: _descriptionController.text.trim(),
                 estimatedHours: double.tryParse(_hoursController.text),

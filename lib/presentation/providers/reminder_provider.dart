@@ -640,10 +640,7 @@ class ReminderProvider with ChangeNotifier {
       debugPrint('✅ Completing reminder: ${reminder.text}');
       
       // MVP: Auto-log rep if reminder is linked to a skill
-      if (reminder.linkedSkillId != null && onRepLogged != null) {
-        debugPrint('   Reminder linked to skill ${reminder.linkedSkillId}, logging rep...');
-        onRepLogged(reminder.linkedSkillId!, reminder.text);
-      }
+      // Skills removed - no longer logging reps
       
       if (reminder.isRecurring) {
         // For recurring reminders, mark specific occurrence

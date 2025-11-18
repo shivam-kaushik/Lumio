@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/growth_provider.dart';
 import '../theme/app_theme.dart';
-import '../../data/models/goal_subtask.dart';
+import '../../data/models/goal_task.dart';
 import '../../data/models/goal.dart';
 
 /// Calendar screen showing all scheduled subtasks across all goals
@@ -26,28 +26,28 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
     });
   }
 
-  List<GoalSubtask> _getSubtasksForDay(DateTime day) {
+  List<GoalTask> _getTasksForDay(DateTime day) {
     final growthProvider = context.read<GrowthProvider>();
     final dateKey = DateTime(day.year, day.month, day.day);
     
-    // Get all subtasks from all goals
-    final allSubtasks = <GoalSubtask>[];
+    // Get all tasks from all goals
+    final allTasks = <GoalTask>[];
     for (var goal in growthProvider.goals) {
-      final subtasks = growthProvider.getSubtasksForGoal(goal.id);
-      for (var subtask in subtasks) {
-        if (subtask.scheduledDate != null) {
+      final tasks = growthProvider.getTasksForGoal(goal.id);
+      for (var task in tasks) {
+        if (task.scheduledDate != null) {
           final scheduledKey = DateTime(
-            subtask.scheduledDate!.year,
-            subtask.scheduledDate!.month,
-            subtask.scheduledDate!.day,
+            task.scheduledDate!.year,
+            task.scheduledDate!.month,
+            task.scheduledDate!.day,
           );
-          if (scheduledKey == dateKey && !subtask.isCompleted) {
-            allSubtasks.add(subtask);
+          if (scheduledKey == dateKey && !task.isCompleted) {
+            allTasks.add(task);
           }
         }
       }
     }
-    return allSubtasks;
+    return allTasks;
   }
 
   @override
@@ -103,9 +103,9 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
               // Calendar grid
               _buildCalendarGrid(),
               const Divider(),
-              // Selected day's subtasks
+              // Selected day's tasks
               Expanded(
-                child: _buildSubtasksList(),
+                child: _buildTasksList(),
               ),
             ],
           );
@@ -180,7 +180,7 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
                   final isToday = day.year == DateTime.now().year &&
                       day.month == DateTime.now().month &&
                       day.day == DateTime.now().day;
-                  final hasSubtasks = _getSubtasksForDay(day).isNotEmpty;
+                  final hasTasks = _getTasksForDay(day).isNotEmpty;
                   
                   return Expanded(
                     child: GestureDetector(
@@ -212,7 +212,7 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
                                 fontSize: 14,
                               ),
                             ),
-                            if (hasSubtasks)
+                            if (hasTasks)
                               Container(
                                 width: 4,
                                 height: 4,
@@ -236,11 +236,11 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
     );
   }
 
-  Widget _buildSubtasksList() {
-    final subtasks = _getSubtasksForDay(_selectedDay);
+  Widget _buildTasksList() {
+    final tasks = _getTasksForDay(_selectedDay);
     final growthProvider = context.read<GrowthProvider>();
     
-    if (subtasks.isEmpty) {
+    if (tasks.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -252,7 +252,7 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
             ),
             const SizedBox(height: AppTheme.spacingMD),
             Text(
-              'No subtasks scheduled for ${DateFormat('MMM d, y').format(_selectedDay)}',
+              'No tasks scheduled for ${DateFormat('MMM d, y').format(_selectedDay)}',
               style: TextStyle(color: AppTheme.textSecondary),
             ),
           ],
@@ -262,11 +262,11 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
     
     return ListView.builder(
       padding: const EdgeInsets.all(AppTheme.spacingMD),
-      itemCount: subtasks.length,
+      itemCount: tasks.length,
       itemBuilder: (context, index) {
-        final subtask = subtasks[index];
+        final task = tasks[index];
         final goal = growthProvider.goals.firstWhere(
-          (g) => g.id == subtask.goalId,
+          (g) => g.id == task.goalId,
           orElse: () => Goal(
             id: 0,
             name: 'Unknown Goal',
@@ -277,17 +277,17 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
         return Card(
           margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
           child: ListTile(
-            leading: subtask.isMilestone
+            leading: task.isMilestone
                 ? Icon(Icons.flag_rounded, color: AppTheme.primaryColor)
                 : Icon(Icons.check_circle_outline_rounded),
             title: Text(
-              subtask.title,
+              task.title,
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(subtask.description),
+                Text(task.description),
                 const SizedBox(height: 4),
                 Text(
                   'Goal: ${goal.name}',
@@ -297,9 +297,9 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (subtask.estimatedHours != null)
+                if (task.estimatedHours != null)
                   Text(
-                    'Estimated: ${subtask.estimatedHours!.toStringAsFixed(1)} hours',
+                    'Estimated: ${task.estimatedHours!.toStringAsFixed(1)} hours',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppTheme.textSecondary,
@@ -309,14 +309,14 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
             ),
             trailing: IconButton(
               icon: Icon(
-                subtask.isCompleted
+                task.isCompleted
                     ? Icons.check_circle_rounded
                     : Icons.radio_button_unchecked_rounded,
-                color: subtask.isCompleted ? Colors.green : AppTheme.textSecondary,
+                color: task.isCompleted ? Colors.green : AppTheme.textSecondary,
               ),
               onPressed: () async {
-                if (!subtask.isCompleted) {
-                  final message = await growthProvider.completeSubtask(subtask.id);
+                if (!task.isCompleted) {
+                  final message = await growthProvider.completeTask(task.id);
                   if (mounted && message != null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(

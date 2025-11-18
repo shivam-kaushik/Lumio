@@ -1,9 +1,9 @@
-import 'subtask.dart';
+import 'subtask.dart' show Task;
 
-/// Goal roadmap containing goal name and subtasks
+/// Goal roadmap containing goal name and tasks
 class GoalRoadmap {
   final String goalName;
-  final List<Subtask> subtasks;
+  final List<Task> tasks;
   final DateTime? targetDeadline;
   final double? hoursPerDay;
   final int? totalEstimatedHours;
@@ -13,7 +13,7 @@ class GoalRoadmap {
 
   GoalRoadmap({
     required this.goalName,
-    required this.subtasks,
+    required this.tasks,
     this.targetDeadline,
     this.hoursPerDay,
     this.totalEstimatedHours,
@@ -33,8 +33,8 @@ class GoalRoadmap {
 
     return GoalRoadmap(
       goalName: json['goal'] as String? ?? '',
-      subtasks: (json['subtasks'] as List<dynamic>?)
-              ?.map((s) => Subtask.fromMap(s as Map<String, dynamic>))
+      tasks: (json['tasks'] as List<dynamic>?)
+              ?.map((s) => Task.fromMap(s as Map<String, dynamic>))
               .toList() ?? [],
       targetDeadline: deadline,
       hoursPerDay: json['hoursPerDay'] != null
@@ -61,7 +61,7 @@ class GoalRoadmap {
   Map<String, dynamic> toMap() {
     return {
       'goal': goalName,
-      'subtasks': subtasks.map((s) => s.toMap()).toList(),
+      'tasks': tasks.map((s) => s.toMap()).toList(),
       'targetDeadline': targetDeadline?.toIso8601String(),
       'hoursPerDay': hoursPerDay,
       'totalEstimatedHours': totalEstimatedHours,
@@ -71,4 +71,3 @@ class GoalRoadmap {
     };
   }
 }
-

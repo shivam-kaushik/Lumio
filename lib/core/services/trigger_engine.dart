@@ -438,50 +438,40 @@ class TriggerEngine {
       print('📱 Showing notification...');
     }
     
-    // MVP: Create payload with skill info if linked
+    // Create payload for notification
     String payload;
     String title;
     String body;
     
-    if (reminder.linkedSkillId != null) {
-      // Skill-linked reminder - generate motivational message
+    // Get goal name if reminder is linked to a goal
+    String? goalName;
+    if (reminder.linkedGoalId != null) {
+      final goal = await _growthRepository.getGoal(reminder.linkedGoalId!);
+      goalName = goal?.name;
+    }
+    
+    // Generate motivational message if linked to goal
+    if (goalName != null) {
       try {
-        final skill = await _growthRepository.getSkillById(reminder.linkedSkillId!);
-        final reps = await _growthRepository.getRepsForSkill(reminder.linkedSkillId!);
-        final streak = await _growthRepository.getStreak();
-        
-        // Get goal name if skill is linked to a goal
-        String? goalName;
-        if (skill?.goalId != null) {
-          final goal = await _growthRepository.getGoal(skill!.goalId!);
-          goalName = goal?.name;
-        }
-        
-        // Generate motivational message
         final motivationalMessage = await _privacyGpt.generateMotivationalMessage(
-          goalName: goalName ?? 'Your goal',
+          goalName: goalName,
           taskDescription: reminder.text,
-          skillName: skill?.name,
-          streakCount: streak,
-          totalReps: reps.length,
-          motivationAnchor: null, // Could be stored in reminder metadata
+          motivationAnchor: null,
         );
         
-        title = '🚀 Execution Time!';
-        body = motivationalMessage ?? 'Ready to log your rep? (${reminder.text})';
-        payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
+        title = '🚀 Task Time!';
+        body = motivationalMessage ?? reminder.text;
       } catch (e) {
         debugPrint('❌ Error generating motivational message: $e');
-        title = 'Momentum Rep Ready!';
-        body = 'Ready to log your rep? (${reminder.text})';
-        payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
+        title = 'Task';
+        body = reminder.text;
       }
     } else {
-      // Standard task
       title = 'Task';
       body = reminder.text;
-      payload = '{"action":"complete","reminder_id":"${reminder.id}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
     }
+    
+    payload = '{"action":"complete","reminder_id":"${reminder.id}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
     
     await _notificationService.showNotification(
       id: reminder.id.hashCode,
@@ -512,20 +502,12 @@ class TriggerEngine {
         await _reminderRepository.updateReminder(updatedReminder);
 
         // Schedule notification for next occurrence
-        // MVP: Create payload with skill info if linked
+        // Create payload for next occurrence
         String payload;
-        String title;
-        String body;
+        String title = 'Task';
+        String body = reminder.text;
         
-        if (reminder.linkedSkillId != null) {
-          title = 'Momentum Rep Ready!';
-          body = 'Ready to log your rep? (${reminder.text})';
-          payload = '{"action":"log_rep","reminder_id":"${reminder.id}","skill_id":${reminder.linkedSkillId},"notes":"${reminder.text.replaceAll('"', '\\"')}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
-        } else {
-          title = 'Task';
-          body = reminder.text;
-          payload = '{"action":"complete","reminder_id":"${reminder.id}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
-        }
+        payload = '{"action":"complete","reminder_id":"${reminder.id}","title":"${title.replaceAll('"', '\\"')}","body":"${body.replaceAll('"', '\\"')}"}';
         
         await _notificationService.scheduleNotification(
           id: reminder.id.hashCode,

@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import '../../data/models/goal_subtask.dart';
+import '../../data/models/goal_task.dart';
 import '../../data/models/goal.dart';
 import '../../data/repositories/growth_repository.dart';
 
@@ -7,36 +7,33 @@ import '../../data/repositories/growth_repository.dart';
 class AdaptiveReschedulingService {
   final GrowthRepository _repository = GrowthRepository();
 
-  /// Reschedule missed subtasks for a goal
-  /// Returns list of rescheduled subtask IDs
-  Future<List<int>> rescheduleMissedSubtasks(int goalId) async {
+  /// Reschedule missed tasks for a goal
+  /// Returns list of rescheduled task IDs
+  Future<List<int>> rescheduleMissedTasks(int goalId) async {
     final goal = await _repository.getGoal(goalId);
     if (goal == null) return [];
 
-    final subtasks = await _repository.getSubtasksForGoal(goalId);
+    final tasks = await _repository.getTasksForGoal(goalId);
     final now = DateTime.now();
     final rescheduledIds = <int>[];
 
-    for (var subtask in subtasks) {
-      // Check if subtask is missed (past scheduled date and not completed)
-      if (subtask.scheduledDate != null &&
-          subtask.scheduledDate!.isBefore(now) &&
-          !subtask.isCompleted) {
-        // Calculate new scheduled date
+    for (var task in tasks) {
+      if (task.scheduledDate != null &&
+          task.scheduledDate!.isBefore(now) &&
+          !task.isCompleted) {
         final newDate = _calculateNextAvailableDate(
-          subtask,
+          task,
           goal,
           now,
         );
 
         if (newDate != null) {
-          // Update subtask with new scheduled date
-          final updatedSubtask = subtask.copyWith(scheduledDate: newDate);
-          await _repository.updateSubtask(updatedSubtask);
-          rescheduledIds.add(subtask.id);
+          final updatedTask = task.copyWith(scheduledDate: newDate);
+          await _repository.updateTask(updatedTask);
+          rescheduledIds.add(task.id);
 
           debugPrint(
-            '🔄 Rescheduled missed subtask "${subtask.title}" from ${subtask.scheduledDate} to $newDate',
+            '🔄 Rescheduled missed task "${task.title}" from ${task.scheduledDate} to $newDate',
           );
         }
       }
@@ -45,54 +42,43 @@ class AdaptiveReschedulingService {
     return rescheduledIds;
   }
 
-  /// Calculate next available date for a missed subtask
   DateTime? _calculateNextAvailableDate(
-    GoalSubtask subtask,
+    GoalTask task,
     Goal goal,
     DateTime now,
   ) {
-    // Start from tomorrow
     var candidateDate = DateTime(now.year, now.month, now.day)
         .add(const Duration(days: 1));
 
-    // If goal has a deadline, don't reschedule beyond it
     final maxDate = goal.targetDeadline ?? now.add(const Duration(days: 90));
 
-    // Try to find a suitable date within the next 7 days
     for (var i = 0; i < 7 && candidateDate.isBefore(maxDate); i++) {
-      // Check if this date works based on suggested time
-      if (_isDateSuitable(candidateDate, subtask)) {
-        // Set the time based on suggested time
-        return _applySuggestedTime(candidateDate, subtask);
+      if (_isDateSuitable(candidateDate, task)) {
+        return _applySuggestedTime(candidateDate, task);
       }
       candidateDate = candidateDate.add(const Duration(days: 1));
     }
 
-    // If no suitable date found in 7 days, use the first available date
     if (candidateDate.isBefore(maxDate)) {
-      return _applySuggestedTime(candidateDate, subtask);
+      return _applySuggestedTime(candidateDate, task);
     }
 
-    // If we've exceeded the deadline, schedule for the deadline
     if (goal.targetDeadline != null) {
-      return _applySuggestedTime(goal.targetDeadline!, subtask);
+      return _applySuggestedTime(goal.targetDeadline!, task);
     }
 
     return null;
   }
 
-  /// Check if a date is suitable for the subtask
-  bool _isDateSuitable(DateTime date, GoalSubtask subtask) {
-    // For now, any weekday is suitable
-    // Could be enhanced to check for weekends, holidays, etc.
+  bool _isDateSuitable(DateTime date, GoalTask task) {
+    // Placeholder for future logic (weekends, workload, etc.)
     return true;
   }
 
-  /// Apply suggested time to a date
-  DateTime _applySuggestedTime(DateTime date, GoalSubtask subtask) {
+  DateTime _applySuggestedTime(DateTime date, GoalTask task) {
     int hour = 9; // Default to 9 AM
 
-    switch (subtask.suggestedTime) {
+    switch (task.suggestedTime) {
       case 'morning':
         hour = 9;
         break;
@@ -111,7 +97,6 @@ class AdaptiveReschedulingService {
     return DateTime(date.year, date.month, date.day, hour);
   }
 
-  /// Check for missed subtasks and optionally reschedule them
   Future<Map<String, dynamic>> checkAndRescheduleMissedTasks(
     int goalId, {
     bool autoReschedule = false,
@@ -121,25 +106,25 @@ class AdaptiveReschedulingService {
       return {'missedCount': 0, 'rescheduledCount': 0};
     }
 
-    final subtasks = await _repository.getSubtasksForGoal(goalId);
+    final tasks = await _repository.getTasksForGoal(goalId);
     final now = DateTime.now();
-    final missedSubtasks = subtasks.where((subtask) {
-      return subtask.scheduledDate != null &&
-          subtask.scheduledDate!.isBefore(now) &&
-          !subtask.isCompleted;
+    final missedTasks = tasks.where((task) {
+      return task.scheduledDate != null &&
+          task.scheduledDate!.isBefore(now) &&
+          !task.isCompleted;
     }).toList();
 
     int rescheduledCount = 0;
 
-    if (autoReschedule && missedSubtasks.isNotEmpty) {
-      final rescheduledIds = await rescheduleMissedSubtasks(goalId);
+    if (autoReschedule && missedTasks.isNotEmpty) {
+      final rescheduledIds = await rescheduleMissedTasks(goalId);
       rescheduledCount = rescheduledIds.length;
     }
 
     return {
-      'missedCount': missedSubtasks.length,
+      'missedCount': missedTasks.length,
       'rescheduledCount': rescheduledCount,
-      'missedSubtasks': missedSubtasks,
+      'missedTasks': missedTasks,
     };
   }
 }

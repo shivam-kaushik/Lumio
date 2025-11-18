@@ -4,9 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/growth_provider.dart';
 import '../theme/app_theme.dart';
 import '../../data/models/goal.dart';
-import '../../data/models/skill.dart';
-import '../../data/models/goal_subtask.dart';
-import 'skill_details_screen.dart';
+import '../../data/models/goal_task.dart';
 import '../widgets/roadmap_view.dart';
 import '../../core/services/adaptive_rescheduling_service.dart';
 
@@ -57,51 +55,6 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
           duration: const Duration(seconds: 3),
         ),
       );
-    }
-  }
-
-  Future<void> _addSkill() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Skill'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Skill name',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null && result.isNotEmpty && mounted) {
-      try {
-        await context.read<GrowthProvider>().createSkill(result, goalId: widget.goalId);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Skill added!')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
-      }
     }
   }
 
@@ -189,11 +142,8 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
           (g) => g.id == widget.goalId,
           orElse: () => throw Exception('Goal not found'),
         );
-        final skills = growthProvider.getSkillsForGoal(widget.goalId);
-        final totalReps = skills.fold<int>(
-          0,
-          (sum, skill) => sum + growthProvider.getRepsForSkill(skill.id).length,
-        );
+        final tasks = growthProvider.getTasksForGoal(widget.goalId);
+        final completedTasks = tasks.where((t) => t.isCompleted).length;
 
         return SingleChildScrollView(
             padding: const EdgeInsets.all(AppTheme.spacingMD),
@@ -321,18 +271,18 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
                     Expanded(
                       child: _buildStatCard(
                         context,
-                        'Skills',
-                        '${skills.length}',
-                        Icons.track_changes_rounded,
+                        'Tasks',
+                        '${tasks.length}',
+                        Icons.checklist_rtl_rounded,
                       ),
                     ),
                     const SizedBox(width: AppTheme.spacingMD),
                     Expanded(
                       child: _buildStatCard(
                         context,
-                        'Total Reps',
-                        '$totalReps',
-                        Icons.repeat_rounded,
+                        'Completed',
+                        '$completedTasks',
+                        Icons.check_circle_rounded,
                       ),
                     ),
                   ],
@@ -340,18 +290,18 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
 
                 const SizedBox(height: AppTheme.spacingLG),
 
-                // Subtasks section
+                // Tasks section
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Subtasks',
+                      'Tasks',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
                     ),
                     Text(
-                      '${growthProvider.getSubtasksForGoal(widget.goalId).length} tasks',
+                      '${tasks.length} total • $completedTasks completed',
                       style: TextStyle(color: AppTheme.textSecondary),
                     ),
                   ],
@@ -360,8 +310,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
 
                 Builder(
                   builder: (context) {
-                    final subtasks = growthProvider.getSubtasksForGoal(widget.goalId);
-                    if (subtasks.isEmpty) {
+                    if (tasks.isEmpty) {
                       return Container(
                     padding: const EdgeInsets.all(AppTheme.spacingMD),
                     decoration: BoxDecoration(
@@ -371,23 +320,23 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
                     ),
                     child: Center(
                       child: Text(
-                        'No subtasks planned yet',
+                        'No tasks planned yet',
                         style: TextStyle(color: AppTheme.textSecondary),
                       ),
                     ),
                   );
                     }
                     return Column(
-                      children: subtasks.map((subtask) => Card(
+                      children: tasks.map((task) => Card(
                     margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
                     child: ListTile(
-                      leading: subtask.isCompleted
+                      leading: task.isCompleted
                           ? Icon(Icons.check_circle_rounded, color: Colors.green)
                           : Icon(Icons.radio_button_unchecked_rounded),
                       title: Text(
-                        subtask.title,
+                        task.title,
                         style: TextStyle(
-                          decoration: subtask.isCompleted
+                          decoration: task.isCompleted
                               ? TextDecoration.lineThrough
                               : null,
                         ),
@@ -395,11 +344,11 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(subtask.description),
-                          if (subtask.scheduledDate != null) ...[
+                          Text(task.description),
+                          if (task.scheduledDate != null) ...[
                             const SizedBox(height: 4),
                             Text(
-                              'Scheduled: ${DateFormat('MMM d, y').format(subtask.scheduledDate!)}',
+                              'Scheduled: ${DateFormat('MMM d, y').format(task.scheduledDate!)}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textSecondary,
@@ -408,12 +357,12 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
                           ],
                         ],
                       ),
-                      trailing: subtask.isMilestone
+                      trailing: task.isMilestone
                           ? Icon(Icons.flag_rounded, color: AppTheme.primaryColor)
                           : null,
                             onTap: () async {
-                              if (!subtask.isCompleted) {
-                                final message = await growthProvider.completeSubtask(subtask.id);
+                              if (!task.isCompleted) {
+                                final message = await growthProvider.completeTask(task.id);
                                 if (mounted && message != null) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -430,64 +379,6 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
                     );
                   },
                 ),
-
-                const SizedBox(height: AppTheme.spacingLG),
-
-                // Skills section with progress
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Skills Progress',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    TextButton.icon(
-                      onPressed: _addSkill,
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Add Skill'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppTheme.spacingMD),
-
-                if (skills.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(AppTheme.spacingXL),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceColor,
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMD),
-                      border: Border.all(color: AppTheme.borderColor),
-                    ),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.track_changes_rounded,
-                            size: 48,
-                            color: AppTheme.textSecondary.withOpacity(0.5),
-                          ),
-                          const SizedBox(height: AppTheme.spacingMD),
-                          Text(
-                            'No skills yet',
-                            style: TextStyle(color: AppTheme.textSecondary),
-                          ),
-                          const SizedBox(height: AppTheme.spacingSM),
-                          ElevatedButton.icon(
-                            onPressed: _addSkill,
-                            icon: const Icon(Icons.add_rounded),
-                            label: const Text('Add First Skill'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  ...skills.map((skill) {
-                    final reps = growthProvider.getRepsForSkill(skill.id);
-                    return _buildSkillCard(context, skill, reps.length);
-                  }),
               ],
             ),
           );
@@ -532,94 +423,4 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
       ),
     );
   }
-
-  Widget _buildSkillCard(BuildContext context, Skill skill, int repCount) {
-    // Calculate progress (toward 30-day streak goal)
-    final progress = skill.currentStreak > 0 ? (skill.currentStreak / 30.0).clamp(0.0, 1.0) : 0.0;
-    
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppTheme.radiusMD),
-        side: BorderSide(color: AppTheme.borderColor, width: 1),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.spacingMD),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    skill.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                if (skill.currentStreak > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.local_fire_department_rounded,
-                          size: 16,
-                          color: Colors.orange,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${skill.currentStreak}',
-                          style: TextStyle(
-                            color: Colors.orange,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: AppTheme.spacingSM),
-            Row(
-              children: [
-                Expanded(
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    backgroundColor: AppTheme.borderColor,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppTheme.primaryColor,
-                    ),
-                    minHeight: 8,
-                  ),
-                ),
-                const SizedBox(width: AppTheme.spacingSM),
-                Text(
-                  '${skill.totalReps} reps',
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
-

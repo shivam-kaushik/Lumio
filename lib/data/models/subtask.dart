@@ -1,8 +1,7 @@
-/// Subtask model for goal breakdown
-class Subtask {
+/// Task model for goal breakdown (from GPT)
+class Task {
   final String title;
   final String description;
-  final String? skillName; // Skill required for this subtask (from GPT)
   final String frequency; // 'daily', 'weekly', 'monthly', 'one-time'
   final String suggestedTime; // 'morning', 'afternoon', 'evening', 'any'
   final String suggestedLocation; // 'home', 'office', 'coffee_shop', 'any'
@@ -12,10 +11,9 @@ class Subtask {
   final bool isMilestone; // Is this a milestone checkpoint
   final String? motivationAnchor; // Why this task matters
 
-  Subtask({
+  Task({
     required this.title,
     required this.description,
-    this.skillName,
     this.frequency = 'weekly',
     this.suggestedTime = 'any',
     this.suggestedLocation = 'any',
@@ -26,12 +24,11 @@ class Subtask {
     this.motivationAnchor,
   });
 
-  /// Create Subtask from map (from GPT response)
-  factory Subtask.fromMap(Map<String, dynamic> map) {
-    return Subtask(
+  /// Create Task from map (from GPT response)
+  factory Task.fromMap(Map<String, dynamic> map) {
+    return Task(
       title: map['title'] as String? ?? '',
       description: map['description'] as String? ?? '',
-      skillName: map['skillName'] as String?,
       frequency: map['estimatedFrequency'] as String? ?? 
                  map['frequency'] as String? ?? 'weekly',
       suggestedTime: map['suggestedTime'] as String? ?? 'any',
@@ -50,12 +47,11 @@ class Subtask {
     );
   }
 
-  /// Convert Subtask to map
+  /// Convert Task to map
   Map<String, dynamic> toMap() {
     return {
       'title': title,
       'description': description,
-      'skillName': skillName,
       'frequency': frequency,
       'suggestedTime': suggestedTime,
       'suggestedLocation': suggestedLocation,
@@ -68,10 +64,9 @@ class Subtask {
   }
 
   /// Copy with method
-  Subtask copyWith({
+  Task copyWith({
     String? title,
     String? description,
-    String? skillName,
     String? frequency,
     String? suggestedTime,
     String? suggestedLocation,
@@ -81,10 +76,9 @@ class Subtask {
     bool? isMilestone,
     String? motivationAnchor,
   }) {
-    return Subtask(
+    return Task(
       title: title ?? this.title,
       description: description ?? this.description,
-      skillName: skillName ?? this.skillName,
       frequency: frequency ?? this.frequency,
       suggestedTime: suggestedTime ?? this.suggestedTime,
       suggestedLocation: suggestedLocation ?? this.suggestedLocation,
