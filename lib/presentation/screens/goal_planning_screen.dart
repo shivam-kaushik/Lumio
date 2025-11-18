@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../providers/growth_provider.dart';
 import '../providers/reminder_provider.dart';
 import '../theme/app_theme.dart';
@@ -8,6 +9,7 @@ import '../../data/models/subtask.dart' show Task;
 import '../../data/models/goal_task.dart';
 import '../../data/models/reminder.dart' hide TimeOfDay;
 import '../../core/services/privacy_gpt_service.dart';
+import '../../core/services/permission_service.dart';
 
 /// Screen for planning and editing goal tasks with calendar view
 class GoalPlanningScreen extends StatefulWidget {
@@ -275,9 +277,32 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           debugPrint('  ✅ Saved task "${goalTask.title}"');
           
           // Create reminder for task, linked to goal
+          // Use reminder time from task if available, otherwise use scheduled date
+          DateTime? reminderTime = goalTask.scheduledDate;
+          
+          // If task has a reminder time preference, apply it to the scheduled date
+          if (goalTask.scheduledDate != null) {
+            // Find the corresponding Task to get reminder time preference
+            final task = _tasks.firstWhere(
+              (t) => t.title == goalTask.title,
+              orElse: () => Task(title: '', description: ''),
+            );
+            
+            if (task.reminderTime != null) {
+              // Apply the reminder time to the scheduled date
+              reminderTime = DateTime(
+                goalTask.scheduledDate!.year,
+                goalTask.scheduledDate!.month,
+                goalTask.scheduledDate!.day,
+                task.reminderTime!.hour,
+                task.reminderTime!.minute,
+              );
+            }
+          }
+          
           final reminder = Reminder(
             text: goalTask.description,
-            timeAt: goalTask.scheduledDate,
+            timeAt: reminderTime,
             priority: _getReminderPriority(goalTask.priority),
             linkedGoalId: widget.goalId, // Direct link to goal for categorization
           );
@@ -808,8 +833,13 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
   late TextEditingController _hoursController;
+  final stt.SpeechToText _speech = stt.SpeechToText();
   String _priority = 'medium';
   String _frequency = 'one-time';
+  String? _reminderTimeType;
+  TimeOfDay? _reminderTime;
+  bool _isListeningTitle = false;
+  bool _isListeningDescription = false;
 
   @override
   void initState() {
@@ -821,6 +851,8 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
     );
     _priority = widget.task.priority;
     _frequency = widget.task.frequency;
+    _reminderTimeType = widget.task.reminderTimeType;
+    _reminderTime = widget.task.reminderTime;
   }
 
   @override
@@ -829,6 +861,191 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
     _descriptionController.dispose();
     _hoursController.dispose();
     super.dispose();
+  }
+
+  Future<void> _transcribeVoiceInput(
+    TextEditingController controller,
+    bool isTitle,
+  ) async {
+    final permissionService = PermissionService();
+    final hasPermission = await permissionService.requestMicrophonePermission();
+    
+    if (!hasPermission) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission is required')),
+        );
+      }
+      setState(() {
+        if (isTitle) {
+          _isListeningTitle = false;
+        } else {
+          _isListeningDescription = false;
+        }
+      });
+      return;
+    }
+
+    final available = await _speech.initialize();
+    if (!available) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Speech recognition not available')),
+        );
+      }
+      setState(() {
+        if (isTitle) {
+          _isListeningTitle = false;
+        } else {
+          _isListeningDescription = false;
+        }
+      });
+      return;
+    }
+
+    bool isFinal = false;
+    await _speech.listen(
+      onResult: (result) {
+        setState(() {
+          controller.text = result.recognizedWords;
+          if (result.finalResult) {
+            isFinal = true;
+            _speech.stop();
+            if (isTitle) {
+              _isListeningTitle = false;
+            } else {
+              _isListeningDescription = false;
+            }
+          }
+        });
+      },
+      localeId: 'en_US',
+      listenOptions: stt.SpeechListenOptions(
+        listenMode: stt.ListenMode.confirmation,
+        cancelOnError: true,
+        partialResults: true,
+      ),
+    );
+
+    // Auto-stop after 5 seconds if no final result
+    await Future.delayed(const Duration(seconds: 5));
+    if (!isFinal) {
+      await _speech.stop();
+      setState(() {
+        if (isTitle) {
+          _isListeningTitle = false;
+        } else {
+          _isListeningDescription = false;
+        }
+      });
+    }
+  }
+
+  Future<void> _selectReminderTime() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('When should you be reminded?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.wb_sunny, color: Colors.orange),
+              title: const Text('Morning (9 AM)'),
+              onTap: () => Navigator.pop(context, 'morning'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.wb_twilight, color: Colors.blue),
+              title: const Text('Afternoon (2 PM)'),
+              onTap: () => Navigator.pop(context, 'afternoon'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.nightlight, color: Colors.purple),
+              title: const Text('Evening (6 PM)'),
+              onTap: () => Navigator.pop(context, 'evening'),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.access_time),
+              title: const Text('Specific Time'),
+              onTap: () => Navigator.pop(context, 'specific'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.schedule),
+              title: const Text('Custom Time Range'),
+              onTap: () => Navigator.pop(context, 'custom'),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('No Reminder'),
+              onTap: () => Navigator.pop(context, 'none'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == null || result == 'none') {
+      setState(() {
+        _reminderTimeType = null;
+        _reminderTime = null;
+      });
+      return;
+    }
+
+    if (result == 'specific' || result == 'custom') {
+      final time = await showTimePicker(
+        context: context,
+        initialTime: _reminderTime ?? TimeOfDay.now(),
+      );
+      if (time != null) {
+        setState(() {
+          _reminderTimeType = result;
+          _reminderTime = time;
+        });
+      }
+    } else {
+      // Set default times for morning/afternoon/evening
+      TimeOfDay defaultTime;
+      switch (result) {
+        case 'morning':
+          defaultTime = const TimeOfDay(hour: 9, minute: 0);
+          break;
+        case 'afternoon':
+          defaultTime = const TimeOfDay(hour: 14, minute: 0);
+          break;
+        case 'evening':
+          defaultTime = const TimeOfDay(hour: 18, minute: 0);
+          break;
+        default:
+          return;
+      }
+      setState(() {
+        _reminderTimeType = result;
+        _reminderTime = defaultTime;
+      });
+    }
+  }
+
+  String _getReminderTimeDisplay() {
+    if (_reminderTimeType == null) return 'No reminder';
+    switch (_reminderTimeType) {
+      case 'morning':
+        return 'Morning (9:00 AM)';
+      case 'afternoon':
+        return 'Afternoon (2:00 PM)';
+      case 'evening':
+        return 'Evening (6:00 PM)';
+      case 'specific':
+      case 'custom':
+        if (_reminderTime != null) {
+          return '${_reminderTime!.format(context)}';
+        }
+        return 'Custom time';
+      default:
+        return 'No reminder';
+    }
   }
 
   @override
@@ -841,12 +1058,38 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
           children: [
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Title'),
+              decoration: InputDecoration(
+                labelText: 'Title',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _isListeningTitle ? Icons.mic_rounded : Icons.mic_none_rounded,
+                    color: _isListeningTitle ? Colors.red : null,
+                  ),
+                  onPressed: () async {
+                    setState(() => _isListeningTitle = true);
+                    await _transcribeVoiceInput(_titleController, true);
+                  },
+                  tooltip: 'Voice input',
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _descriptionController,
-              decoration: const InputDecoration(labelText: 'Description'),
+              decoration: InputDecoration(
+                labelText: 'Description',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _isListeningDescription ? Icons.mic_rounded : Icons.mic_none_rounded,
+                    color: _isListeningDescription ? Colors.red : null,
+                  ),
+                  onPressed: () async {
+                    setState(() => _isListeningDescription = true);
+                    await _transcribeVoiceInput(_descriptionController, false);
+                  },
+                  tooltip: 'Voice input',
+                ),
+              ),
               maxLines: 3,
             ),
             const SizedBox(height: 16),
@@ -863,6 +1106,18 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
                   .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                   .toList(),
               onChanged: (value) => setState(() => _priority = value!),
+            ),
+            const SizedBox(height: 16),
+            // Reminder time selection
+            InkWell(
+              onTap: _selectReminderTime,
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Reminder Time',
+                  suffixIcon: Icon(Icons.access_time),
+                ),
+                child: Text(_getReminderTimeDisplay()),
+              ),
             ),
           ],
         ),
@@ -888,6 +1143,8 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
                 estimatedHours: double.tryParse(_hoursController.text),
                 priority: _priority,
                 frequency: _frequency,
+                reminderTimeType: _reminderTimeType,
+                reminderTime: _reminderTime,
               ),
             );
           },

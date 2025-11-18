@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// Task model for goal breakdown (from GPT)
 class Task {
   final String title;
@@ -10,6 +12,8 @@ class Task {
   final List<String> dependencies; // IDs or titles of dependent tasks
   final bool isMilestone; // Is this a milestone checkpoint
   final String? motivationAnchor; // Why this task matters
+  final String? reminderTimeType; // 'specific', 'morning', 'afternoon', 'evening', 'custom', null
+  final TimeOfDay? reminderTime; // Specific time if reminderTimeType is 'specific' or 'custom'
 
   Task({
     required this.title,
@@ -22,6 +26,8 @@ class Task {
     this.dependencies = const [],
     this.isMilestone = false,
     this.motivationAnchor,
+    this.reminderTimeType,
+    this.reminderTime,
   });
 
   /// Create Task from map (from GPT response)
@@ -44,6 +50,13 @@ class Task {
           : [],
       isMilestone: map['isMilestone'] as bool? ?? false,
       motivationAnchor: map['motivationAnchor'] as String?,
+      reminderTimeType: map['reminderTimeType'] as String?,
+      reminderTime: map['reminderTime'] != null
+          ? TimeOfDay(
+              hour: map['reminderTime']['hour'] as int,
+              minute: map['reminderTime']['minute'] as int,
+            )
+          : null,
     );
   }
 
@@ -60,6 +73,10 @@ class Task {
       'dependencies': dependencies,
       'isMilestone': isMilestone,
       'motivationAnchor': motivationAnchor,
+      'reminderTimeType': reminderTimeType,
+      'reminderTime': reminderTime != null
+          ? {'hour': reminderTime!.hour, 'minute': reminderTime!.minute}
+          : null,
     };
   }
 
@@ -75,6 +92,8 @@ class Task {
     List<String>? dependencies,
     bool? isMilestone,
     String? motivationAnchor,
+    String? reminderTimeType,
+    TimeOfDay? reminderTime,
   }) {
     return Task(
       title: title ?? this.title,
@@ -87,6 +106,8 @@ class Task {
       dependencies: dependencies ?? this.dependencies,
       isMilestone: isMilestone ?? this.isMilestone,
       motivationAnchor: motivationAnchor ?? this.motivationAnchor,
+      reminderTimeType: reminderTimeType ?? this.reminderTimeType,
+      reminderTime: reminderTime ?? this.reminderTime,
     );
   }
 }

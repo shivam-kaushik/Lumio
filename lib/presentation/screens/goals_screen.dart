@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../providers/growth_provider.dart';
 import '../theme/app_theme.dart';
 import '../../core/services/permission_service.dart';
+import '../../core/services/premium_service.dart';
 import 'goal_details_screen.dart';
 import 'goal_planning_screen.dart';
 import '../../data/models/goal.dart';
@@ -127,7 +128,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, controller.text),
-                child: const Text('Create'),
+                child: const Text('Next'),
               ),
             ],
           );
@@ -136,77 +137,215 @@ class _GoalsScreenState extends State<GoalsScreen> {
     );
 
     if (result != null && result.isNotEmpty && mounted) {
-      try {
-        // Show loading
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const Center(child: CircularProgressIndicator()),
-        );
-
-        // Generate roadmap using GPT (includes tasks)
-        final gptService = PrivacyGptService();
+      // Show creation method selection
+      final creationMethod = await _showCreationMethodDialog(context);
+      
+      if (creationMethod == null) return;
+      
+      if (creationMethod == 'manual') {
+        // Manual creation - go directly to planning screen
+        await _createManualGoal(result);
+      } else if (creationMethod == 'ai') {
+        // AI creation - check premium status
+        final premiumService = PremiumService();
+        final isPremium = await premiumService.isPremium();
         
-        // Ask for timeline first (needed for generateDetailedRoadmap)
-        final timeline = await _showTimelineDialog(context);
-        
-        if (timeline == null) {
-          if (mounted) {
-            Navigator.pop(context); // Close loading dialog
-          }
-          return;
+        if (!isPremium) {
+          // Show premium upgrade dialog
+          final upgrade = await _showPremiumUpgradeDialog(context);
+          if (upgrade != true) return;
         }
         
-        final deadline = timeline['deadline'] as DateTime;
-        final hoursPerDay = (timeline['hoursPerDay'] as num?)?.toDouble() ?? 2.0;
-        
-        // Generate detailed roadmap with tasks
-        final roadmap = await gptService.generateDetailedRoadmap(
-          result,
-          targetDeadline: deadline,
-          hoursPerDay: hoursPerDay,
+        // Proceed with AI creation
+        await _createAIGoal(result);
+      }
+    }
+  }
+
+  Future<String?> _showCreationMethodDialog(BuildContext context) async {
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('How would you like to create your goal?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit, color: AppTheme.primaryColor),
+              title: const Text('Create Manually'),
+              subtitle: const Text('Add tasks yourself'),
+              onTap: () => Navigator.pop(context, 'manual'),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome, color: Colors.amber),
+              title: const Text('AI-Powered (Premium)'),
+              subtitle: const Text('Let AI create tasks and roadmap'),
+              trailing: const Icon(Icons.star, color: Colors.amber, size: 20),
+              onTap: () => Navigator.pop(context, 'ai'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _showPremiumUpgradeDialog(BuildContext context) async {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.star, color: Colors.amber),
+            SizedBox(width: 8),
+            Text('Premium Feature'),
+          ],
+        ),
+        content: const Text(
+          'AI-powered goal planning is a premium feature. Upgrade to unlock intelligent task generation and roadmaps.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // TODO: Implement premium upgrade flow
+              // For now, just show a message
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Premium upgrade coming soon! For now, you can create goals manually.'),
+                ),
+              );
+              Navigator.pop(context, false);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+            ),
+            child: const Text('Upgrade'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createManualGoal(String goalName) async {
+    try {
+      // Ask for timeline
+      final timeline = await _showTimelineDialog(context);
+      
+      if (timeline == null) return;
+      
+      final deadline = timeline['deadline'] as DateTime;
+      final hoursPerDay = (timeline['hoursPerDay'] as num?)?.toDouble() ?? 2.0;
+      
+      // Create goal
+      final goalId = await context.read<GrowthProvider>().createGoal(
+        goalName,
+        targetDeadline: deadline,
+        hoursPerDay: hoursPerDay,
+      );
+      
+      if (mounted) {
+        // Navigate to planning screen with empty tasks
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => GoalPlanningScreen(
+              goalId: goalId,
+              goalName: goalName,
+              initialTasks: [], // Empty tasks for manual creation
+              timeline: timeline,
+            ),
+          ),
         );
-        
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _createAIGoal(String goalName) async {
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // Generate roadmap using GPT (includes tasks)
+      final gptService = PrivacyGptService();
+      
+      // Ask for timeline first (needed for generateDetailedRoadmap)
+      final timeline = await _showTimelineDialog(context);
+      
+      if (timeline == null) {
         if (mounted) {
           Navigator.pop(context); // Close loading dialog
-          
-          if (roadmap != null && roadmap['tasks'] != null) {
-            // Create goal with deadline and capacity
-            final goalId = await context.read<GrowthProvider>().createGoal(
-              result,
-              targetDeadline: deadline,
-              hoursPerDay: hoursPerDay,
-              totalEstimatedHours: roadmap['totalEstimatedHours'] as int?,
-            );
-            
-            // Navigate to planning screen with roadmap data
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => GoalPlanningScreen(
-                  goalId: goalId,
-                  goalName: result,
-                  initialTasks: (roadmap['tasks'] as List)
-                      .map((s) => Task.fromMap(s as Map<String, dynamic>))
-                      .toList(),
-                  timeline: timeline,
-                ),
-              ),
-            );
-          } else {
-            // Fallback: create goal without roadmap
-            final goalId = await context.read<GrowthProvider>().createGoal(result);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Goal created! You can add subtasks manually.')),
-            );
-          }
         }
-      } catch (e) {
-        if (mounted) {
-          Navigator.pop(context); // Close loading dialog if open
+        return;
+      }
+      
+      final deadline = timeline['deadline'] as DateTime;
+      final hoursPerDay = (timeline['hoursPerDay'] as num?)?.toDouble() ?? 2.0;
+      
+      // Generate detailed roadmap with tasks
+      final roadmap = await gptService.generateDetailedRoadmap(
+        goalName,
+        targetDeadline: deadline,
+        hoursPerDay: hoursPerDay,
+      );
+      
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        
+        if (roadmap != null && roadmap['tasks'] != null) {
+          // Create goal with deadline and capacity
+          final goalId = await context.read<GrowthProvider>().createGoal(
+            goalName,
+            targetDeadline: deadline,
+            hoursPerDay: hoursPerDay,
+            totalEstimatedHours: roadmap['totalEstimatedHours'] as int?,
+          );
+          
+          // Navigate to planning screen with roadmap data
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => GoalPlanningScreen(
+                goalId: goalId,
+                goalName: goalName,
+                initialTasks: (roadmap['tasks'] as List)
+                    .map((s) => Task.fromMap(s as Map<String, dynamic>))
+                    .toList(),
+                timeline: timeline,
+              ),
+            ),
+          );
+        } else {
+          // Fallback: create goal without roadmap
+          final goalId = await context.read<GrowthProvider>().createGoal(goalName);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
+            const SnackBar(content: Text('Goal created! You can add tasks manually.')),
           );
         }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog if open
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
       }
     }
   }
