@@ -262,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   .slideX(begin: -0.2, end: 0, duration: 600.ms, curve: Curves.easeOutCubic),
                 const SizedBox(height: 2),
                 Text(
-                  'Never forget what matters',
+                  'Turning goals into actions',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppTheme.textSecondary,
                     fontSize: 13,

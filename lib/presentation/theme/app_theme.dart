@@ -4,43 +4,43 @@ import 'package:google_fonts/google_fonts.dart';
 /// Application theme configuration using Material 3
 /// Premium, minimal design system with modern aesthetics
 class AppTheme {
-  // Brand Colors - Premium gradient palette
-  static const Color primaryColor = Color(0xFF6366F1); // Indigo - Modern, trustworthy
-  static const Color primaryLight = Color(0xFF818CF8); // Light Indigo
-  static const Color primaryDark = Color(0xFF4F46E5); // Dark Indigo
-  static const Color secondaryColor = Color(0xFF8B5CF6); // Purple
-  static const Color accentColor = Color(0xFF10B981); // Emerald Green
+  // Brand Colors - Orange and White theme
+  static const Color primaryColor = Color(0xFFFF6B35); // Vibrant Orange
+  static const Color primaryLight = Color(0xFFFF8C42); // Light Orange
+  static const Color primaryDark = Color(0xFFE55A2B); // Dark Orange
+  static const Color secondaryColor = Color(0xFFFFA366); // Soft Orange
+  static const Color accentColor = Color(0xFFFF6B35); // Orange accent
   static const Color errorColor = Color(0xFFEF4444); // Red
   static const Color successColor = Color(0xFF10B981); // Green
-  static const Color warningColor = Color(0xFFF59E0B); // Amber
+  static const Color warningColor = Color(0xFFFF9500); // Orange Amber
 
-  // Context Colors - Softer, more refined
-  static const Color timeColor = Color(0xFF3B82F6); // Blue
-  static const Color locationColor = Color(0xFFEC4899); // Pink
-  static const Color wifiColor = Color(0xFF06B6D4); // Cyan
-  static const Color activityColor = Color(0xFF8B5CF6); // Purple
+  // Context Colors - Orange variations
+  static const Color timeColor = Color(0xFFFF8C42); // Orange
+  static const Color locationColor = Color(0xFFFF6B35); // Orange
+  static const Color wifiColor = Color(0xFFFFA366); // Light Orange
+  static const Color activityColor = Color(0xFFFF6B35); // Orange
 
-  // Neutral Colors - Subtle grays for premium feel
-  static const Color backgroundColor = Color(0xFFFAFBFC); // Soft white
+  // Neutral Colors - Clean white theme
+  static const Color backgroundColor = Color(0xFFFFFFFF); // Pure white
   static const Color surfaceColor = Colors.white;
   static const Color surfaceElevated = Color(0xFFFFFFFF);
-  static const Color textPrimary = Color(0xFF0F172A); // Deep charcoal
-  static const Color textSecondary = Color(0xFF64748B); // Muted gray
-  static const Color textTertiary = Color(0xFF94A3B8); // Light gray
+  static const Color textPrimary = Color(0xFF1A1A1A); // Dark text on white
+  static const Color textSecondary = Color(0xFF666666); // Medium gray
+  static const Color textTertiary = Color(0xFF999999); // Light gray
   
   // Border and Divider Colors
-  static const Color borderColor = Color(0xFFE2E8F0); // Very light gray
-  static const Color dividerColor = Color(0xFFF1F5F9); // Subtle divider
+  static const Color borderColor = Color(0xFFE0E0E0); // Light gray border
+  static const Color dividerColor = Color(0xFFF0F0F0); // Subtle divider
   
-  // Dark Mode Colors - Material 3 baseline
-  static const Color darkBackground = Color(0xFF000000); // Pure black for maximum contrast
-  static const Color darkSurface = Color(0xFF0F0F0F); // Card surface - slightly lighter than background
-  static const Color darkSurfaceElevated = Color(0xFF1A1A1A); // Elevated cards
-  static const Color darkTextPrimary = Color(0xFFFFFFFF); // White with 87% opacity in practice
-  static const Color darkTextSecondary = Color(0xFF94A3B8); // Muted text (60% opacity)
-  static const Color darkTextTertiary = Color(0xFF64748B); // Very muted (38% opacity)
-  static const Color darkBorder = Color(0xFF2A2A2A); // Subtle border
-  static const Color darkDivider = Color(0xFF1A1A1A); // Divider
+  // Dark Mode Colors - Orange and dark theme
+  static const Color darkBackground = Color(0xFF1A1A1A); // Dark background
+  static const Color darkSurface = Color(0xFF2A2A2A); // Card surface
+  static const Color darkSurfaceElevated = Color(0xFF333333); // Elevated cards
+  static const Color darkTextPrimary = Color(0xFFFFFFFF); // White text
+  static const Color darkTextSecondary = Color(0xFFCCCCCC); // Light gray text
+  static const Color darkTextTertiary = Color(0xFF999999); // Muted text
+  static const Color darkBorder = Color(0xFF404040); // Subtle border
+  static const Color darkDivider = Color(0xFF333333); // Divider
   
   // Shadow Colors - Soft, modern shadows
   static const Color shadowColor = Color(0x1A000000); // 10% opacity
@@ -243,10 +243,10 @@ class AppTheme {
   static ThemeData get darkTheme {
     // Use static constants defined above
     
-    // Neon accent colors for highlights
-    const neonBlue = Color(0xFF3B82F6);
-    const neonPurple = Color(0xFF8B5CF6);
-    const neonMint = Color(0xFF10B981);
+    // Orange accent colors for highlights
+    const orangeAccent = Color(0xFFFF6B35);
+    const lightOrange = Color(0xFFFF8C42);
+    const darkOrange = Color(0xFFE55A2B);
     
     final textTheme = GoogleFonts.interTextTheme(ThemeData.dark().textTheme).apply(
       bodyColor: AppTheme.darkTextPrimary,
@@ -542,21 +542,21 @@ class AppTheme {
         end: Alignment.bottomRight,
         colors: [
           Colors.white,
-          const Color(0xFFFAFBFC),
+          Colors.white,
         ],
       );
     }
   }
   
-  /// Get neon accent color for highlights
-  static Color getNeonAccent({String type = 'blue'}) {
+      /// Get accent color for highlights
+  static Color getNeonAccent({String type = 'orange'}) {
     switch (type) {
-      case 'blue':
-        return const Color(0xFF3B82F6);
-      case 'purple':
-        return const Color(0xFF8B5CF6);
-      case 'mint':
-        return const Color(0xFF10B981);
+      case 'orange':
+        return primaryColor;
+      case 'lightOrange':
+        return primaryLight;
+      case 'darkOrange':
+        return primaryDark;
       default:
         return primaryColor;
     }

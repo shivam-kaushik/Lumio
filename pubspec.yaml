@@ -1,5 +1,5 @@
 name: lumio
-description: "Lumio - The Context-Aware Reminder Assistant. Never forget what matters."
+description: "Lumio - The Context-Aware Reminder Assistant. Turning goals into actions."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -60,6 +60,7 @@ dependencies:
   intl: ^0.19.0
   uuid: ^4.3.3
   collection: ^1.18.0
+  cached_network_image: ^3.3.1
   
   # Speech & NLU
   speech_to_text: ^7.0.0
@@ -91,6 +92,6 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/icons/Lumio_logo.png"
   min_sdk_android: 21 # android min sdk min:16, default 21
-  adaptive_icon_background: "#6366F1" # App theme primary color
+  adaptive_icon_background: "#FF6B35" # App theme primary color (Orange)
   adaptive_icon_foreground: "assets/icons/Lumio_logo.png"
   remove_alpha_ios: true

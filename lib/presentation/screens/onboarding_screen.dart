@@ -23,21 +23,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       description:
           'Get reminded at the right place and time, not just when the clock says so.',
       icon: Icons.lightbulb_outline_rounded,
-      color: const Color(0xFF6366F1),
+      color: AppTheme.primaryColor,
     ),
     OnboardingPage(
       title: 'Smart Triggers',
       description:
           'Uses time, location, Wi-Fi, and motion to understand your context.',
       icon: Icons.sensors_rounded,
-      color: const Color(0xFF8B5CF6),
+      color: AppTheme.primaryLight,
     ),
     OnboardingPage(
       title: 'Natural Language',
       description:
           'Just say "Remind me to take my keys when I leave home" and we\'ll understand.',
       icon: Icons.chat_bubble_outline_rounded,
-      color: const Color(0xFF10B981),
+      color: AppTheme.secondaryColor,
     ),
   ];
 

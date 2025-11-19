@@ -6,6 +6,7 @@ import '../screens/onboarding_screen.dart';
 import '../screens/login_screen.dart';
 import '../navigation/main_navigator.dart';
 import '../providers/auth_provider.dart';
+import '../theme/app_theme.dart';
 import '../../core/services/permission_service.dart';
 
 /// Splash screen shown on app launch
@@ -140,7 +141,7 @@ class _SplashScreenState extends State<SplashScreen>
                             return const Icon(
                               Icons.notifications_active_rounded,
                               size: 64,
-                              color: Color(0xFF6366F1),
+                              color: AppTheme.primaryColor,
                             );
                           },
                         ),
@@ -162,7 +163,7 @@ class _SplashScreenState extends State<SplashScreen>
 
                     // Tagline
                     Text(
-                      'Never forget what matters',
+                      'Turning goals into actions',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: Colors.white.withOpacity(0.9),
                           ),

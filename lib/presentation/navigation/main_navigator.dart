@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import '../screens/home_screen.dart';
 import '../screens/goals_screen.dart';
 import '../screens/subtasks_calendar_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/account_screen.dart';
 import '../screens/add_reminder_screen.dart';
+import '../screens/goal_planning_screen.dart';
+import '../providers/growth_provider.dart';
 import '../theme/app_theme.dart';
+import '../../data/models/goal.dart';
 
 /// Main navigation wrapper with bottom tab bar
 /// Provides smooth transitions and consistent navigation structure
@@ -29,7 +34,7 @@ class _MainNavigatorState extends State<MainNavigator>
     const HomeScreen(), // Tasks list
     const GoalsScreen(), // Goals
     const SubtasksCalendarScreen(), // Calendar (showing subtasks)
-    const SettingsScreen(), // Settings
+    const AccountScreen(), // Account
   ];
 
   // Tab configurations (MVP: Simplified)
@@ -53,9 +58,9 @@ class _MainNavigatorState extends State<MainNavigator>
       badge: null,
     ),
     NavigationTab(
-      icon: Icons.settings_outlined,
-      activeIcon: Icons.settings_rounded,
-      label: 'Settings',
+      icon: Icons.person_outline_rounded,
+      activeIcon: Icons.person_rounded,
+      label: 'Account',
       badge: null,
     ),
   ];
@@ -110,11 +115,112 @@ class _MainNavigatorState extends State<MainNavigator>
 
   void _onRecordButtonPressed() {
     HapticFeedback.mediumImpact();
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const AddReminderScreen(),
+    _showCreateOptionsBottomSheet(context);
+  }
+
+  void _showCreateOptionsBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _CreateOptionsBottomSheet(
+        onCreateTask: () {
+          Navigator.pop(context);
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const AddReminderScreen(),
+            ),
+          );
+        },
+        onCreateGoal: () {
+          Navigator.pop(context);
+          _createGoal(context);
+        },
+        onCreateSubtask: () {
+          Navigator.pop(context);
+          _selectGoalForSubtask(context);
+        },
       ),
     );
+  }
+
+  Future<void> _createGoal(BuildContext context) async {
+    // Switch to Goals tab
+    setState(() {
+      _currentIndex = 1; // Goals tab
+    });
+    
+    // Wait for the tab to switch, then trigger goal creation
+    await Future.delayed(const Duration(milliseconds: 300));
+    
+    // The GoalsScreen has a create button in the app bar
+    // User can tap it to create a goal, or we could programmatically trigger it
+    // For now, just switching to the Goals tab is sufficient
+  }
+
+  Future<void> _selectGoalForSubtask(BuildContext context) async {
+    final growthProvider = context.read<GrowthProvider>();
+    await growthProvider.loadGrowthData();
+    
+    final goals = growthProvider.goals;
+    
+    if (goals.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please create a goal first before adding subtasks'),
+          ),
+        );
+      }
+      return;
+    }
+
+    final selectedGoal = await showDialog<Goal>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Goal'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: goals.length,
+            itemBuilder: (context, index) {
+              final goal = goals[index];
+              return ListTile(
+                title: Text(goal.name),
+                subtitle: goal.targetDeadline != null
+                    ? Text('Deadline: ${goal.targetDeadline!.toString().split(' ')[0]}')
+                    : null,
+                onTap: () => Navigator.pop(context, goal),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (selectedGoal != null && mounted) {
+      // Navigate to goal planning screen
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => GoalPlanningScreen(
+            goalId: selectedGoal.id,
+            goalName: selectedGoal.name,
+            initialTasks: [],
+            timeline: {
+              'deadline': selectedGoal.targetDeadline ?? DateTime.now().add(const Duration(days: 30)),
+              'hoursPerDay': 2.0,
+            },
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -138,7 +244,7 @@ class _MainNavigatorState extends State<MainNavigator>
   /// Build floating action button for quick actions with animations
   Widget _buildFloatingActionButton(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 75), // Position above navigation bar
+      margin: const EdgeInsets.only(bottom: 20), // Position above navigation bar
       child: Material(
         elevation: 8,
         shadowColor: AppTheme.primaryColor.withOpacity(0.4),
@@ -436,5 +542,199 @@ class NavigationTab {
     required this.label,
     this.badge,
   });
+}
+
+/// Bottom sheet widget for create options
+class _CreateOptionsBottomSheet extends StatelessWidget {
+  final VoidCallback onCreateTask;
+  final VoidCallback onCreateGoal;
+  final VoidCallback onCreateSubtask;
+
+  const _CreateOptionsBottomSheet({
+    required this.onCreateTask,
+    required this.onCreateGoal,
+    required this.onCreateSubtask,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurface : Colors.white,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusXL),
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppTheme.spacingLG),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: AppTheme.spacingLG),
+                  decoration: BoxDecoration(
+                    color: AppTheme.textTertiary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              
+              // Title
+              Text(
+                'Create New',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: AppTheme.spacingMD),
+              
+              // Options
+              _CreateOptionTile(
+                icon: Icons.task_rounded,
+                title: 'Create Task',
+                subtitle: 'Add a new reminder or task',
+                color: AppTheme.primaryColor,
+                onTap: onCreateTask,
+              ),
+              const SizedBox(height: AppTheme.spacingSM),
+              
+              _CreateOptionTile(
+                icon: Icons.flag_rounded,
+                title: 'Create Goal',
+                subtitle: 'Set a new long-term goal',
+                color: AppTheme.primaryLight,
+                onTap: onCreateGoal,
+              ),
+              const SizedBox(height: AppTheme.spacingSM),
+              
+              _CreateOptionTile(
+                icon: Icons.checklist_rounded,
+                title: 'Create Subtask',
+                subtitle: 'Add a subtask to an existing goal',
+                color: AppTheme.secondaryColor,
+                onTap: onCreateSubtask,
+              ),
+              
+              const SizedBox(height: AppTheme.spacingMD),
+            ],
+          ),
+        ),
+      ),
+    )
+      .animate()
+      .slideY(
+        begin: 1,
+        end: 0,
+        duration: 300.ms,
+        curve: Curves.easeOutCubic,
+      )
+      .fadeIn(duration: 300.ms);
+  }
+}
+
+/// Individual option tile in the bottom sheet
+class _CreateOptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _CreateOptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+        child: Container(
+          padding: const EdgeInsets.all(AppTheme.spacingMD),
+          decoration: BoxDecoration(
+            color: isDark
+                ? AppTheme.darkSurfaceElevated
+                : AppTheme.backgroundColor,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+            border: Border.all(
+              color: isDark ? AppTheme.darkBorder : AppTheme.borderColor,
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacingMD),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? AppTheme.darkTextPrimary
+                            : AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: isDark
+                            ? AppTheme.darkTextSecondary
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: isDark
+                    ? AppTheme.darkTextTertiary
+                    : AppTheme.textTertiary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 

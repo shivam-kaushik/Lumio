@@ -2,7 +2,7 @@
 class AppConstants {
   // App Info
   static const String appName = 'Lumio';
-  static const String appTagline = 'Never forget what matters';
+  static const String appTagline = 'Turning goals into actions';
   static const String version = '1.0.0';
 
   // Database
