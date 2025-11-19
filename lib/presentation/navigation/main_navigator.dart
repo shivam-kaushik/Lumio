@@ -175,9 +175,12 @@ class _MainNavigatorState extends State<MainNavigator>
       return;
     }
 
+    // Store the outer context before showing dialog
+    final navigatorContext = Navigator.of(context);
+    
     final selectedGoal = await showDialog<Goal>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Select Goal'),
         content: SizedBox(
           width: double.maxFinite,
@@ -191,23 +194,26 @@ class _MainNavigatorState extends State<MainNavigator>
                 subtitle: goal.targetDeadline != null
                     ? Text('Deadline: ${goal.targetDeadline!.toString().split(' ')[0]}')
                     : null,
-                onTap: () => Navigator.pop(context, goal),
+                onTap: () => Navigator.pop(dialogContext, goal),
               );
             },
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
         ],
       ),
     );
 
+    // Wait a bit to ensure dialog is fully closed
+    await Future.delayed(const Duration(milliseconds: 100));
+    
     if (selectedGoal != null && mounted) {
-      // Navigate to goal planning screen
-      Navigator.of(context).push(
+      // Navigate to goal planning screen using the stored navigator context
+      navigatorContext.push(
         MaterialPageRoute(
           builder: (context) => GoalPlanningScreen(
             goalId: selectedGoal.id,
@@ -215,7 +221,7 @@ class _MainNavigatorState extends State<MainNavigator>
             initialTasks: [],
             timeline: {
               'deadline': selectedGoal.targetDeadline ?? DateTime.now().add(const Duration(days: 30)),
-              'hoursPerDay': 2.0,
+              'hoursPerDay': selectedGoal.hoursPerDay ?? 2.0,
             },
           ),
         ),
@@ -235,53 +241,7 @@ class _MainNavigatorState extends State<MainNavigator>
         children: _pages,
       ),
       bottomNavigationBar: _buildBottomNavBar(context),
-      floatingActionButton: _buildFloatingActionButton(context),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       extendBody: true,
-    );
-  }
-
-  /// Build floating action button for quick actions with animations
-  Widget _buildFloatingActionButton(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20), // Position above navigation bar
-      child: Material(
-        elevation: 8,
-        shadowColor: AppTheme.primaryColor.withOpacity(0.4),
-        shape: const CircleBorder(),
-        child: Container(
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppTheme.primaryColor,
-                AppTheme.primaryLight,
-              ],
-            ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _onRecordButtonPressed,
-              customBorder: const CircleBorder(),
-              child: const SizedBox(
-                width: 64,
-                height: 64,
-                child: Icon(
-                  Icons.add_rounded,
-                  color: Colors.white,
-                  size: 32,
-                ),
-              ),
-            ),
-          ),
-        ),
-      )
-        .animate()
-        .scale(delay: 500.ms, duration: 600.ms, curve: Curves.elasticOut)
-        .shimmer(delay: 1100.ms, duration: 2000.ms, color: Colors.white.withOpacity(0.4)),
     );
   }
 
@@ -347,7 +307,7 @@ class _MainNavigatorState extends State<MainNavigator>
     );
   }
 
-  /// Build center record button (Strava-style) with animations
+  /// Build center + button with animations
   Widget _buildCenterRecordButton(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXS),
@@ -375,9 +335,9 @@ class _MainNavigatorState extends State<MainNavigator>
               onTap: _onRecordButtonPressed,
               customBorder: const CircleBorder(),
               child: const Icon(
-                Icons.fiber_manual_record_rounded,
+                Icons.add_rounded,
                 color: Colors.white,
-                size: 28,
+                size: 32,
               ),
             ),
           ),
@@ -495,17 +455,10 @@ class _InteractiveTabButtonState extends State<_InteractiveTabButton>
                   color: widget.isActive
                       ? AppTheme.primaryColor
                       : (Theme.of(context).brightness == Brightness.dark
-                          ? AppTheme.darkTextPrimary.withOpacity(0.85)
-                          : AppTheme.textPrimary.withOpacity(0.65)),
+                          ? AppTheme.darkTextPrimary
+                          : AppTheme.textPrimary),
                   size: 26,
-                )
-                  .animate(target: widget.isActive ? 1 : 0)
-                  .scale(duration: 200.ms, curve: Curves.easeOutCubic)
-                  .then()
-                  .shimmer(
-                    duration: 1000.ms,
-                    color: AppTheme.primaryColor.withOpacity(0.3),
-                  ),
+                ),
               ),
               const SizedBox(height: 4),
               AnimatedDefaultTextStyle(
@@ -516,8 +469,8 @@ class _InteractiveTabButtonState extends State<_InteractiveTabButton>
                   color: widget.isActive
                       ? AppTheme.primaryColor
                       : (Theme.of(context).brightness == Brightness.dark
-                          ? AppTheme.darkTextPrimary.withOpacity(0.7)
-                          : AppTheme.textPrimary.withOpacity(0.7)),
+                          ? AppTheme.darkTextPrimary
+                          : AppTheme.textPrimary),
                 ),
                 child: Text(widget.label),
               ),

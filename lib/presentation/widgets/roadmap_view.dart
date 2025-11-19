@@ -36,31 +36,16 @@ class RoadmapView extends StatelessWidget {
         final tasks = growthProvider.getTasksForGoal(goalId);
         final dbPhases = growthProvider.getPhasesForGoal(goalId);
         
+        // Only show empty state if both tasks and phases are empty
         if (tasks.isEmpty && dbPhases.isEmpty) {
           return _buildEmptyState(context, goal);
         }
 
-        // Get phases from database, or auto-generate if none exist
+        // Only show phases if they exist in the database (user-created)
+        // Don't auto-generate phases
         if (dbPhases.isEmpty) {
-          // No phases created - auto-generate from tasks
-          final phases = _groupTasksByPhase(tasks, goal);
-          return CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.all(AppTheme.spacingMD),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final phase = phases[index];
-                      return _buildPhaseCard(context, phase, index + 1, index);
-                    },
-                    childCount: phases.length,
-                  ),
-                ),
-              ),
-            ],
-          );
+          // No phases created yet - show empty state encouraging user to create phases
+          return _buildEmptyStateWithTasks(context, goal, tasks);
         } else {
           // Use phases from database
           return CustomScrollView(
@@ -126,6 +111,97 @@ class RoadmapView extends StatelessWidget {
             const SizedBox(height: AppTheme.spacingSM),
             Text(
               'Create phases to organize your goal roadmap\nand visualize your journey',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 16,
+              ),
+            )
+              .animate()
+              .fadeIn(delay: 600.ms, duration: 500.ms)
+              .slideY(begin: 0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
+            const SizedBox(height: AppTheme.spacingXL),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RoadmapManagementScreen(
+                      goalId: goalId,
+                      goalName: goal.name,
+                    ),
+                  ),
+                ).then((_) {
+                  context.read<GrowthProvider>().loadGrowthData();
+                });
+              },
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'Create Phases',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacingLG,
+                  vertical: AppTheme.spacingMD,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                ),
+                elevation: 4,
+              ),
+            )
+              .animate()
+              .fadeIn(delay: 800.ms, duration: 500.ms)
+              .scale(delay: 800.ms, duration: 500.ms, curve: Curves.elasticOut),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyStateWithTasks(BuildContext context, Goal goal, List<GoalTask> tasks) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spacingXL),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spacingXL),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.primaryColor.withOpacity(0.1),
+                    AppTheme.primaryLight.withOpacity(0.1),
+                  ],
+                ),
+              ),
+              child: Icon(
+                Icons.timeline_rounded,
+                size: 80,
+                color: AppTheme.primaryColor,
+              ),
+            )
+              .animate()
+              .scale(delay: 200.ms, duration: 600.ms, curve: Curves.elasticOut)
+              .shimmer(delay: 800.ms, duration: 2000.ms, color: AppTheme.primaryColor.withOpacity(0.3)),
+            const SizedBox(height: AppTheme.spacingXL),
+            Text(
+              'No phases created yet',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            )
+              .animate()
+              .fadeIn(delay: 400.ms, duration: 500.ms)
+              .slideY(begin: 0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
+            const SizedBox(height: AppTheme.spacingSM),
+            Text(
+              'You have ${tasks.length} task${tasks.length == 1 ? '' : 's'}.\nCreate phases to organize them into a roadmap.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppTheme.textSecondary,

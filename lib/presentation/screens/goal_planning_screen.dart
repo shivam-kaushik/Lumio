@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/growth_provider.dart';
 import '../providers/reminder_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/modern_smart_card.dart';
 import '../../data/models/subtask.dart' show Task;
 import '../../data/models/goal_task.dart';
 import '../../data/models/reminder.dart' hide TimeOfDay;
@@ -42,6 +44,8 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
   Map<DateTime, List<GoalTask>> _scheduledTasks = {};
   // Map to store phaseId for each task (using task title+description as key)
   final Map<String, int?> _taskPhaseMap = {}; // "title|description" -> phaseId
+  // Map to store selected date for each task (using task title+description as key)
+  final Map<String, DateTime?> _taskDateMap = {}; // "title|description" -> selectedDate
 
   String _getTaskKey(Task task) => '${task.title}|${task.description}';
 
@@ -53,8 +57,60 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     _deadline = (widget.timeline['deadline'] as DateTime?) ??
         DateTime.now().add(const Duration(days: 30));
     
-    // Schedule tasks across timeline
-    _scheduleTasks();
+    // Load existing tasks from database
+    _loadExistingTasks();
+  }
+
+  Future<void> _loadExistingTasks() async {
+    try {
+      final growthProvider = context.read<GrowthProvider>();
+      final existingGoalTasks = growthProvider.getTasksForGoal(widget.goalId);
+      
+      // Convert GoalTask to Task model
+      final existingTasks = existingGoalTasks.map((goalTask) {
+        return Task(
+          title: goalTask.title,
+          description: goalTask.description,
+          priority: goalTask.priority,
+          frequency: goalTask.frequency,
+          suggestedTime: goalTask.suggestedTime,
+          suggestedLocation: goalTask.suggestedLocation,
+          estimatedHours: goalTask.estimatedHours,
+          isMilestone: goalTask.isMilestone,
+          motivationAnchor: goalTask.motivationAnchor,
+          reminderTimeType: null, // GoalTask doesn't have this
+          reminderTime: null, // GoalTask doesn't have this
+        );
+      }).toList();
+      
+      // Merge with initial tasks, avoiding duplicates
+      final existingTitles = _tasks.map((t) => t.title.toLowerCase()).toSet();
+      final newTasks = existingTasks.where(
+        (t) => !existingTitles.contains(t.title.toLowerCase()),
+      ).toList();
+      
+      // Load phase IDs and dates from existing tasks
+      for (var goalTask in existingGoalTasks) {
+        final taskKey = '${goalTask.title}|${goalTask.description}';
+        _taskPhaseMap[taskKey] = goalTask.phaseId;
+        if (goalTask.scheduledDate != null) {
+          _taskDateMap[taskKey] = DateTime(
+            goalTask.scheduledDate!.year,
+            goalTask.scheduledDate!.month,
+            goalTask.scheduledDate!.day,
+          );
+        }
+      }
+      
+      setState(() {
+        _tasks.addAll(newTasks);
+        _scheduleTasks();
+      });
+    } catch (e) {
+      debugPrint('Error loading existing tasks: $e');
+      // If loading fails, just schedule the initial tasks
+      _scheduleTasks();
+    }
   }
 
   @override
@@ -83,6 +139,12 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       
       for (var task in _tasks) {
         final phaseId = _taskPhaseMap[_getTaskKey(task)];
+        // Use user-selected date if available, otherwise use deadline
+        final userSelectedDate = _taskDateMap[_getTaskKey(task)];
+        final taskDate = userSelectedDate != null
+            ? DateTime(userSelectedDate.year, userSelectedDate.month, userSelectedDate.day)
+            : deadlineDate;
+        
         final goalTask = GoalTask(
           id: 0, // Will be assigned on save
           goalId: widget.goalId,
@@ -90,7 +152,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           description: task.description,
           priority: task.priority,
           estimatedHours: task.estimatedHours ?? 1.0,
-          scheduledDate: deadlineDate,
+          scheduledDate: taskDate,
           phaseId: phaseId,
           isCompleted: false,
           isMilestone: task.isMilestone,
@@ -98,7 +160,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           createdAt: DateTime.now(),
         );
         
-        _scheduledTasks.putIfAbsent(deadlineDate, () => []).add(goalTask);
+        _scheduledTasks.putIfAbsent(taskDate, () => []).add(goalTask);
       }
       
       setState(() {});
@@ -134,74 +196,84 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     for (var task in sortedTasks) {
       final estimatedHours = task.estimatedHours ?? 1.0;
       
-      // Calculate what percentage of total hours this task represents
-      final taskPercentage = estimatedHours / totalHours;
+      // Check if user has selected a date for this task
+      final userSelectedDate = _taskDateMap[_getTaskKey(task)];
+      DateTime finalDate;
       
-      // Calculate what percentage of the timeline this should occupy
-      // Use cumulative hours to spread tasks across the timeline
-      final timelinePosition = cumulativeHours / totalHours;
-      
-      // Calculate the target day based on timeline position
-      // Leave 10% buffer at the end for final tasks
-      final effectiveDays = (daysUntilDeadline * 0.9).ceil();
-      final targetDayIndex = (timelinePosition * effectiveDays).floor();
-      
-      // Ensure we don't go beyond deadline
-      final dayIndex = targetDayIndex.clamp(0, daysUntilDeadline - 1);
-      
-      // Calculate the target date
-      var targetDate = now.add(Duration(days: dayIndex));
-      
-      // Ensure we don't schedule beyond deadline
-      if (targetDate.isAfter(_deadline)) {
-        targetDate = _deadline.subtract(const Duration(days: 1));
-      }
-      
-      // For tasks that might exceed daily capacity, distribute across multiple days
-      // But for now, schedule on the calculated day
-      final dateKey = DateTime(targetDate.year, targetDate.month, targetDate.day);
-      
-      // Check if this day already has too many hours scheduled
-      final existingHoursOnDay = _scheduledTasks[dateKey]?.fold<double>(
-        0.0,
-        (sum, t) => sum + (t.estimatedHours ?? 1.0),
-      ) ?? 0.0;
-      
-      // If adding this task would exceed daily capacity, try to find a nearby day
-      DateTime finalDate = dateKey;
-      if (existingHoursOnDay + estimatedHours > hoursPerDay) {
-        // Try to find a nearby day with available capacity
-        bool found = false;
-        for (int offset = 1; offset <= 3 && !found; offset++) {
-          // Try days after
-          final candidateDate = dateKey.add(Duration(days: offset));
-          if (candidateDate.isBefore(_deadline)) {
-            final candidateKey = DateTime(candidateDate.year, candidateDate.month, candidateDate.day);
-            final candidateHours = _scheduledTasks[candidateKey]?.fold<double>(
-              0.0,
-              (sum, t) => sum + (t.estimatedHours ?? 1.0),
-            ) ?? 0.0;
-            
-            if (candidateHours + estimatedHours <= hoursPerDay) {
-              finalDate = candidateKey;
-              found = true;
-              break;
+      if (userSelectedDate != null) {
+        // Use user-selected date
+        finalDate = DateTime(userSelectedDate.year, userSelectedDate.month, userSelectedDate.day);
+      } else {
+        // Auto-schedule based on timeline
+        // Calculate what percentage of total hours this task represents
+        final taskPercentage = estimatedHours / totalHours;
+        
+        // Calculate what percentage of the timeline this should occupy
+        // Use cumulative hours to spread tasks across the timeline
+        final timelinePosition = cumulativeHours / totalHours;
+        
+        // Calculate the target day based on timeline position
+        // Leave 10% buffer at the end for final tasks
+        final effectiveDays = (daysUntilDeadline * 0.9).ceil();
+        final targetDayIndex = (timelinePosition * effectiveDays).floor();
+        
+        // Ensure we don't go beyond deadline
+        final dayIndex = targetDayIndex.clamp(0, daysUntilDeadline - 1);
+        
+        // Calculate the target date
+        var targetDate = now.add(Duration(days: dayIndex));
+        
+        // Ensure we don't schedule beyond deadline
+        if (targetDate.isAfter(_deadline)) {
+          targetDate = _deadline.subtract(const Duration(days: 1));
+        }
+        
+        // For tasks that might exceed daily capacity, distribute across multiple days
+        // But for now, schedule on the calculated day
+        final dateKey = DateTime(targetDate.year, targetDate.month, targetDate.day);
+        
+        // Check if this day already has too many hours scheduled
+        final existingHoursOnDay = _scheduledTasks[dateKey]?.fold<double>(
+          0.0,
+          (sum, t) => sum + (t.estimatedHours ?? 1.0),
+        ) ?? 0.0;
+        
+        // If adding this task would exceed daily capacity, try to find a nearby day
+        finalDate = dateKey;
+        if (existingHoursOnDay + estimatedHours > hoursPerDay) {
+          // Try to find a nearby day with available capacity
+          bool found = false;
+          for (int offset = 1; offset <= 3 && !found; offset++) {
+            // Try days after
+            final candidateDate = dateKey.add(Duration(days: offset));
+            if (candidateDate.isBefore(_deadline)) {
+              final candidateKey = DateTime(candidateDate.year, candidateDate.month, candidateDate.day);
+              final candidateHours = _scheduledTasks[candidateKey]?.fold<double>(
+                0.0,
+                (sum, t) => sum + (t.estimatedHours ?? 1.0),
+              ) ?? 0.0;
+              
+              if (candidateHours + estimatedHours <= hoursPerDay) {
+                finalDate = candidateKey;
+                found = true;
+                break;
+              }
             }
-          }
-          
-          // Try days before
-          final candidateDateBefore = dateKey.subtract(Duration(days: offset));
-          if (candidateDateBefore.isAfter(now) || candidateDateBefore.isAtSameMomentAs(now)) {
-            final candidateKey = DateTime(candidateDateBefore.year, candidateDateBefore.month, candidateDateBefore.day);
-            final candidateHours = _scheduledTasks[candidateKey]?.fold<double>(
-              0.0,
-              (sum, t) => sum + (t.estimatedHours ?? 1.0),
-            ) ?? 0.0;
             
-            if (candidateHours + estimatedHours <= hoursPerDay) {
-              finalDate = candidateKey;
-              found = true;
-              break;
+            // Try days before
+            final candidateDateBefore = dateKey.subtract(Duration(days: offset));
+            if (candidateDateBefore.isAfter(now) || candidateDateBefore.isAtSameMomentAs(now)) {
+              final candidateKey = DateTime(candidateDateBefore.year, candidateDateBefore.month, candidateDateBefore.day);
+              final candidateHours = _scheduledTasks[candidateKey]?.fold<double>(
+                0.0,
+                (sum, t) => sum + (t.estimatedHours ?? 1.0),
+              ) ?? 0.0;
+              
+              if (candidateHours + estimatedHours <= hoursPerDay) {
+                finalDate = candidateKey;
+                found = true;
+                break;
+              }
             }
           }
         }
@@ -243,8 +315,10 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       
       _scheduledTasks[finalDate]!.add(goalTask);
       
-      // Update cumulative hours for next iteration
-      cumulativeHours += estimatedHours;
+      // Update cumulative hours for next iteration (only for auto-scheduled tasks)
+      if (userSelectedDate == null) {
+        cumulativeHours += estimatedHours;
+      }
     }
     
     debugPrint('📅 Scheduled ${_scheduledTasks.values.fold(0, (sum, list) => sum + list.length)} tasks across ${_scheduledTasks.keys.length} days (deadline: ${daysUntilDeadline} days away)');
@@ -378,9 +452,11 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     if (result != null && (result['task'] as Task).title.isNotEmpty) {
       final task = result['task'] as Task;
       final phaseId = result['phaseId'] as int?;
+      final selectedDate = result['selectedDate'] as DateTime?;
       setState(() {
         _tasks.add(task);
         _taskPhaseMap[_getTaskKey(task)] = phaseId;
+        _taskDateMap[_getTaskKey(task)] = selectedDate;
         _scheduleTasks();
       });
     }
@@ -526,7 +602,10 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     );
     
     if (confirmed == true) {
+      final task = _tasks[index];
       setState(() {
+        _taskPhaseMap.remove(_getTaskKey(task));
+        _taskDateMap.remove(_getTaskKey(task));
         _tasks.removeAt(index);
         _scheduleTasks();
       });
@@ -536,12 +615,14 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
   Future<void> _editTask(int index) async {
     final task = _tasks[index];
     final currentPhaseId = _taskPhaseMap[_getTaskKey(task)];
+    final currentDate = _taskDateMap[_getTaskKey(task)];
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _EditTaskDialog(
         task: task,
         goalId: widget.goalId,
         initialPhaseId: currentPhaseId,
+        initialDate: currentDate,
       ),
     );
     
@@ -549,10 +630,13 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       final oldKey = _getTaskKey(task);
       final newTask = result['task'] as Task;
       final newPhaseId = result['phaseId'] as int?;
+      final selectedDate = result['selectedDate'] as DateTime?;
       setState(() {
         _taskPhaseMap.remove(oldKey);
+        _taskDateMap.remove(oldKey);
         _tasks[index] = newTask;
         _taskPhaseMap[_getTaskKey(newTask)] = newPhaseId;
+        _taskDateMap[_getTaskKey(newTask)] = selectedDate;
         _scheduleTasks();
       });
     }
@@ -580,17 +664,46 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       }
     }
     
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final selectedDate = await showDatePicker(
       context: context,
       initialDate: currentDate ?? DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: _deadline,
+      builder: (context, child) {
+        // Use the full app theme, just ensure proper colors for date picker
+        return Theme(
+          data: isDark ? AppTheme.darkTheme : AppTheme.lightTheme,
+          child: child!,
+        );
+      },
     );
     
     if (selectedDate != null) {
       final selectedTime = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.fromDateTime(currentDate ?? DateTime.now()),
+        builder: (context, child) {
+          return Theme(
+            data: theme.copyWith(
+              colorScheme: theme.colorScheme.copyWith(
+                primary: AppTheme.primaryColor,
+                onPrimary: Colors.white,
+                surface: theme.brightness == Brightness.dark
+                    ? AppTheme.darkSurface
+                    : AppTheme.surfaceColor,
+                onSurface: theme.brightness == Brightness.dark
+                    ? AppTheme.darkTextPrimary
+                    : AppTheme.textPrimary,
+              ),
+              dialogBackgroundColor: theme.brightness == Brightness.dark
+                  ? AppTheme.darkSurface
+                  : AppTheme.surfaceColor,
+            ),
+            child: child!,
+          );
+        },
       );
       
       if (selectedTime != null) {
@@ -646,11 +759,14 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: isDark ? AppTheme.darkBackground : AppTheme.backgroundColor,
       appBar: AppBar(
         title: Text(widget.goalName),
-        backgroundColor: AppTheme.surfaceColor,
+        backgroundColor: isDark ? AppTheme.darkSurface : AppTheme.surfaceColor,
         elevation: 0,
         actions: [
           PopupMenuButton<String>(
@@ -713,6 +829,72 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
   }
 
   Widget _buildTasksTab() {
+    if (_tasks.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.task_alt_rounded,
+              size: 120,
+              color: AppTheme.primaryColor.withOpacity(0.3),
+            )
+              .animate()
+              .scale(delay: 200.ms, duration: 600.ms, curve: Curves.easeOutCubic)
+              .fadeIn(delay: 200.ms, duration: 600.ms),
+            const SizedBox(height: AppTheme.spacingXL),
+            Text(
+              'No tasks yet',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+            )
+              .animate()
+              .fadeIn(delay: 400.ms, duration: 600.ms)
+              .slideY(begin: 0.2, end: 0, delay: 400.ms, duration: 600.ms),
+            const SizedBox(height: AppTheme.spacingSM),
+            Text(
+              'Create your first task to get started',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+              textAlign: TextAlign.center,
+            )
+              .animate()
+              .fadeIn(delay: 600.ms, duration: 600.ms)
+              .slideY(begin: 0.2, end: 0, delay: 600.ms, duration: 600.ms),
+            const SizedBox(height: AppTheme.spacingXL),
+            ElevatedButton.icon(
+              onPressed: _addNewTask,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Create Task'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacingXL,
+                  vertical: AppTheme.spacingMD,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                ),
+                elevation: 4,
+              ),
+            )
+              .animate()
+              .scale(delay: 800.ms, duration: 400.ms, curve: Curves.easeOutCubic)
+              .fadeIn(delay: 800.ms, duration: 400.ms)
+              .shimmer(
+                delay: 1200.ms,
+                duration: 1500.ms,
+                color: Colors.white.withOpacity(0.3),
+              ),
+          ],
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.all(AppTheme.spacingMD),
       itemCount: _tasks.length,
@@ -737,72 +919,266 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           }
         }
         
-        return Card(
+        return ModernSmartCard(
           margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-              child: Text(
-                '${index + 1}',
-                style: TextStyle(color: AppTheme.primaryColor),
-              ),
-            ),
-            title: Text(
-              task.title,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(task.description),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    Chip(
-                      label: Text(task.priority),
-                      avatar: const Icon(Icons.flag_rounded, size: 16),
+          padding: const EdgeInsets.all(AppTheme.spacingMD),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppTheme.primaryColor,
+                          AppTheme.primaryLight,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMD),
                     ),
-                    if (task.estimatedHours != null)
-                      Chip(
-                        label: Text('${task.estimatedHours!.toStringAsFixed(1)}h'),
-                        avatar: const Icon(Icons.timer_rounded, size: 16),
-                      ),
-                    if (scheduledDate != null)
-                      Chip(
-                        label: Text(
-                          DateFormat('MMM d, y').format(scheduledDate),
-                          style: const TextStyle(fontSize: 11),
+                    child: Center(
+                      child: Text(
+                        '${index + 1}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
                         ),
-                        avatar: const Icon(Icons.calendar_today_rounded, size: 16),
                       ),
-                  ],
-                ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.access_time_rounded, size: 20),
-                  onPressed: () => _editTaskTime(index),
-                  tooltip: 'Edit Time',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.edit_rounded, size: 20),
-                  onPressed: () => _editTask(index),
-                  tooltip: 'Edit',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_rounded, size: 20),
-                  color: Colors.red,
-                  onPressed: () => _deleteTask(index),
-                  tooltip: 'Delete',
-                ),
-              ],
-            ),
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.spacingMD),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          task.title,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textPrimary,
+                              ),
+                        ),
+                        if (task.description.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            task.description,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert_rounded, size: 20),
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _editTask(index);
+                      } else if (value == 'time') {
+                        _editTaskTime(index);
+                      } else if (value == 'delete') {
+                        _deleteTask(index);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_rounded, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'time',
+                        child: Row(
+                          children: [
+                            Icon(Icons.access_time_rounded, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit Time'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_rounded, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppTheme.spacingMD),
+              Wrap(
+                spacing: AppTheme.spacingSM,
+                runSpacing: AppTheme.spacingSM,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spacingSM,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                      border: Border.all(
+                        color: AppTheme.primaryColor.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.flag_rounded,
+                          size: 14,
+                          color: AppTheme.primaryColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          task.priority,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.primaryColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (task.estimatedHours != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spacingSM,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                        border: Border.all(
+                          color: AppTheme.primaryColor.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.timer_rounded,
+                            size: 14,
+                            color: AppTheme.primaryColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${task.estimatedHours!.toStringAsFixed(1)}h',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (scheduledDate != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spacingSM,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                        border: Border.all(
+                          color: AppTheme.primaryColor.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 14,
+                            color: AppTheme.primaryColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            DateFormat('MMM d, y').format(scheduledDate),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (task.isMilestone)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spacingSM,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppTheme.primaryColor,
+                            AppTheme.primaryLight,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Milestone',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ),
-        );
+        )
+          .animate()
+          .fadeIn(delay: (index * 100).ms, duration: 400.ms)
+          .slideY(
+            begin: 0.2,
+            end: 0,
+            delay: (index * 100).ms,
+            duration: 400.ms,
+            curve: Curves.easeOutCubic,
+          );
       },
     );
   }
@@ -881,15 +1257,15 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     final lastDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
     final firstWeekday = firstDayOfMonth.weekday;
     final daysInMonth = lastDayOfMonth.day;
-    
+
     final weeks = <List<DateTime>>[];
     var currentWeek = <DateTime>[];
-    
+
     // Add empty cells for days before the first day of the month
     for (var i = 1; i < firstWeekday; i++) {
       currentWeek.add(DateTime(0));
     }
-    
+
     // Add all days of the month
     for (var day = 1; day <= daysInMonth; day++) {
       currentWeek.add(DateTime(_focusedDay.year, _focusedDay.month, day));
@@ -898,7 +1274,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         currentWeek = <DateTime>[];
       }
     }
-    
+
     // Add remaining empty cells
     while (currentWeek.length < 7 && currentWeek.isNotEmpty) {
       currentWeek.add(DateTime(0));
@@ -906,7 +1282,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     if (currentWeek.isNotEmpty) {
       weeks.add(currentWeek);
     }
-    
+
     return Column(
       children: [
         // Weekday headers
@@ -932,7 +1308,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
                 if (day.year == 0) {
                   return Expanded(child: Container());
                 }
-                
+
                 final isSelected = day.year == _selectedDay.year &&
                     day.month == _selectedDay.month &&
                     day.day == _selectedDay.day;
@@ -941,7 +1317,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
                     day.day == DateTime.now().day;
                 final hasTasks = _getTasksForDay(day).isNotEmpty;
                 final dateKey = DateTime(day.year, day.month, day.day);
-                
+
                 return Expanded(
                   child: GestureDetector(
                     onTap: () {
@@ -950,37 +1326,50 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
                       });
                     },
                     child: Container(
-                      margin: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppTheme.primaryColor
-                            : isToday
-                                ? AppTheme.primaryColor.withOpacity(0.3)
-                                : Colors.transparent,
-                        shape: BoxShape.circle,
-                      ),
+                      margin: const EdgeInsets.all(4),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            '${day.day}',
-                            style: TextStyle(
+                          Container(
+                            width: 36,
+                            height: 36,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
                               color: isSelected
-                                  ? Colors.white
-                                  : AppTheme.textPrimary,
-                              fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                                  ? AppTheme.primaryColor
+                                  : Colors.transparent,
+                              border: isToday && !isSelected
+                                  ? Border.all(
+                                color: AppTheme.primaryColor.withOpacity(0.8),
+                                width: 1.4,
+                              )
+                                  : null,
                             ),
-                          ),
-                          if (hasTasks)
-                            Container(
-                              width: 4,
-                              height: 4,
-                              margin: const EdgeInsets.only(top: 2),
-                              decoration: BoxDecoration(
+                            child: Text(
+                              '${day.day}',
+                              style: TextStyle(
                                 color: isSelected
                                     ? Colors.white
                                     : AppTheme.primaryColor,
-                                shape: BoxShape.circle,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          if (hasTasks)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Container(
+                                width: 4,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppTheme.primaryColor,
+                                ),
                               ),
                             ),
                         ],
@@ -1000,12 +1389,14 @@ class _EditTaskDialog extends StatefulWidget {
   final bool isNew;
   final int goalId;
   final int? initialPhaseId;
+  final DateTime? initialDate;
 
   const _EditTaskDialog({
     required this.task,
     required this.goalId,
     this.isNew = false,
     this.initialPhaseId,
+    this.initialDate,
   });
 
   @override
@@ -1022,6 +1413,7 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
   String? _reminderTimeType;
   TimeOfDay? _reminderTime;
   int? _selectedPhaseId;
+  DateTime? _selectedDate;
   bool _isListeningTitle = false;
   bool _isListeningDescription = false;
 
@@ -1038,6 +1430,8 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
     _reminderTimeType = widget.task.reminderTimeType;
     _reminderTime = widget.task.reminderTime;
     _selectedPhaseId = widget.initialPhaseId;
+    // Initialize selected date from widget if editing, otherwise null
+    _selectedDate = widget.initialDate;
   }
 
   @override
@@ -1244,7 +1638,7 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
             TextField(
               controller: _titleController,
               decoration: InputDecoration(
-                labelText: 'Title',
+                labelText: 'Title *',
                 suffixIcon: IconButton(
                   icon: Icon(
                     _isListeningTitle ? Icons.mic_rounded : Icons.mic_none_rounded,
@@ -1276,6 +1670,48 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
                 ),
               ),
               maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            // Date picker
+            InkWell(
+              onTap: () async {
+                final theme = Theme.of(context);
+                final isDark = theme.brightness == Brightness.dark;
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: _selectedDate ?? DateTime.now(),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                  builder: (context, child) {
+                    // Use the full app theme, just ensure proper colors for date picker
+                    return Theme(
+                      data: isDark ? AppTheme.darkTheme : AppTheme.lightTheme,
+                      child: child!,
+                    );
+                  },
+                );
+                if (date != null) {
+                  setState(() {
+                    _selectedDate = date;
+                  });
+                }
+              },
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Task Date *',
+                  suffixIcon: const Icon(Icons.calendar_today_rounded),
+                ),
+                child: Text(
+                  _selectedDate != null
+                      ? DateFormat('MMM d, y').format(_selectedDate!)
+                      : 'Select a date',
+                  style: TextStyle(
+                    color: _selectedDate != null
+                        ? AppTheme.textPrimary
+                        : AppTheme.textSecondary,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -1368,6 +1804,12 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
               );
               return;
             }
+            if (_selectedDate == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please select a task date')),
+              );
+              return;
+            }
             Navigator.pop(
               context,
               {
@@ -1381,6 +1823,7 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
                   reminderTime: _reminderTime,
                 ),
                 'phaseId': _selectedPhaseId,
+                'selectedDate': _selectedDate,
               },
             );
           },
