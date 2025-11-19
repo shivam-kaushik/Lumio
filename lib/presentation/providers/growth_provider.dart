@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../../data/models/goal.dart';
 import '../../data/models/goal_task.dart';
+import '../../data/models/goal_phase.dart';
 import '../../data/repositories/growth_repository.dart';
 import '../../core/services/privacy_gpt_service.dart';
 
@@ -11,6 +12,7 @@ class GrowthProvider with ChangeNotifier {
   // State
   List<Goal> _goals = [];
   Map<int, List<GoalTask>> _tasksByGoal = {}; // goalId -> tasks
+  Map<int, List<GoalPhase>> _phasesByGoal = {}; // goalId -> phases
   bool _isLoading = false;
   String? _error;
 
@@ -20,11 +22,16 @@ class GrowthProvider with ChangeNotifier {
   // Getters
   List<Goal> get goals => _goals;
   Map<int, List<GoalTask>> get tasksByGoal => _tasksByGoal;
+  Map<int, List<GoalPhase>> get phasesByGoal => _phasesByGoal;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
   List<GoalTask> getTasksForGoal(int goalId) {
     return _tasksByGoal[goalId] ?? [];
+  }
+
+  List<GoalPhase> getPhasesForGoal(int goalId) {
+    return _phasesByGoal[goalId] ?? [];
   }
 
   /// Load all growth data
@@ -36,10 +43,12 @@ class GrowthProvider with ChangeNotifier {
     try {
       _goals = await _repository.getGoals();
 
-      // Load tasks for all goals
+      // Load tasks and phases for all goals
       _tasksByGoal.clear();
+      _phasesByGoal.clear();
       for (var goal in _goals) {
         _tasksByGoal[goal.id] = await _repository.getTasksForGoal(goal.id);
+        _phasesByGoal[goal.id] = await _repository.getPhasesForGoal(goal.id);
       }
 
       _isLoading = false;
@@ -68,6 +77,18 @@ class GrowthProvider with ChangeNotifier {
       );
       await loadGrowthData(); // Reload to get updated list
       return id;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Update goal
+  Future<void> updateGoal(Goal goal) async {
+    try {
+      await _repository.updateGoal(goal);
+      await loadGrowthData();
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -168,6 +189,45 @@ class GrowthProvider with ChangeNotifier {
       _error = e.toString();
       debugPrint('Error loading tasks: $e');
       notifyListeners();
+    }
+  }
+
+  // ==================== Phases ====================
+
+  /// Create a phase
+  Future<int> createPhase(GoalPhase phase) async {
+    try {
+      final id = await _repository.createPhase(phase);
+      await loadGrowthData();
+      return id;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Update a phase
+  Future<void> updatePhase(GoalPhase phase) async {
+    try {
+      await _repository.updatePhase(phase);
+      await loadGrowthData();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Delete a phase
+  Future<void> deletePhase(int phaseId) async {
+    try {
+      await _repository.deletePhase(phaseId);
+      await loadGrowthData();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
     }
   }
 

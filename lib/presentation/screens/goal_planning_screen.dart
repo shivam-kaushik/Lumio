@@ -10,6 +10,8 @@ import '../../data/models/goal_task.dart';
 import '../../data/models/reminder.dart' hide TimeOfDay;
 import '../../core/services/privacy_gpt_service.dart';
 import '../../core/services/permission_service.dart';
+import '../../core/services/premium_service.dart';
+import 'roadmap_management_screen.dart';
 
 /// Screen for planning and editing goal tasks with calendar view
 class GoalPlanningScreen extends StatefulWidget {
@@ -38,6 +40,10 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
   DateTime _focusedDay = DateTime.now();
   late DateTime _deadline;
   Map<DateTime, List<GoalTask>> _scheduledTasks = {};
+  // Map to store phaseId for each task (using task title+description as key)
+  final Map<String, int?> _taskPhaseMap = {}; // "title|description" -> phaseId
+
+  String _getTaskKey(Task task) => '${task.title}|${task.description}';
 
   @override
   void initState() {
@@ -76,6 +82,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       final deadlineDate = DateTime(_deadline.year, _deadline.month, _deadline.day);
       
       for (var task in _tasks) {
+        final phaseId = _taskPhaseMap[_getTaskKey(task)];
         final goalTask = GoalTask(
           id: 0, // Will be assigned on save
           goalId: widget.goalId,
@@ -84,6 +91,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           priority: task.priority,
           estimatedHours: task.estimatedHours ?? 1.0,
           scheduledDate: deadlineDate,
+          phaseId: phaseId,
           isCompleted: false,
           isMilestone: task.isMilestone,
           motivationAnchor: task.motivationAnchor,
@@ -213,6 +221,9 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         scheduledDateTime = DateTime(finalDate.year, finalDate.month, finalDate.day, hour);
       }
       
+      // Find phaseId for this task
+      final phaseId = _taskPhaseMap[_getTaskKey(task)];
+      
       final goalTask = GoalTask(
         id: 0,
         goalId: widget.goalId,
@@ -226,6 +237,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         isMilestone: task.isMilestone,
         motivationAnchor: task.motivationAnchor,
         scheduledDate: scheduledDateTime,
+        phaseId: phaseId,
         createdAt: DateTime.now(),
       );
       
@@ -349,7 +361,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
   }
 
   Future<void> _addNewTask() async {
-    final result = await showDialog<Task>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _EditTaskDialog(
         task: Task(
@@ -358,15 +370,138 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           priority: 'medium',
           frequency: 'one-time',
         ),
+        goalId: widget.goalId,
         isNew: true,
       ),
     );
     
-    if (result != null && result.title.isNotEmpty) {
+    if (result != null && (result['task'] as Task).title.isNotEmpty) {
+      final task = result['task'] as Task;
+      final phaseId = result['phaseId'] as int?;
       setState(() {
-        _tasks.add(result);
+        _tasks.add(task);
+        _taskPhaseMap[_getTaskKey(task)] = phaseId;
         _scheduleTasks();
       });
+    }
+  }
+
+  Future<void> _generateTasksWithAI() async {
+    // Check premium status
+    final premiumService = PremiumService();
+    final isPremium = await premiumService.isPremium();
+    
+    if (!isPremium) {
+      final upgrade = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.star, color: Colors.amber),
+              SizedBox(width: 8),
+              Text('Premium Feature'),
+            ],
+          ),
+          content: const Text(
+            'AI-powered task generation is a premium feature. Upgrade to unlock intelligent task suggestions.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // TODO: Implement premium upgrade flow
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Premium upgrade coming soon! You can add tasks manually.'),
+                  ),
+                );
+                Navigator.pop(context, false);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber,
+              ),
+              child: const Text('Upgrade'),
+            ),
+          ],
+        ),
+      );
+      if (upgrade != true) return;
+    }
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final gptService = PrivacyGptService();
+      final goal = await context.read<GrowthProvider>().goals.firstWhere(
+        (g) => g.id == widget.goalId,
+      );
+
+      // Generate additional tasks for the goal
+      final roadmap = await gptService.generateDetailedRoadmap(
+        goal.name,
+        targetDeadline: goal.targetDeadline ?? DateTime.now().add(const Duration(days: 30)),
+        hoursPerDay: goal.hoursPerDay ?? 2.0,
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+
+        if (roadmap != null && roadmap['tasks'] != null) {
+          final newTasks = (roadmap['tasks'] as List)
+              .map((s) => Task.fromMap(s as Map<String, dynamic>))
+              .toList();
+
+          // Filter out tasks that already exist
+          final existingTitles = _tasks.map((t) => t.title.toLowerCase()).toSet();
+          final uniqueNewTasks = newTasks.where(
+            (t) => !existingTitles.contains(t.title.toLowerCase()),
+          ).toList();
+
+          if (uniqueNewTasks.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No new tasks generated. All suggested tasks already exist.'),
+              ),
+            );
+            return;
+          }
+
+          setState(() {
+            _tasks.addAll(uniqueNewTasks);
+            _scheduleTasks();
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Generated ${uniqueNewTasks.length} new task(s)'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to generate tasks. Please try again.'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     }
   }
 
@@ -400,14 +535,24 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
 
   Future<void> _editTask(int index) async {
     final task = _tasks[index];
-    final result = await showDialog<Task>(
+    final currentPhaseId = _taskPhaseMap[_getTaskKey(task)];
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => _EditTaskDialog(task: task),
+      builder: (context) => _EditTaskDialog(
+        task: task,
+        goalId: widget.goalId,
+        initialPhaseId: currentPhaseId,
+      ),
     );
     
     if (result != null) {
+      final oldKey = _getTaskKey(task);
+      final newTask = result['task'] as Task;
+      final newPhaseId = result['phaseId'] as int?;
       setState(() {
-        _tasks[index] = result;
+        _taskPhaseMap.remove(oldKey);
+        _tasks[index] = newTask;
+        _taskPhaseMap[_getTaskKey(newTask)] = newPhaseId;
         _scheduleTasks();
       });
     }
@@ -473,6 +618,9 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
             _scheduledTasks[dateKey] = [];
           }
           
+          // Find phaseId for this task
+          final phaseId = _taskPhaseMap[_getTaskKey(task)];
+          
           final goalTask = GoalTask(
             id: 0,
             goalId: widget.goalId,
@@ -486,6 +634,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
             isMilestone: task.isMilestone,
             motivationAnchor: task.motivationAnchor,
             scheduledDate: newDateTime,
+            phaseId: phaseId,
             createdAt: DateTime.now(),
           );
           
@@ -504,10 +653,40 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         backgroundColor: AppTheme.surfaceColor,
         elevation: 0,
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.add_rounded),
-            onPressed: _addNewTask,
             tooltip: 'Add Task',
+            onSelected: (value) {
+              if (value == 'manual') {
+                _addNewTask();
+              } else if (value == 'ai') {
+                _generateTasksWithAI();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'manual',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_rounded, size: 20),
+                    SizedBox(width: 8),
+                    Text('Add Manually'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'ai',
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_awesome_rounded, size: 20, color: Colors.amber),
+                    SizedBox(width: 8),
+                    Text('Generate with AI'),
+                    SizedBox(width: 4),
+                    Icon(Icons.star, size: 16, color: Colors.amber),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
         bottom: TabBar(
@@ -819,10 +998,14 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
 class _EditTaskDialog extends StatefulWidget {
   final Task task;
   final bool isNew;
+  final int goalId;
+  final int? initialPhaseId;
 
   const _EditTaskDialog({
     required this.task,
+    required this.goalId,
     this.isNew = false,
+    this.initialPhaseId,
   });
 
   @override
@@ -838,6 +1021,7 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
   String _frequency = 'one-time';
   String? _reminderTimeType;
   TimeOfDay? _reminderTime;
+  int? _selectedPhaseId;
   bool _isListeningTitle = false;
   bool _isListeningDescription = false;
 
@@ -853,6 +1037,7 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
     _frequency = widget.task.frequency;
     _reminderTimeType = widget.task.reminderTimeType;
     _reminderTime = widget.task.reminderTime;
+    _selectedPhaseId = widget.initialPhaseId;
   }
 
   @override
@@ -1108,6 +1293,54 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
               onChanged: (value) => setState(() => _priority = value!),
             ),
             const SizedBox(height: 16),
+            // Phase selection
+            Consumer<GrowthProvider>(
+              builder: (context, growthProvider, child) {
+                final phases = growthProvider.getPhasesForGoal(widget.goalId);
+                if (phases.isEmpty) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Phase',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'No phases created yet. Create phases in Roadmap tab.',
+                        style: TextStyle(
+                          color: AppTheme.textTertiary,
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return DropdownButtonFormField<int?>(
+                  value: _selectedPhaseId,
+                  decoration: const InputDecoration(
+                    labelText: 'Phase',
+                    hintText: 'Select a phase (optional)',
+                  ),
+                  items: [
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('No Phase'),
+                    ),
+                    ...phases.map((phase) => DropdownMenuItem<int?>(
+                      value: phase.id,
+                      child: Text(phase.name),
+                    )),
+                  ],
+                  onChanged: (value) => setState(() => _selectedPhaseId = value),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
             // Reminder time selection
             InkWell(
               onTap: _selectReminderTime,
@@ -1137,15 +1370,18 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
             }
             Navigator.pop(
               context,
-              widget.task.copyWith(
-                title: _titleController.text.trim(),
-                description: _descriptionController.text.trim(),
-                estimatedHours: double.tryParse(_hoursController.text),
-                priority: _priority,
-                frequency: _frequency,
-                reminderTimeType: _reminderTimeType,
-                reminderTime: _reminderTime,
-              ),
+              {
+                'task': widget.task.copyWith(
+                  title: _titleController.text.trim(),
+                  description: _descriptionController.text.trim(),
+                  estimatedHours: double.tryParse(_hoursController.text),
+                  priority: _priority,
+                  frequency: _frequency,
+                  reminderTimeType: _reminderTimeType,
+                  reminderTime: _reminderTime,
+                ),
+                'phaseId': _selectedPhaseId,
+              },
             );
           },
           child: Text(widget.isNew ? 'Add' : 'Save'),

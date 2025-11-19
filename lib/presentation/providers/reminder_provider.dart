@@ -708,4 +708,54 @@ class ReminderProvider with ChangeNotifier {
       return false;
     }
   }
+
+  /// Unmark a reminder as completed
+  /// For recurring reminders, unmarks the most recent completed occurrence
+  /// For one-time reminders, re-enables the reminder
+  Future<bool> uncompleteReminder(String reminderId) async {
+    try {
+      final reminder = _reminders.firstWhere((r) => r.id == reminderId);
+      
+      debugPrint('↩️ Uncompleting reminder: ${reminder.text}');
+      
+      if (reminder.isRecurring) {
+        // For recurring reminders, uncomplete the most recent completed occurrence
+        final completed = await _reminderRepository.getCompletedOccurrences(reminderId);
+        if (completed.isNotEmpty) {
+          // Uncomplete the most recent one
+          await _reminderRepository.uncompleteOccurrence(completed.first.id);
+          debugPrint('   Uncompleted most recent occurrence');
+        } else {
+          debugPrint('   No completed occurrences to uncomplete');
+          return false;
+        }
+      } else {
+        // For one-time reminders, re-enable the reminder
+        await _reminderRepository.toggleReminder(reminderId, true);
+        
+        // Re-schedule notification if timeAt is in the future
+        if (reminder.timeAt != null && reminder.timeAt!.isAfter(DateTime.now())) {
+          await AlarmService.scheduleExactAlarm(
+            id: reminder.id.hashCode,
+            title: 'Reminder',
+            body: reminder.text,
+            scheduledTime: reminder.timeAt!,
+            payload: reminder.id,
+          );
+          debugPrint('   Re-enabled reminder and re-scheduled notification');
+        } else {
+          debugPrint('   Re-enabled reminder (notification not re-scheduled - time has passed)');
+        }
+      }
+      
+      await loadReminders();
+      await loadStatistics();
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error uncompleting reminder: $e');
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
 }

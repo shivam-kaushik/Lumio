@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/reminder.dart';
+import '../../data/models/reminder_occurrence.dart';
 import '../../data/repositories/reminder_repository.dart';
 import '../theme/app_theme.dart';
 import '../../core/utils/date_time_utils.dart';
@@ -76,12 +77,64 @@ class _ReminderCardState extends State<ReminderCard>
             // Complete checkbox - Leftmost
             Consumer<ReminderProvider>(
               builder: (context, provider, child) {
-                final isCompleted = !widget.reminder.enabled;
+                // For one-time reminders, completion is based on enabled flag
+                // For recurring reminders, check if there are completed occurrences
+                final isCompleted = widget.reminder.isRecurring
+                    ? false // Will be determined by FutureBuilder below
+                    : !widget.reminder.enabled;
+                
+                if (widget.reminder.isRecurring) {
+                  // For recurring reminders, check if there are completed occurrences
+                  return FutureBuilder<List<ReminderOccurrence>>(
+                    future: ReminderRepository().getCompletedOccurrences(widget.reminder.id),
+                    builder: (context, snapshot) {
+                      final hasCompletedOccurrences = snapshot.hasData && snapshot.data!.isNotEmpty;
+                      return GestureDetector(
+                        onTap: () {
+                          HapticFeedback.mediumImpact();
+                          if (!hasCompletedOccurrences) {
+                            provider.completeReminder(widget.reminder.id);
+                          } else {
+                            provider.uncompleteReminder(widget.reminder.id);
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: hasCompletedOccurrences
+                                  ? AppTheme.successColor
+                                  : AppTheme.borderColor,
+                              width: 2,
+                            ),
+                            color: hasCompletedOccurrences
+                                ? AppTheme.successColor
+                                : Colors.transparent,
+                          ),
+                          child: hasCompletedOccurrences
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  color: Colors.white,
+                                  size: 14,
+                                )
+                              : null,
+                        ),
+                      );
+                    },
+                  );
+                }
+                
+                // For one-time reminders
                 return GestureDetector(
                   onTap: () {
                     HapticFeedback.mediumImpact();
                     if (!isCompleted) {
                       provider.completeReminder(widget.reminder.id);
+                    } else {
+                      provider.uncompleteReminder(widget.reminder.id);
                     }
                   },
                   child: AnimatedContainer(

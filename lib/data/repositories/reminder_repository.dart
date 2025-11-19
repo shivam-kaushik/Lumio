@@ -234,6 +234,47 @@ class ReminderRepository {
     );
   }
 
+  /// Uncomplete an occurrence (mark as not completed)
+  Future<int> uncompleteOccurrence(String occurrenceId) async {
+    final db = await _dbHelper.database;
+    return await db.update(
+      AppConstants.reminderOccurrencesTable,
+      {
+        'isCompleted': 0,
+        'completedAt': null,
+      },
+      where: 'id = ?',
+      whereArgs: [occurrenceId],
+    );
+  }
+
+  /// Uncomplete an occurrence by notification ID
+  Future<int> uncompleteOccurrenceByNotificationId(int notificationId) async {
+    final db = await _dbHelper.database;
+    return await db.update(
+      AppConstants.reminderOccurrencesTable,
+      {
+        'isCompleted': 0,
+        'completedAt': null,
+      },
+      where: 'notificationId = ?',
+      whereArgs: [notificationId],
+    );
+  }
+
+  /// Get completed occurrences for a reminder (most recent first)
+  Future<List<ReminderOccurrence>> getCompletedOccurrences(String reminderId) async {
+    final db = await _dbHelper.database;
+    final maps = await db.query(
+      AppConstants.reminderOccurrencesTable,
+      where: 'reminderId = ? AND isCompleted = ?',
+      whereArgs: [reminderId, 1],
+      orderBy: 'completedAt DESC',
+    );
+
+    return maps.map((map) => ReminderOccurrence.fromMap(map)).toList();
+  }
+
   /// Delete occurrence
   Future<int> deleteOccurrence(String occurrenceId) async {
     final db = await _dbHelper.database;

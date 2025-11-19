@@ -3,6 +3,7 @@ import '../../core/constants/app_constants.dart';
 import '../database/database_helper.dart';
 import '../models/goal.dart';
 import '../models/goal_task.dart';
+import '../models/goal_phase.dart';
 
 /// Repository for growth-related operations (goals and tasks)
 class GrowthRepository {
@@ -52,6 +53,17 @@ class GrowthRepository {
     );
     if (maps.isEmpty) return null;
     return Goal.fromMap(maps.first);
+  }
+
+  /// Update goal
+  Future<int> updateGoal(Goal goal) async {
+    final db = await _dbHelper.database;
+    return await db.update(
+      AppConstants.goalsTable,
+      goal.toMap(),
+      where: 'id = ?',
+      whereArgs: [goal.id],
+    );
   }
 
   /// Delete goal
@@ -162,5 +174,69 @@ class GrowthRepository {
       ['$dateStr%'],
     );
     return maps.map((map) => GoalTask.fromMap(map)).toList();
+  }
+
+  // ==================== Phases ====================
+
+  /// Create a phase for a goal
+  Future<int> createPhase(GoalPhase phase) async {
+    final db = await _dbHelper.database;
+    return await db.insert(
+      AppConstants.phasesTable,
+      phase.toInsertMap(),
+    );
+  }
+
+  /// Get all phases for a goal
+  Future<List<GoalPhase>> getPhasesForGoal(int goalId) async {
+    final db = await _dbHelper.database;
+    final maps = await db.query(
+      AppConstants.phasesTable,
+      where: 'goal_id = ?',
+      whereArgs: [goalId],
+      orderBy: 'order_index ASC, start_date ASC',
+    );
+    return maps.map((map) => GoalPhase.fromMap(map)).toList();
+  }
+
+  /// Get phase by ID
+  Future<GoalPhase?> getPhaseById(int phaseId) async {
+    final db = await _dbHelper.database;
+    final maps = await db.query(
+      AppConstants.phasesTable,
+      where: 'id = ?',
+      whereArgs: [phaseId],
+    );
+    if (maps.isEmpty) return null;
+    return GoalPhase.fromMap(maps.first);
+  }
+
+  /// Update phase
+  Future<int> updatePhase(GoalPhase phase) async {
+    final db = await _dbHelper.database;
+    return await db.update(
+      AppConstants.phasesTable,
+      phase.toMap(),
+      where: 'id = ?',
+      whereArgs: [phase.id],
+    );
+  }
+
+  /// Delete phase
+  Future<int> deletePhase(int phaseId) async {
+    final db = await _dbHelper.database;
+    // Set phase_id to NULL for all tasks in this phase
+    await db.update(
+      AppConstants.tasksTable,
+      {'phase_id': null},
+      where: 'phase_id = ?',
+      whereArgs: [phaseId],
+    );
+    // Delete the phase
+    return await db.delete(
+      AppConstants.phasesTable,
+      where: 'id = ?',
+      whereArgs: [phaseId],
+    );
   }
 }

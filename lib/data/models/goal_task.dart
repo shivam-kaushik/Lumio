@@ -12,6 +12,7 @@ class GoalTask {
   final bool isMilestone;
   final String? motivationAnchor;
   final DateTime? scheduledDate;
+  final int? phaseId; // Link to goal phase
   final bool isCompleted;
   final DateTime? completedAt;
   final DateTime createdAt;
@@ -29,6 +30,7 @@ class GoalTask {
     this.isMilestone = false,
     this.motivationAnchor,
     this.scheduledDate,
+    this.phaseId,
     this.isCompleted = false,
     this.completedAt,
     required this.createdAt,
@@ -55,6 +57,7 @@ class GoalTask {
       scheduledDate: map['scheduled_date'] != null
           ? DateTime.parse(map['scheduled_date'] as String)
           : null,
+      phaseId: map['phase_id'] as int?,
       isCompleted: (map['is_completed'] as int? ?? 0) == 1,
       completedAt: map['completed_at'] != null
           ? DateTime.parse(map['completed_at'] as String)
@@ -78,6 +81,7 @@ class GoalTask {
       'is_milestone': isMilestone ? 1 : 0,
       'motivation_anchor': motivationAnchor,
       'scheduled_date': scheduledDate?.toIso8601String(),
+      'phase_id': phaseId,
       'is_completed': isCompleted ? 1 : 0,
       'completed_at': completedAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
@@ -98,6 +102,7 @@ class GoalTask {
       'is_milestone': isMilestone ? 1 : 0,
       'motivation_anchor': motivationAnchor,
       'scheduled_date': scheduledDate?.toIso8601String(),
+      'phase_id': phaseId,
       'is_completed': 0,
       'created_at': DateTime.now().toIso8601String(),
     };
@@ -117,6 +122,7 @@ class GoalTask {
     bool? isMilestone,
     String? motivationAnchor,
     DateTime? scheduledDate,
+    int? phaseId,
     bool? isCompleted,
     DateTime? completedAt,
     DateTime? createdAt,
@@ -134,6 +140,7 @@ class GoalTask {
       isMilestone: isMilestone ?? this.isMilestone,
       motivationAnchor: motivationAnchor ?? this.motivationAnchor,
       scheduledDate: scheduledDate ?? this.scheduledDate,
+      phaseId: phaseId ?? this.phaseId,
       isCompleted: isCompleted ?? this.isCompleted,
       completedAt: completedAt ?? this.completedAt,
       createdAt: createdAt ?? this.createdAt,

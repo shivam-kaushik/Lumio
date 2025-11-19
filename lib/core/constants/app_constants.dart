@@ -7,7 +7,7 @@ class AppConstants {
 
   // Database
   static const String dbName = 'lumio.db';
-  static const int dbVersion = 12; // Removed skills/reps, renamed subtasks to tasks
+  static const int dbVersion = 13; // Added phases table and phase_id to tasks
 
   // Tables
   static const String remindersTable = 'reminders';
@@ -16,6 +16,7 @@ class AppConstants {
   static const String reminderOccurrencesTable = 'reminder_occurrences';
   static const String goalsTable = 'goals';
   static const String tasksTable = 'tasks';
+  static const String phasesTable = 'goal_phases';
 
   // Geofence
   static const double defaultGeofenceRadius = 100.0; // meters

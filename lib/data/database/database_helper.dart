@@ -219,6 +219,22 @@ class DatabaseHelper {
       )
     ''');
 
+    // Create phases table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ${AppConstants.phasesTable} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        goal_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        order_index INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (goal_id) REFERENCES ${AppConstants.goalsTable} (id)
+          ON DELETE CASCADE
+      )
+    ''');
+
     // Create tasks table (renamed from subtasks)
     await db.execute('''
       CREATE TABLE IF NOT EXISTS ${AppConstants.tasksTable} (
@@ -234,11 +250,14 @@ class DatabaseHelper {
         is_milestone INTEGER DEFAULT 0,
         motivation_anchor TEXT,
         scheduled_date TEXT,
+        phase_id INTEGER,
         is_completed INTEGER DEFAULT 0,
         completed_at TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (goal_id) REFERENCES ${AppConstants.goalsTable} (id)
-          ON DELETE CASCADE
+          ON DELETE CASCADE,
+        FOREIGN KEY (phase_id) REFERENCES ${AppConstants.phasesTable} (id)
+          ON DELETE SET NULL
       )
     ''');
 
@@ -250,6 +269,16 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_tasks_scheduled 
       ON ${AppConstants.tasksTable} (scheduled_date)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_phases_goal 
+      ON ${AppConstants.phasesTable} (goal_id)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_tasks_phase 
+      ON ${AppConstants.tasksTable} (phase_id)
     ''');
 
     await db.execute('''
@@ -679,6 +708,51 @@ class DatabaseHelper {
         print('✅ Migration to version 12 completed');
       } catch (e) {
         print('⚠️ Error in version 12 migration: $e');
+      }
+    }
+
+    // Migration to version 13: Add phases table and phase_id to tasks
+    if (oldVersion < 13) {
+      try {
+        // Create phases table
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS ${AppConstants.phasesTable} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            goal_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            order_index INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (goal_id) REFERENCES ${AppConstants.goalsTable} (id)
+              ON DELETE CASCADE
+          )
+        ''');
+
+        await db.execute('''
+          CREATE INDEX IF NOT EXISTS idx_phases_goal 
+          ON ${AppConstants.phasesTable} (goal_id)
+        ''');
+
+        // Add phase_id column to tasks table
+        // SQLite doesn't support ALTER TABLE ADD COLUMN IF NOT EXISTS, so we check first
+        final tableInfo = await db.rawQuery('PRAGMA table_info(${AppConstants.tasksTable})');
+        final hasPhaseId = tableInfo.any((col) => col['name'] == 'phase_id');
+        
+        if (!hasPhaseId) {
+          await db.execute(
+            'ALTER TABLE ${AppConstants.tasksTable} ADD COLUMN phase_id INTEGER',
+          );
+          await db.execute('''
+            CREATE INDEX IF NOT EXISTS idx_tasks_phase 
+            ON ${AppConstants.tasksTable} (phase_id)
+          ''');
+        }
+
+        print('✅ Migration to version 13 completed');
+      } catch (e) {
+        print('⚠️ Error in version 13 migration: $e');
       }
     }
   }

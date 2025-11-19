@@ -302,20 +302,6 @@ class AccountScreen extends StatelessWidget {
                             value: user.displayName ?? 'Not set',
                             isDark: isDark,
                           ),
-                          if (user.phoneNumber != null) ...[
-                            Divider(
-                              height: 1,
-                              color: isDark
-                                  ? AppTheme.darkDivider
-                                  : AppTheme.dividerColor,
-                            ),
-                            _InfoTile(
-                              icon: Icons.phone_outlined,
-                              label: 'Phone',
-                              value: user.phoneNumber ?? 'Not available',
-                              isDark: isDark,
-                            ),
-                          ],
                           Divider(
                             height: 1,
                             color: isDark

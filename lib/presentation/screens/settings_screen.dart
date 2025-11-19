@@ -3,12 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../core/services/permission_service.dart';
 import '../providers/theme_provider.dart';
-import '../providers/auth_provider.dart';
-import '../screens/login_screen.dart';
 import '../theme/app_theme.dart';
 import '../widgets/modern_smart_card.dart';
 
-/// Minimal settings screen for MVP
+/// Settings screen with app preferences and permissions
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -22,6 +20,9 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   bool _notificationsEnabled = false;
   bool _exactAlarmEnabled = false;
+  bool _locationEnabled = false;
+  bool _locationAlwaysEnabled = false;
+  bool _microphoneEnabled = false;
 
   @override
   void initState() {
@@ -47,11 +48,28 @@ class _SettingsScreenState extends State<SettingsScreen>
   Future<void> _refreshStatuses() async {
     final notif = await _permissionService.hasNotificationPermission();
     final exactAlarm = await _permissionService.hasExactAlarmPermission();
+    final location = await _permissionService.hasLocationPermission();
+    final locationAlways = await _permissionService.hasLocationAlwaysPermission();
+    final microphone = await _permissionService.hasMicrophonePermission();
 
     setState(() {
       _notificationsEnabled = notif;
       _exactAlarmEnabled = exactAlarm;
+      _locationEnabled = location;
+      _locationAlwaysEnabled = locationAlways;
+      _microphoneEnabled = microphone;
     });
+  }
+
+  Future<void> _openNotificationSettings() async {
+    // Open system notification settings
+    final granted = await _permissionService.ensureNotificationPermission(
+      context,
+      rationale: 'Notifications are required to deliver reminders. Please enable notifications in app settings.',
+    );
+    if (granted) {
+      _refreshStatuses();
+    }
   }
 
   @override
@@ -84,6 +102,13 @@ class _SettingsScreenState extends State<SettingsScreen>
             ),
             child: Row(
               children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  onPressed: () => Navigator.of(context).pop(),
+                  color: isDark 
+                      ? AppTheme.darkTextPrimary 
+                      : AppTheme.textPrimary,
+                ),
                 Expanded(
                   child: Text(
                     'Settings',
@@ -104,6 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             onRefresh: _refreshStatuses,
             color: AppTheme.primaryColor,
             child: ListView(
+              physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(
                 AppTheme.spacingMD,
                 AppTheme.spacingMD,
@@ -111,14 +137,16 @@ class _SettingsScreenState extends State<SettingsScreen>
                 120, // keep above bottom nav bar
               ),
               children: [
-                // Theme Settings
+                // Appearance Settings
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),
                   child: Text(
                     'Appearance',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
+                      color: isDark 
+                          ? AppTheme.darkTextPrimary 
+                          : AppTheme.textPrimary,
                     ),
                   ),
                 ),
@@ -132,20 +160,30 @@ class _SettingsScreenState extends State<SettingsScreen>
                         contentPadding: EdgeInsets.zero,
                         secondary: Icon(
                           themeProvider.isDarkMode(context)
-                              ? Icons.dark_mode
-                              : Icons.light_mode,
+                              ? Icons.dark_mode_rounded
+                              : Icons.light_mode_rounded,
                           color: isDark 
                               ? AppTheme.darkTextPrimary 
                               : AppTheme.textPrimary,
                         ),
                         title: Text(
-                          themeProvider.isDarkMode(context)
-                              ? 'Dark Mode'
-                              : 'Light Mode',
+                          'Dark Mode',
                           style: TextStyle(
                             color: isDark 
                                 ? AppTheme.darkTextPrimary 
                                 : AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          themeProvider.isDarkMode(context)
+                              ? 'Dark theme enabled'
+                              : 'Light theme enabled',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextSecondary 
+                                : AppTheme.textSecondary,
+                            fontSize: 12,
                           ),
                         ),
                         value: themeProvider.themeMode == ThemeMode.dark,
@@ -159,6 +197,65 @@ class _SettingsScreenState extends State<SettingsScreen>
                   },
                 ),
                 const SizedBox(height: AppTheme.spacingLG),
+                
+                // Notifications
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+                  child: Text(
+                    'Notifications',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isDark 
+                          ? AppTheme.darkTextPrimary 
+                          : AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingSM),
+                ModernSmartCard(
+                  useGradient: true,
+                  elevationLevel: 1,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      Icons.notifications_rounded,
+                      color: isDark 
+                          ? AppTheme.darkTextPrimary 
+                          : AppTheme.textPrimary,
+                    ),
+                    title: Text(
+                      'Notification Settings',
+                      style: TextStyle(
+                        color: isDark 
+                            ? AppTheme.darkTextPrimary 
+                            : AppTheme.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      _notificationsEnabled 
+                          ? 'Notifications are enabled' 
+                          : 'Notifications are disabled',
+                      style: TextStyle(
+                        color: _notificationsEnabled
+                            ? AppTheme.successColor
+                            : (isDark 
+                                ? AppTheme.darkTextSecondary 
+                                : AppTheme.textSecondary),
+                        fontSize: 12,
+                      ),
+                    ),
+                    trailing: Icon(
+                      Icons.chevron_right_rounded,
+                      color: isDark 
+                          ? AppTheme.darkTextTertiary 
+                          : AppTheme.textTertiary,
+                    ),
+                    onTap: _openNotificationSettings,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingLG),
+                
                 // Permissions
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),
@@ -166,7 +263,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                     'Permissions',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
+                      color: isDark 
+                          ? AppTheme.darkTextPrimary 
+                          : AppTheme.textPrimary,
                     ),
                   ),
                 ),
@@ -179,71 +278,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(
-                          Icons.notifications,
-                          color: isDark 
-                              ? AppTheme.darkTextPrimary 
-                              : AppTheme.textPrimary,
-                        ),
-                        title: Text(
-                          'Notifications',
-                          style: TextStyle(
-                            color: isDark 
-                                ? AppTheme.darkTextPrimary 
-                                : AppTheme.textPrimary,
-                          ),
-                        ),
-                        subtitle: Text(
-                          _notificationsEnabled ? 'Enabled' : 'Disabled',
-                          style: TextStyle(
-                            color: _notificationsEnabled
-                                ? AppTheme.successColor
-                                : (isDark 
-                                    ? AppTheme.darkTextSecondary 
-                                    : AppTheme.textSecondary),
-                          ),
-                        ),
-                        trailing: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: isDark 
-                                  ? AppTheme.darkBorder 
-                                  : AppTheme.borderColor,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-                            ),
-                          ),
-                          onPressed: () async {
-                            final granted =
-                                await _permissionService.ensureNotificationPermission(
-                              context,
-                              rationale:
-                                  'Notifications are required to deliver reminders.',
-                            );
-                            if (granted) {
-                              _refreshStatuses();
-                            }
-                          },
-                          child: Text(
-                            'Manage',
-                            style: TextStyle(
-                              color: isDark 
-                                  ? AppTheme.darkTextPrimary 
-                                  : AppTheme.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Divider(
-                        height: 1,
-                        color: isDark 
-                            ? AppTheme.darkDivider 
-                            : AppTheme.dividerColor,
-                      ),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          Icons.schedule,
+                          Icons.schedule_rounded,
                           color: isDark 
                               ? AppTheme.darkTextPrimary 
                               : AppTheme.textPrimary,
@@ -254,16 +289,20 @@ class _SettingsScreenState extends State<SettingsScreen>
                             color: isDark 
                                 ? AppTheme.darkTextPrimary 
                                 : AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         subtitle: Text(
-                          _exactAlarmEnabled ? 'Enabled' : 'Disabled',
+                          _exactAlarmEnabled 
+                              ? 'Enabled for precise reminders' 
+                              : 'Disabled - reminders may be delayed',
                           style: TextStyle(
                             color: _exactAlarmEnabled
                                 ? AppTheme.successColor
                                 : (isDark 
                                     ? AppTheme.darkTextSecondary 
                                     : AppTheme.textSecondary),
+                            fontSize: 12,
                           ),
                         ),
                         trailing: OutlinedButton(
@@ -298,158 +337,374 @@ class _SettingsScreenState extends State<SettingsScreen>
                           ),
                         ),
                       ),
+                      Divider(
+                        height: 1,
+                        color: isDark 
+                            ? AppTheme.darkDivider 
+                            : AppTheme.dividerColor,
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.location_on_rounded,
+                          color: isDark 
+                              ? AppTheme.darkTextPrimary 
+                              : AppTheme.textPrimary,
+                        ),
+                        title: Text(
+                          'Location',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextPrimary 
+                                : AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          _locationEnabled 
+                              ? (_locationAlwaysEnabled 
+                                  ? 'Always allowed' 
+                                  : 'While using app') 
+                              : 'Disabled',
+                          style: TextStyle(
+                            color: _locationEnabled
+                                ? AppTheme.successColor
+                                : (isDark 
+                                    ? AppTheme.darkTextSecondary 
+                                    : AppTheme.textSecondary),
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: isDark 
+                                  ? AppTheme.darkBorder 
+                                  : AppTheme.borderColor,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final granted =
+                                await _permissionService.ensureLocationPermission(
+                              context,
+                              rationale:
+                                  'Location is needed for location-based reminders.',
+                            );
+                            if (granted) {
+                              _refreshStatuses();
+                            }
+                          },
+                          child: Text(
+                            'Manage',
+                            style: TextStyle(
+                              color: isDark 
+                                  ? AppTheme.darkTextPrimary 
+                                  : AppTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Divider(
+                        height: 1,
+                        color: isDark 
+                            ? AppTheme.darkDivider 
+                            : AppTheme.dividerColor,
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.mic_rounded,
+                          color: isDark 
+                              ? AppTheme.darkTextPrimary 
+                              : AppTheme.textPrimary,
+                        ),
+                        title: Text(
+                          'Microphone',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextPrimary 
+                                : AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          _microphoneEnabled 
+                              ? 'Enabled for voice input' 
+                              : 'Disabled',
+                          style: TextStyle(
+                            color: _microphoneEnabled
+                                ? AppTheme.successColor
+                                : (isDark 
+                                    ? AppTheme.darkTextSecondary 
+                                    : AppTheme.textSecondary),
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: isDark 
+                                  ? AppTheme.darkBorder 
+                                  : AppTheme.borderColor,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final granted =
+                                await _permissionService.ensureMicrophonePermission(
+                              context,
+                              rationale:
+                                  'Microphone is needed for voice input when creating reminders.',
+                            );
+                            if (granted) {
+                              _refreshStatuses();
+                            }
+                          },
+                          child: Text(
+                            'Manage',
+                            style: TextStyle(
+                              color: isDark 
+                                  ? AppTheme.darkTextPrimary 
+                                  : AppTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: AppTheme.spacingLG),
+                
                 // App Settings
-                ModernSmartCard(
-                  useGradient: true,
-                  elevationLevel: 1,
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      Icons.settings,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+                  child: Text(
+                    'App Settings',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
                       color: isDark 
                           ? AppTheme.darkTextPrimary 
                           : AppTheme.textPrimary,
                     ),
-                    title: Text(
-                      'App Settings',
-                      style: TextStyle(
-                        color: isDark 
-                            ? AppTheme.darkTextPrimary 
-                            : AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingSM),
+                ModernSmartCard(
+                  useGradient: true,
+                  elevationLevel: 1,
+                  child: Column(
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.settings_applications_rounded,
+                          color: isDark 
+                              ? AppTheme.darkTextPrimary 
+                              : AppTheme.textPrimary,
+                        ),
+                        title: Text(
+                          'System Settings',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextPrimary 
+                                : AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Open device settings',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextSecondary 
+                                : AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: isDark 
+                              ? AppTheme.darkTextTertiary 
+                              : AppTheme.textTertiary,
+                        ),
+                        onTap: () async {
+                          await _permissionService.openSettings();
+                        },
                       ),
-                    ),
-                    subtitle: Text(
-                      'Open system app settings',
-                      style: TextStyle(
+                      Divider(
+                        height: 1,
                         color: isDark 
-                            ? AppTheme.darkTextSecondary 
-                            : AppTheme.textSecondary,
+                            ? AppTheme.darkDivider 
+                            : AppTheme.dividerColor,
                       ),
-                    ),
-                    trailing: Icon(
-                      Icons.chevron_right,
-                      color: isDark 
-                          ? AppTheme.darkTextSecondary 
-                          : AppTheme.textSecondary,
-                    ),
-                    onTap: () async {
-                      await _permissionService.openSettings();
-                    },
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.storage_rounded,
+                          color: isDark 
+                              ? AppTheme.darkTextPrimary 
+                              : AppTheme.textPrimary,
+                        ),
+                        title: Text(
+                          'Data & Storage',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextPrimary 
+                                : AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Manage app data and cache',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextSecondary 
+                                : AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: isDark 
+                              ? AppTheme.darkTextTertiary 
+                              : AppTheme.textTertiary,
+                        ),
+                        onTap: () {
+                          _showDataManagementDialog(context);
+                        },
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: AppTheme.spacingLG),
-                // Account Section
+                
+                // About
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),
                   child: Text(
-                    'Account',
+                    'About',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
+                      color: isDark 
+                          ? AppTheme.darkTextPrimary 
+                          : AppTheme.textPrimary,
                     ),
                   ),
                 ),
                 const SizedBox(height: AppTheme.spacingSM),
-                Consumer<AuthProvider>(
-                  builder: (context, authProvider, child) {
-                    final user = authProvider.user;
-                    return ModernSmartCard(
-                      useGradient: true,
-                      elevationLevel: 1,
-                      child: Column(
-                        children: [
-                          if (user != null)
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: CircleAvatar(
-                                backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-                                child: Icon(
-                                  Icons.person,
-                                  color: AppTheme.primaryColor,
-                                ),
-                              ),
-                              title: Text(
-                                user.email ?? 'User',
-                                style: TextStyle(
-                                  color: isDark 
-                                      ? AppTheme.darkTextPrimary 
-                                      : AppTheme.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              subtitle: Text(
-                                'Signed in',
-                                style: TextStyle(
-                                  color: AppTheme.successColor,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          if (user != null)
-                            Divider(
-                              height: 1,
-                              color: isDark 
-                                  ? AppTheme.darkDivider 
-                                  : AppTheme.dividerColor,
-                            ),
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: Icon(
-                              Icons.logout_rounded,
-                              color: AppTheme.errorColor,
-                            ),
-                            title: Text(
-                              'Sign Out',
-                              style: TextStyle(
-                                color: AppTheme.errorColor,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            onTap: () async {
-                              final confirm = await showDialog<bool>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Sign Out'),
-                                  content: const Text(
-                                    'Are you sure you want to sign out?',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context, false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () => Navigator.pop(context, true),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.errorColor,
-                                      ),
-                                      child: const Text('Sign Out'),
-                                    ),
-                                  ],
-                                ),
-                              );
-
-                              if (confirm == true && mounted) {
-                                await authProvider.signOut();
-                                if (mounted) {
-                                  Navigator.of(context).pushAndRemoveUntil(
-                                    MaterialPageRoute(
-                                      builder: (context) => const LoginScreen(),
-                                    ),
-                                    (route) => false,
-                                  );
-                                }
-                              }
-                            },
+                ModernSmartCard(
+                  useGradient: true,
+                  elevationLevel: 1,
+                  child: Column(
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.info_outline_rounded,
+                          color: isDark 
+                              ? AppTheme.darkTextPrimary 
+                              : AppTheme.textPrimary,
+                        ),
+                        title: Text(
+                          'App Version',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextPrimary 
+                                : AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
                           ),
-                        ],
+                        ),
+                        subtitle: const Text(
+                          '1.0.0',
+                          style: TextStyle(
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
-                    );
-                  },
+                      Divider(
+                        height: 1,
+                        color: isDark 
+                            ? AppTheme.darkDivider 
+                            : AppTheme.dividerColor,
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.description_rounded,
+                          color: isDark 
+                              ? AppTheme.darkTextPrimary 
+                              : AppTheme.textPrimary,
+                        ),
+                        title: Text(
+                          'Privacy Policy',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextPrimary 
+                                : AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.open_in_new_rounded,
+                          size: 18,
+                          color: isDark 
+                              ? AppTheme.darkTextTertiary 
+                              : AppTheme.textTertiary,
+                        ),
+                        onTap: () {
+                          // TODO: Add privacy policy URL
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Privacy policy coming soon'),
+                            ),
+                          );
+                        },
+                      ),
+                      Divider(
+                        height: 1,
+                        color: isDark 
+                            ? AppTheme.darkDivider 
+                            : AppTheme.dividerColor,
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.description_rounded,
+                          color: isDark 
+                              ? AppTheme.darkTextPrimary 
+                              : AppTheme.textPrimary,
+                        ),
+                        title: Text(
+                          'Terms of Service',
+                          style: TextStyle(
+                            color: isDark 
+                                ? AppTheme.darkTextPrimary 
+                                : AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.open_in_new_rounded,
+                          size: 18,
+                          color: isDark 
+                              ? AppTheme.darkTextTertiary 
+                              : AppTheme.textTertiary,
+                        ),
+                        onTap: () {
+                          // TODO: Add terms of service URL
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Terms of service coming soon'),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -457,6 +712,31 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
       ],
     ),
+    );
+  }
+
+  void _showDataManagementDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Data & Storage'),
+        content: const Text(
+          'Data management features coming soon. You can clear app data from system settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _permissionService.openSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
     );
   }
 }

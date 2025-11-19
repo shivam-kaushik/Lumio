@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:intl/intl.dart';
@@ -12,11 +13,12 @@ import '../../core/services/permission_service.dart';
 import '../../core/services/premium_service.dart';
 import 'goal_details_screen.dart';
 import 'goal_planning_screen.dart';
+import 'roadmap_management_screen.dart';
 import '../../data/models/goal.dart';
 import '../../core/services/privacy_gpt_service.dart';
 import '../../data/models/subtask.dart' show Task;
 
-/// Goals screen showing all business goals
+/// Goals screen showing all business goals with modern, interactive UI
 class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
 
@@ -482,6 +484,45 @@ class _GoalsScreenState extends State<GoalsScreen> {
     );
   }
 
+  String _getGoalStatus(Goal goal, int totalTasks, int completedTasks) {
+    if (totalTasks == 0) return 'Not Started';
+    if (completedTasks == totalTasks) return 'Completed';
+    final progress = completedTasks / totalTasks;
+    if (progress >= 0.75) return 'Almost There';
+    if (progress >= 0.5) return 'In Progress';
+    if (progress >= 0.25) return 'Getting Started';
+    return 'Just Started';
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'Completed':
+        return AppTheme.successColor;
+      case 'Almost There':
+        return AppTheme.primaryColor;
+      case 'In Progress':
+        return AppTheme.primaryLight;
+      case 'Getting Started':
+        return AppTheme.secondaryColor;
+      case 'Just Started':
+        return AppTheme.textSecondary;
+      default:
+        return AppTheme.textTertiary;
+    }
+  }
+
+  String _getDaysRemaining(DateTime? deadline) {
+    if (deadline == null) return '';
+    final now = DateTime.now();
+    final difference = deadline.difference(now);
+    if (difference.inDays < 0) return 'Overdue';
+    if (difference.inDays == 0) return 'Due Today';
+    if (difference.inDays == 1) return '1 day left';
+    if (difference.inDays < 7) return '${difference.inDays} days left';
+    if (difference.inDays < 30) return '${(difference.inDays / 7).ceil()} weeks left';
+    return '${(difference.inDays / 30).ceil()} months left';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -489,82 +530,166 @@ class _GoalsScreenState extends State<GoalsScreen> {
     
     return Scaffold(
       backgroundColor: isDark ? Colors.black : AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Goals')
-          .animate()
-          .fadeIn(duration: 500.ms)
-          .slideX(begin: -0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_rounded),
-            onPressed: _createGoal,
-            tooltip: 'Create Goal',
-          )
-            .animate()
-            .scale(delay: 200.ms, duration: 500.ms, curve: Curves.elasticOut)
-            .shimmer(delay: 700.ms, duration: 1500.ms, color: AppTheme.primaryColor.withOpacity(0.3)),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // App Bar
+          SliverAppBar(
+            expandedHeight: 120,
+            floating: false,
+            pinned: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            flexibleSpace: FlexibleSpaceBar(
+              title: const Text(
+                'Goals',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 28,
+                ),
+              )
+                .animate()
+                .fadeIn(duration: 500.ms)
+                .slideX(begin: -0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.add_rounded),
+                onPressed: _createGoal,
+                tooltip: 'Create Goal',
+              )
+                .animate()
+                .scale(delay: 200.ms, duration: 500.ms, curve: Curves.elasticOut)
+                .shimmer(delay: 700.ms, duration: 1500.ms, color: AppTheme.primaryColor.withOpacity(0.3)),
+            ],
+          ),
+          
+          // Content
+          Consumer<GrowthProvider>(
+            builder: (context, growthProvider, child) {
+              if (growthProvider.isLoading) {
+                return SliverFillRemaining(
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: AppTheme.primaryColor,
+                    )
+                      .animate()
+                      .scale(duration: 500.ms, curve: Curves.easeOutCubic),
+                  ),
+                );
+              }
+
+              final goals = growthProvider.goals;
+
+              if (goals.isEmpty) {
+                return SliverFillRemaining(
+                  child: _buildEmptyState(context),
+                );
+              }
+
+              return SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final goal = goals[index];
+                      final tasks = growthProvider.getTasksForGoal(goal.id);
+                      final completedTasks = tasks.where((t) => t.isCompleted).length;
+                      return _buildGoalCard(
+                        context,
+                        goal,
+                        tasks.length,
+                        completedTasks,
+                        index,
+                      );
+                    },
+                    childCount: goals.length,
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
-      body: Consumer<GrowthProvider>(
-        builder: (context, growthProvider, child) {
-          if (growthProvider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    );
+  }
 
-          final goals = growthProvider.goals;
-
-          if (goals.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppTheme.spacingXL),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.flag_rounded,
-                      size: 80,
-                      color: AppTheme.textSecondary.withOpacity(0.5),
-                    ),
-                    const SizedBox(height: AppTheme.spacingLG),
-                    Text(
-                      'No goals yet',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: AppTheme.spacingSM),
-                    Text(
-                      'Create your first business goal to get started',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppTheme.textSecondary),
-                    ),
-                    const SizedBox(height: AppTheme.spacingXL),
-                    ElevatedButton.icon(
-                      onPressed: _createGoal,
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('Create Goal'),
-                    ),
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spacingXL),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spacingXL),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.primaryColor.withOpacity(0.1),
+                    AppTheme.primaryLight.withOpacity(0.1),
                   ],
                 ),
               ),
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: () => growthProvider.loadGrowthData(),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(AppTheme.spacingMD),
-              itemCount: goals.length,
-              itemBuilder: (context, index) {
-                final goal = goals[index];
-                final tasks = growthProvider.getTasksForGoal(goal.id);
-                final completedTasks = tasks.where((t) => t.isCompleted).length;
-
-                return _buildGoalCard(context, goal, tasks.length, completedTasks, index);
-              },
-            ),
-          );
-        },
+              child: Icon(
+                Icons.flag_rounded,
+                size: 80,
+                color: AppTheme.primaryColor,
+              ),
+            )
+              .animate()
+              .scale(delay: 200.ms, duration: 600.ms, curve: Curves.elasticOut)
+              .shimmer(delay: 800.ms, duration: 2000.ms, color: AppTheme.primaryColor.withOpacity(0.3)),
+            const SizedBox(height: AppTheme.spacingXL),
+            Text(
+              'No goals yet',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            )
+              .animate()
+              .fadeIn(delay: 400.ms, duration: 500.ms)
+              .slideY(begin: 0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
+            const SizedBox(height: AppTheme.spacingSM),
+            Text(
+              'Create your first goal to start turning\ndreams into reality',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 16,
+              ),
+            )
+              .animate()
+              .fadeIn(delay: 600.ms, duration: 500.ms)
+              .slideY(begin: 0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
+            const SizedBox(height: AppTheme.spacingXL),
+            ElevatedButton.icon(
+              onPressed: _createGoal,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'Create Your First Goal',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacingLG,
+                  vertical: AppTheme.spacingMD,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                ),
+                elevation: 4,
+              ),
+            )
+              .animate()
+              .fadeIn(delay: 800.ms, duration: 500.ms)
+              .scale(delay: 800.ms, duration: 500.ms, curve: Curves.elasticOut),
+          ],
+        ),
       ),
     );
   }
@@ -579,12 +704,13 @@ class _GoalsScreenState extends State<GoalsScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final progress = taskCount > 0 ? completedTasks / taskCount : 0.0;
+    final status = _getGoalStatus(goal, taskCount, completedTasks);
+    final statusColor = _getStatusColor(status);
+    final daysRemaining = _getDaysRemaining(goal.targetDeadline);
     
-    final cardContent = ModernSmartCard(
-      margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
-      useGradient: true,
-      elevationLevel: 2,
+    return GestureDetector(
       onTap: () {
+        HapticFeedback.mediumImpact();
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -592,89 +718,287 @@ class _GoalsScreenState extends State<GoalsScreen> {
           ),
         );
       },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Goal title and progress
-          Row(
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
+        child: ModernSmartCard(
+          useGradient: true,
+          elevationLevel: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Header Row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Goal Icon/Emoji
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primaryColor.withOpacity(0.2),
+                          AppTheme.primaryLight.withOpacity(0.2),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                    ),
+                    child: Icon(
+                      Icons.flag_rounded,
+                      color: AppTheme.primaryColor,
+                      size: 24,
+                    ),
+                  )
+                    .animate()
+                    .scale(delay: (index * 50).ms, duration: 400.ms, curve: Curves.elasticOut),
+                  
+                  const SizedBox(width: AppTheme.spacingMD),
+                  
+                  // Goal Title and Status
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          goal.name,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 20,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: AppTheme.spacingXS),
+                        Row(
+                          children: [
+                            // Status Badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppTheme.spacingSM,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                                border: Border.all(
+                                  color: statusColor.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                status,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            if (daysRemaining.isNotEmpty) ...[
+                              const SizedBox(width: AppTheme.spacingSM),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppTheme.spacingSM,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: goal.targetDeadline != null &&
+                                          goal.targetDeadline!.isBefore(DateTime.now())
+                                      ? AppTheme.errorColor.withOpacity(0.15)
+                                      : AppTheme.textSecondary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      goal.targetDeadline != null &&
+                                              goal.targetDeadline!.isBefore(DateTime.now())
+                                          ? Icons.warning_rounded
+                                          : Icons.schedule_rounded,
+                                      size: 12,
+                                      color: goal.targetDeadline != null &&
+                                              goal.targetDeadline!.isBefore(DateTime.now())
+                                          ? AppTheme.errorColor
+                                          : AppTheme.textSecondary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      daysRemaining,
+                                      style: TextStyle(
+                                        color: goal.targetDeadline != null &&
+                                                goal.targetDeadline!.isBefore(DateTime.now())
+                                            ? AppTheme.errorColor
+                                            : AppTheme.textSecondary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Chevron Icon
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppTheme.textSecondary,
+                    size: 24,
+                  ),
+                ],
+              ),
+              
+              // Progress Section
+              if (taskCount > 0) ...[
+                const SizedBox(height: AppTheme.spacingMD),
+                Row(
                   children: [
-                    Text(
-                      goal.name,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Progress',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '$completedTasks / $taskCount tasks',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppTheme.spacingSM),
+                          AnimatedProgressBar(
+                            progress: progress,
+                            height: 8,
+                            showPercentage: false,
+                            progressColor: statusColor,
+                          ),
+                        ],
                       ),
                     ),
-                    if (taskCount > 0) ...[
-                      const SizedBox(height: AppTheme.spacingSM),
-                      AnimatedProgressBar(
-                        progress: progress,
-                        height: 6,
-                        showPercentage: false,
-                        progressColor: AppTheme.getNeonAccent(type: 'blue'),
+                    const SizedBox(width: AppTheme.spacingMD),
+                    // Progress Percentage Circle
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [
+                            statusColor.withOpacity(0.2),
+                            statusColor.withOpacity(0.1),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: AppTheme.spacingXS),
+                      child: Center(
+                        child: Text(
+                          '${(progress * 100).toInt()}%',
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    )
+                      .animate()
+                      .scale(delay: (index * 50 + 200).ms, duration: 400.ms, curve: Curves.elasticOut),
+                  ],
+                ),
+              ] else ...[
+                const SizedBox(height: AppTheme.spacingMD),
+                Container(
+                  padding: const EdgeInsets.all(AppTheme.spacingMD),
+                  decoration: BoxDecoration(
+                    color: AppTheme.textSecondary.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                    border: Border.all(
+                      color: AppTheme.borderColor,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.add_task_rounded,
+                        size: 20,
+                        color: AppTheme.textSecondary,
+                      ),
+                      const SizedBox(width: AppTheme.spacingSM),
                       Text(
-                        '$completedTasks of $taskCount tasks completed',
+                        'No tasks yet - Add tasks to get started',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: AppTheme.textSecondary,
                         ),
                       ),
                     ],
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: AppTheme.textSecondary,
-              ),
-            ],
-          ),
-          // Deadline info if available
-          if (goal.targetDeadline != null) ...[
-            const SizedBox(height: AppTheme.spacingSM),
-            Row(
-              children: [
-                Icon(
-                  Icons.calendar_today_rounded,
-                  size: 14,
-                  color: AppTheme.textSecondary,
-                ),
-                const SizedBox(width: AppTheme.spacingXS),
-                Text(
-                  'Deadline: ${DateFormat('MMM d, y').format(goal.targetDeadline!)}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
                   ),
                 ),
               ],
-            ),
-          ],
-        ],
+              
+              // Deadline Info
+              if (goal.targetDeadline != null) ...[
+                const SizedBox(height: AppTheme.spacingMD),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spacingSM,
+                    vertical: AppTheme.spacingXS,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.calendar_today_rounded,
+                        size: 14,
+                        color: AppTheme.primaryColor,
+                      ),
+                      const SizedBox(width: AppTheme.spacingXS),
+                      Text(
+                        DateFormat('MMM d, y').format(goal.targetDeadline!),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        )
+          .animate()
+          .fadeIn(duration: 600.ms, delay: (index * 80).ms)
+          .slideY(begin: 0.2, end: 0, duration: 600.ms, delay: (index * 80).ms, curve: Curves.easeOutCubic)
+          .scale(
+            begin: const Offset(0.95, 0.95),
+            end: const Offset(1.0, 1.0),
+            duration: 600.ms,
+            delay: (index * 80).ms,
+            curve: Curves.easeOutCubic,
+          ),
       ),
     );
-    
-    // Wrap with 3D card for enhanced visual effect
-    return Card3D(
-      front: cardContent,
-      enableTilt: true,
-      tiltAngle: 5.0,
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => GoalDetailsScreen(goalId: goal.id),
-          ),
-        );
-      },
-    )
-      .animate()
-      .fadeIn(duration: 600.ms, delay: (index * 80).ms)
-      .slideY(begin: 0.2, end: 0, duration: 600.ms, curve: Curves.easeOutCubic)
-      .scale(begin: const Offset(0.9, 0.9), end: const Offset(1.0, 1.0), duration: 600.ms, curve: Curves.easeOutCubic);
   }
 }
-
