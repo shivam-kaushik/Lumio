@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "74766630364",
+    "project_id": "lumio-44058",
+    "storage_bucket": "lumio-44058.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:74766630364:android:a7b71ae25afe3c8ae46319",
+        "android_client_info": {
+          "package_name": "com.example.lumio"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "74766630364-j7deg4im7nt85bsndf1ctm726lp5sh0i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lumio",
+            "certificate_hash": "a1915ee40a1f56d5ab1e508db3a5d0fd51f18491"
+          }
+        },
+        {
+          "client_id": "74766630364-rbmhfik0bvicbcrb1fjc58jdhok83ptj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvVp2ueO7KrhYSNtpcgcZnyfaLtqXuMoo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "74766630364-rbmhfik0bvicbcrb1fjc58jdhok83ptj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "74766630364-u7ssstd42l21k91pvphebptvp47fr4k8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.lumio"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

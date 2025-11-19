@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
 
 import '../screens/onboarding_screen.dart';
+import '../screens/login_screen.dart';
 import '../navigation/main_navigator.dart';
+import '../providers/auth_provider.dart';
 import '../../core/services/permission_service.dart';
 
 /// Splash screen shown on app launch
@@ -57,19 +60,36 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    // Check if this is first launch (simplified - use SharedPreferences in production)
-    const isFirstLaunch = true; // Replace with actual check
-
-    // Import MainNavigator instead of HomeScreen directly
-    final nextScreen = isFirstLaunch 
-        ? const OnboardingScreen() 
-        : const MainNavigator();
+    final authProvider = context.read<AuthProvider>();
     
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => nextScreen,
-      ),
-    );
+    // Wait for auth state to be determined
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    // Check authentication state
+    if (authProvider.isAuthenticated) {
+      // User is logged in, go to main app
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const MainNavigator(),
+        ),
+      );
+    } else {
+      // User is not logged in, go to login screen
+      // Check if this is first launch (simplified - use SharedPreferences in production)
+      const isFirstLaunch = false; // Replace with actual check
+      
+      final nextScreen = isFirstLaunch 
+          ? const OnboardingScreen() 
+          : const LoginScreen();
+      
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => nextScreen,
+        ),
+      );
+    }
   }
 
   @override
@@ -108,10 +128,22 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.notifications_active_rounded,
-                        size: 64,
-                        color: Color(0xFF6366F1),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(32),
+                        child: Image.asset(
+                          'assets/icons/Lumio_logo.png',
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            // Fallback to icon if image not found
+                            return const Icon(
+                              Icons.notifications_active_rounded,
+                              size: 64,
+                              color: Color(0xFF6366F1),
+                            );
+                          },
+                        ),
                       ),
                     ),
 

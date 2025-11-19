@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/services/permission_service.dart';
 import '../providers/theme_provider.dart';
+import '../providers/auth_provider.dart';
+import '../screens/login_screen.dart';
 import '../theme/app_theme.dart';
 import '../widgets/modern_smart_card.dart';
 
@@ -338,6 +340,116 @@ class _SettingsScreenState extends State<SettingsScreen>
                       await _permissionService.openSettings();
                     },
                   ),
+                ),
+                const SizedBox(height: AppTheme.spacingLG),
+                // Account Section
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+                  child: Text(
+                    'Account',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingSM),
+                Consumer<AuthProvider>(
+                  builder: (context, authProvider, child) {
+                    final user = authProvider.user;
+                    return ModernSmartCard(
+                      useGradient: true,
+                      elevationLevel: 1,
+                      child: Column(
+                        children: [
+                          if (user != null)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: CircleAvatar(
+                                backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                                child: Icon(
+                                  Icons.person,
+                                  color: AppTheme.primaryColor,
+                                ),
+                              ),
+                              title: Text(
+                                user.email ?? 'User',
+                                style: TextStyle(
+                                  color: isDark 
+                                      ? AppTheme.darkTextPrimary 
+                                      : AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Signed in',
+                                style: TextStyle(
+                                  color: AppTheme.successColor,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          if (user != null)
+                            Divider(
+                              height: 1,
+                              color: isDark 
+                                  ? AppTheme.darkDivider 
+                                  : AppTheme.dividerColor,
+                            ),
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(
+                              Icons.logout_rounded,
+                              color: AppTheme.errorColor,
+                            ),
+                            title: Text(
+                              'Sign Out',
+                              style: TextStyle(
+                                color: AppTheme.errorColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            onTap: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Sign Out'),
+                                  content: const Text(
+                                    'Are you sure you want to sign out?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.errorColor,
+                                      ),
+                                      child: const Text('Sign Out'),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (confirm == true && mounted) {
+                                await authProvider.signOut();
+                                if (mounted) {
+                                  Navigator.of(context).pushAndRemoveUntil(
+                                    MaterialPageRoute(
+                                      builder: (context) => const LoginScreen(),
+                                    ),
+                                    (route) => false,
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

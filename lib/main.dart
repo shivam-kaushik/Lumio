@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 import 'core/services/notification_service.dart';
 import 'core/services/permission_service.dart';
@@ -16,8 +18,10 @@ import 'data/repositories/growth_repository.dart';
 import 'presentation/providers/reminder_provider.dart';
 import 'presentation/providers/growth_provider.dart';
 import 'presentation/providers/theme_provider.dart';
+import 'presentation/providers/auth_provider.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/screens/splash_screen.dart';
+import 'presentation/navigation/main_navigator.dart';
 
 /// Background task callback for Workmanager
 /// Executes context monitoring and reminder triggering in background
@@ -60,6 +64,17 @@ void callbackDispatcher() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('✅ Firebase initialized successfully');
+  } catch (e) {
+    debugPrint('⚠️ Firebase initialization error: $e');
+    debugPrint('⚠️ Make sure you have configured Firebase for your platform');
+  }
 
   // Load environment variables
   try {
@@ -165,6 +180,9 @@ class _LumioAppState extends State<LumioApp> {
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider(),
         ),
+        ChangeNotifierProvider<AuthProvider>(
+          create: (_) => AuthProvider(),
+        ),
         ChangeNotifierProvider<ReminderProvider>(
           create: (context) => ReminderProvider(
             reminderRepository: context.read<ReminderRepository>(),
@@ -189,6 +207,9 @@ class _LumioAppState extends State<LumioApp> {
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
             home: const SplashScreen(),
+            routes: {
+              '/home': (context) => const MainNavigator(),
+            },
           );
 
           // Enable DevicePreview in debug mode for UI preview
