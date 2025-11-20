@@ -2,21 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../core/services/text_to_speech_service.dart';
 import '../../core/services/permission_service.dart';
-import '../../core/services/smart_nudge_service.dart';
-import '../../data/repositories/growth_repository.dart';
-import '../../data/models/skill.dart';
+import '../../data/repositories/firestore_growth_repository.dart';
 
 /// Voice-based completion handler for hands-free task completion
 class VoiceCompletionHandler {
   final stt.SpeechToText _speech = stt.SpeechToText();
   final TextToSpeechService _ttsService = TextToSpeechService();
-  final SmartNudgeService _nudgeService = SmartNudgeService();
-  final GrowthRepository _growthRepository = GrowthRepository();
+  final FirestoreGrowthRepository _growthRepository = FirestoreGrowthRepository();
 
   /// Handle voice completion ("Done" command)
   Future<bool> handleVoiceCompletion({
     required int subtaskId,
-    required int? skillId,
     required String taskDescription,
     required Function(String message) onComplete,
   }) async {
@@ -65,41 +61,18 @@ class VoiceCompletionHandler {
         return false;
       }
 
-      // Complete the task
-      await _growthRepository.completeSubtask(subtaskId);
-
-      // Get updated skill info for feedback
-      Skill? skill;
-      if (skillId != null) {
-        final skills = await _growthRepository.getSkills();
-        skill = skills.firstWhere((s) => s.id == skillId, orElse: () => throw Exception());
-      }
+      // Complete the goal task
+      await _growthRepository.completeTask(subtaskId);
 
       // Generate voice feedback
-      String feedbackMessage;
-      if (skill != null) {
-        feedbackMessage = 
-            'Nice! You just completed a rep for ${skill.name}. '
-            'Your streak is now ${skill.currentStreak} days.';
-      } else {
-        feedbackMessage = 'Task completed! Great work!';
-      }
+      final feedbackMessage =
+          taskDescription.isNotEmpty
+              ? 'Task "$taskDescription" completed. Great work!'
+              : 'Task completed! Great work!';
 
       // Speak feedback
       await _ttsService.speak(feedbackMessage);
       onComplete(feedbackMessage);
-
-        // Check for momentum nudges
-        if (skill != null && skillId != null) {
-          final reps = await _growthRepository.getRepsForSkill(skillId);
-        final now = DateTime.now();
-        final weekAgo = now.subtract(const Duration(days: 7));
-        final repsThisWeek = reps.where((r) => r.timestamp.isAfter(weekAgo)).length;
-
-        if (repsThisWeek >= 6) {
-          await _nudgeService.sendMomentumNudge(skill, repsThisWeek);
-        }
-      }
 
       return true;
     } catch (e) {

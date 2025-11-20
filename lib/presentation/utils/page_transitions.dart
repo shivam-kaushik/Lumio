@@ -41,30 +41,23 @@ class PageTransitions {
     );
   }
 
-  /// Open container (morph transition)
-  static PageRouteBuilder<T> openContainer<T>({
-    required Widget page,
-    required Widget closedBuilder,
+  /// Open container (morph transition) widget helper
+  static Widget openContainer({
+    required CloseContainerBuilder closedBuilder,
+    required OpenContainerBuilder openBuilder,
+    Duration duration = const Duration(milliseconds: 400),
+    Color? closedColor,
+    Color? openColor,
   }) {
-    return PageRouteBuilder<T>(
-      pageBuilder: (context, animation, secondaryAnimation) => page,
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        return OpenContainer(
-          closedBuilder: closedBuilder,
-          openBuilder: (context, _) => page,
-          transitionDuration: const Duration(milliseconds: 400),
-          closedElevation: 0,
-          openElevation: 0,
-        ).buildTransitions(
-          page,
-          context,
-          animation,
-          secondaryAnimation,
-          child,
-        );
-      },
-      transitionDuration: const Duration(milliseconds: 400),
-      reverseTransitionDuration: const Duration(milliseconds: 400),
+    return OpenContainer(
+      closedBuilder: closedBuilder,
+      openBuilder: openBuilder,
+      transitionDuration: duration,
+      closedElevation: 0,
+      openElevation: 0,
+      closedColor: closedColor ?? Colors.transparent,
+      openColor: openColor ?? Colors.transparent,
+      middleColor: Colors.transparent,
     );
   }
 

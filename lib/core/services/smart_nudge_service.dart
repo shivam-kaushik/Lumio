@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import '../../data/repositories/growth_repository.dart';
-import '../../data/repositories/reminder_repository.dart';
+import '../../data/repositories/firestore_growth_repository.dart';
+import '../../data/repositories/firestore_reminder_repository.dart';
 import '../services/notification_service.dart';
 
 /// Smart nudge service for goal accountability (skills removed)
@@ -9,8 +9,8 @@ class SmartNudgeService {
   factory SmartNudgeService() => _instance;
   SmartNudgeService._internal();
 
-  final GrowthRepository _growthRepository = GrowthRepository();
-  final ReminderRepository _reminderRepository = ReminderRepository();
+  final FirestoreGrowthRepository _growthRepository = FirestoreGrowthRepository();
+  final FirestoreReminderRepository _reminderRepository = FirestoreReminderRepository();
   final NotificationService _notificationService = NotificationService();
 
   /// Check for goals with missed tasks and send nudges

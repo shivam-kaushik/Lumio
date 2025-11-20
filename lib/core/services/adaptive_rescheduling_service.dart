@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../../data/models/goal_task.dart';
 import '../../data/models/goal.dart';
-import '../../data/repositories/growth_repository.dart';
+import '../../data/repositories/firestore_growth_repository.dart';
 
 /// Service for adaptive rescheduling of missed tasks
 class AdaptiveReschedulingService {
-  final GrowthRepository _repository = GrowthRepository();
+  final FirestoreGrowthRepository _repository = FirestoreGrowthRepository();
 
   /// Reschedule missed tasks for a goal
   /// Returns list of rescheduled task IDs

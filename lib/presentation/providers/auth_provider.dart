@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/firestore_service.dart';
 
 /// Authentication provider for managing auth state
 class AuthProvider extends ChangeNotifier {
@@ -20,10 +21,21 @@ class AuthProvider extends ChangeNotifier {
 
   void _init() {
     // Listen to auth state changes
-    _authService.authStateChanges.listen((User? user) {
+    _authService.authStateChanges.listen((User? user) async {
       _user = user;
       _isLoading = false;
       _error = null;
+      
+      // Ensure user document exists in Firestore when user logs in
+      if (user != null) {
+        try {
+          final firestoreService = FirestoreService();
+          await firestoreService.ensureUserDocument();
+        } catch (e) {
+          debugPrint('⚠️ Error ensuring user document: $e');
+        }
+      }
+      
       notifyListeners();
     });
   }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../data/models/context_event.dart';
 import '../../data/models/reminder.dart';
-import '../../data/repositories/reminder_repository.dart';
+import '../../data/repositories/firestore_reminder_repository.dart';
 
 /// Recent Notifications - lists context events (notification triggers)
 class RecentNotificationsScreen extends StatefulWidget {
@@ -15,7 +15,7 @@ class RecentNotificationsScreen extends StatefulWidget {
 }
 
 class _RecentNotificationsScreenState extends State<RecentNotificationsScreen> {
-  final ReminderRepository _repo = ReminderRepository();
+  final FirestoreReminderRepository _repo = FirestoreReminderRepository();
   List<ContextEvent> _events = [];
   Map<String, Reminder> _reminders = {}; // Cache reminders
   bool _loading = true;

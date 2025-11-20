@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show DocumentSnapshot, Timestamp, FieldValue;
 
 /// Priority levels for reminders
 enum ReminderPriority {
@@ -312,6 +313,125 @@ class Reminder {
       'activityType': activityType,
       'useSmartTiming': useSmartTiming ? 1 : 0,
       'linked_goal_id': linkedGoalId,
+    };
+  }
+
+  /// Create Reminder from Firestore document
+  factory Reminder.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Reminder(
+      id: doc.id,
+      text: data['text'] as String,
+      timeAt: data['timeAt'] != null
+          ? (data['timeAt'] is Timestamp
+              ? (data['timeAt'] as Timestamp).toDate()
+              : DateTime.parse(data['timeAt'] as String))
+          : null,
+      geofenceId: data['geofenceId'] as String?,
+      geofenceLat: (data['geofenceLat'] as num?)?.toDouble(),
+      geofenceLng: (data['geofenceLng'] as num?)?.toDouble(),
+      geofenceRadius: (data['geofenceRadius'] as num?)?.toDouble(),
+      wifiSsid: data['wifiSsid'] as String?,
+      onLeaveContext: data['onLeaveContext'] as bool? ?? false,
+      onArriveContext: data['onArriveContext'] as bool? ?? false,
+      weatherCondition: data['weatherCondition'] as String?,
+      enabled: data['enabled'] as bool? ?? true,
+      createdAt: data['createdAt'] != null
+          ? (data['createdAt'] is Timestamp
+              ? (data['createdAt'] as Timestamp).toDate()
+              : DateTime.parse(data['createdAt'] as String))
+          : DateTime.now(),
+      lastTriggeredAt: data['lastTriggeredAt'] != null
+          ? (data['lastTriggeredAt'] is Timestamp
+              ? (data['lastTriggeredAt'] as Timestamp).toDate()
+              : DateTime.parse(data['lastTriggeredAt'] as String))
+          : null,
+      triggerCount: data['triggerCount'] as int? ?? 0,
+      repeatInterval: data['repeatInterval'] as int?,
+      repeatUnit: data['repeatUnit'] as String?,
+      repeatEndDate: data['repeatEndDate'] != null
+          ? (data['repeatEndDate'] is Timestamp
+              ? (data['repeatEndDate'] as Timestamp).toDate()
+              : DateTime.parse(data['repeatEndDate'] as String))
+          : null,
+      repeatOnDays: data['repeatOnDays'] != null
+          ? (data['repeatOnDays'] is List
+              ? (data['repeatOnDays'] as List).map((e) => e as int).toList()
+              : (data['repeatOnDays'] as String)
+                  .split(',')
+                  .map((e) => int.parse(e))
+                  .toList())
+          : null,
+      timeRangeStart: data['timeRangeStart'] != null
+          ? (data['timeRangeStart'] is Timestamp
+              ? (data['timeRangeStart'] as Timestamp).toDate()
+              : DateTime.parse(data['timeRangeStart'] as String))
+          : null,
+      timeRangeEnd: data['timeRangeEnd'] != null
+          ? (data['timeRangeEnd'] is Timestamp
+              ? (data['timeRangeEnd'] as Timestamp).toDate()
+              : DateTime.parse(data['timeRangeEnd'] as String))
+          : null,
+      preferredTimeOfDay: data['preferredTimeOfDay'] != null
+          ? TimeOfDay.values.firstWhere(
+              (e) => e.name == data['preferredTimeOfDay'] as String,
+              orElse: () => TimeOfDay.morning,
+            )
+          : null,
+      priority: data['priority'] != null
+          ? ReminderPriority.values.firstWhere(
+              (e) => e.name == data['priority'] as String,
+              orElse: () => ReminderPriority.medium,
+            )
+          : ReminderPriority.medium,
+      category: data['category'] != null
+          ? ReminderCategory.values.firstWhere(
+              (e) => e.name == data['category'] as String,
+              orElse: () => ReminderCategory.other,
+            )
+          : ReminderCategory.other,
+      isPaused: data['isPaused'] as bool? ?? false,
+      skipCount: data['skipCount'] as int? ?? 0,
+      keepRemindingUntilCompleted: data['keepRemindingUntilCompleted'] as bool? ?? false,
+      activityType: data['activityType'] as String?,
+      useSmartTiming: data['useSmartTiming'] as bool? ?? false,
+      linkedGoalId: data['linkedGoalId'] as int?,
+    );
+  }
+
+  /// Convert Reminder to Firestore document
+  Map<String, dynamic> toFirestore() {
+    return {
+      'text': text,
+      'timeAt': timeAt != null ? Timestamp.fromDate(timeAt!) : null,
+      'geofenceId': geofenceId,
+      'geofenceLat': geofenceLat,
+      'geofenceLng': geofenceLng,
+      'geofenceRadius': geofenceRadius,
+      'wifiSsid': wifiSsid,
+      'onLeaveContext': onLeaveContext,
+      'onArriveContext': onArriveContext,
+      'weatherCondition': weatherCondition,
+      'enabled': enabled,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'lastTriggeredAt': lastTriggeredAt != null ? Timestamp.fromDate(lastTriggeredAt!) : null,
+      'triggerCount': triggerCount,
+      'repeatInterval': repeatInterval,
+      'repeatUnit': repeatUnit,
+      'repeatEndDate': repeatEndDate != null ? Timestamp.fromDate(repeatEndDate!) : null,
+      'repeatOnDays': repeatOnDays,
+      'timeRangeStart': timeRangeStart != null ? Timestamp.fromDate(timeRangeStart!) : null,
+      'timeRangeEnd': timeRangeEnd != null ? Timestamp.fromDate(timeRangeEnd!) : null,
+      'preferredTimeOfDay': preferredTimeOfDay?.name,
+      'priority': priority.name,
+      'category': category.name,
+      'isPaused': isPaused,
+      'skipCount': skipCount,
+      'keepRemindingUntilCompleted': keepRemindingUntilCompleted,
+      'activityType': activityType,
+      'useSmartTiming': useSmartTiming,
+      'linkedGoalId': linkedGoalId,
+      'updatedAt': FieldValue.serverTimestamp(),
     };
   }
 

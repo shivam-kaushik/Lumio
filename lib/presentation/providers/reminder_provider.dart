@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/reminder.dart';
 import '../../data/models/context_event.dart';
 import '../../data/models/reminder_occurrence.dart';
-import '../../data/repositories/reminder_repository.dart';
+import '../../data/repositories/firestore_reminder_repository.dart';
 import '../../core/services/alarm_service.dart';
 import '../../core/services/nlu_parser.dart';
 import '../../core/services/permission_service.dart';
@@ -12,7 +12,7 @@ import '../../core/constants/app_constants.dart';
 
 /// Reminder state management provider
 class ReminderProvider with ChangeNotifier {
-  final ReminderRepository _reminderRepository;
+  final FirestoreReminderRepository _reminderRepository;
   late final LearningService _learningService;
 
   List<Reminder> _reminders = [];
@@ -21,7 +21,7 @@ class ReminderProvider with ChangeNotifier {
   Map<String, dynamic>? _statistics;
 
   ReminderProvider({
-    required ReminderRepository reminderRepository,
+    required FirestoreReminderRepository reminderRepository,
   }) : _reminderRepository = reminderRepository {
     _learningService = LearningService(reminderRepository);
   }

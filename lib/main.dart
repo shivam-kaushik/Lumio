@@ -12,9 +12,10 @@ import 'core/services/notification_service.dart';
 import 'core/services/permission_service.dart';
 import 'core/services/trigger_engine.dart';
 import 'core/services/smart_nudge_service.dart';
-import 'data/database/database_helper.dart';
-import 'data/repositories/reminder_repository.dart';
-import 'data/repositories/growth_repository.dart';
+import 'core/services/firestore_service.dart';
+import 'data/repositories/firestore_reminder_repository.dart';
+import 'data/repositories/firestore_growth_repository.dart';
+import 'core/services/firestore_service.dart';
 import 'presentation/providers/reminder_provider.dart';
 import 'presentation/providers/growth_provider.dart';
 import 'presentation/providers/theme_provider.dart';
@@ -30,7 +31,6 @@ void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     try {
       // Initialize services for background context
-      await DatabaseHelper.instance.database;
       final notificationService = NotificationService();
       await notificationService.initialize();
 
@@ -38,7 +38,7 @@ void callbackDispatcher() {
       tz.initializeTimeZones();
 
       // Initialize repository and trigger engine to run background checks
-      final reminderRepository = ReminderRepository();
+      final reminderRepository = FirestoreReminderRepository();
       final triggerEngine = TriggerEngine(
         reminderRepository: reminderRepository,
         notificationService: notificationService,
@@ -71,6 +71,10 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('✅ Firebase initialized successfully');
+    
+    // Initialize Firestore service and ensure user document exists if user is logged in
+    final firestoreService = FirestoreService();
+    await firestoreService.ensureUserDocument();
   } catch (e) {
     debugPrint('⚠️ Firebase initialization error: $e');
     debugPrint('⚠️ Make sure you have configured Firebase for your platform');
@@ -144,7 +148,7 @@ class _LumioAppState extends State<LumioApp> {
   }
 
   Future<void> _initializeTriggerEngine() async {
-    final reminderRepository = ReminderRepository();
+    final reminderRepository = FirestoreReminderRepository();
     final notificationService = NotificationService();
     await notificationService.initialize();
 
@@ -168,9 +172,12 @@ class _LumioAppState extends State<LumioApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // Repositories
-        Provider<ReminderRepository>(create: (_) => ReminderRepository()),
-        Provider<GrowthRepository>(create: (_) => GrowthRepository()), // MVP
+        // Repositories (Firestore)
+        Provider<FirestoreReminderRepository>(create: (_) => FirestoreReminderRepository()),
+        Provider<FirestoreGrowthRepository>(create: (_) => FirestoreGrowthRepository()),
+        
+        // Firestore Service
+        Provider<FirestoreService>(create: (_) => FirestoreService()),
 
         // Services
         Provider<NotificationService>(create: (_) => NotificationService()),
@@ -185,12 +192,12 @@ class _LumioAppState extends State<LumioApp> {
         ),
         ChangeNotifierProvider<ReminderProvider>(
           create: (context) => ReminderProvider(
-            reminderRepository: context.read<ReminderRepository>(),
+            reminderRepository: context.read<FirestoreReminderRepository>(),
           )..loadReminders(),
         ),
         ChangeNotifierProvider<GrowthProvider>( // MVP
           create: (context) => GrowthProvider(
-            repository: context.read<GrowthRepository>(),
+            repository: context.read<FirestoreGrowthRepository>(),
           )..loadGrowthData(),
         ),
       ],

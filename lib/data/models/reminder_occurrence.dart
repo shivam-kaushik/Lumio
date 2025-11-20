@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show DocumentSnapshot, Timestamp, FieldValue;
 
 /// Represents a single occurrence of a reminder (especially for recurring reminders)
 /// Each occurrence has its own completion status
@@ -73,6 +74,39 @@ class ReminderOccurrence {
       completedAt: completedAt ?? this.completedAt,
       notificationId: notificationId ?? this.notificationId,
     );
+  }
+
+  /// Create ReminderOccurrence from Firestore document
+  factory ReminderOccurrence.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return ReminderOccurrence(
+      id: doc.id,
+      reminderId: data['reminderId'] as String,
+      scheduledTime: data['scheduledTime'] != null
+          ? (data['scheduledTime'] is Timestamp
+              ? (data['scheduledTime'] as Timestamp).toDate()
+              : DateTime.parse(data['scheduledTime'] as String))
+          : DateTime.now(),
+      isCompleted: data['isCompleted'] as bool? ?? false,
+      completedAt: data['completedAt'] != null
+          ? (data['completedAt'] is Timestamp
+              ? (data['completedAt'] as Timestamp).toDate()
+              : DateTime.parse(data['completedAt'] as String))
+          : null,
+      notificationId: data['notificationId'] as int,
+    );
+  }
+
+  /// Convert ReminderOccurrence to Firestore document
+  Map<String, dynamic> toFirestore() {
+    return {
+      'reminderId': reminderId,
+      'scheduledTime': Timestamp.fromDate(scheduledTime),
+      'isCompleted': isCompleted,
+      'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
+      'notificationId': notificationId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
   }
 }
 

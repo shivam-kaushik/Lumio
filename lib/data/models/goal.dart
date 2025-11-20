@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show DocumentSnapshot, Timestamp, FieldValue;
+
 /// Goal model for business goals
 class Goal {
   final int id;
@@ -74,6 +76,39 @@ class Goal {
       hoursPerDay: hoursPerDay ?? this.hoursPerDay,
       totalEstimatedHours: totalEstimatedHours ?? this.totalEstimatedHours,
     );
+  }
+
+  /// Create Goal from Firestore document
+  factory Goal.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Goal(
+      id: int.parse(doc.id), // Firestore uses string IDs, convert to int
+      name: data['name'] as String,
+      createdAt: data['createdAt'] != null
+          ? (data['createdAt'] is Timestamp
+              ? (data['createdAt'] as Timestamp).toDate()
+              : DateTime.parse(data['createdAt'] as String))
+          : DateTime.now(),
+      targetDeadline: data['targetDeadline'] != null
+          ? (data['targetDeadline'] is Timestamp
+              ? (data['targetDeadline'] as Timestamp).toDate()
+              : DateTime.parse(data['targetDeadline'] as String))
+          : null,
+      hoursPerDay: (data['hoursPerDay'] as num?)?.toDouble(),
+      totalEstimatedHours: data['totalEstimatedHours'] as int?,
+    );
+  }
+
+  /// Convert Goal to Firestore document
+  Map<String, dynamic> toFirestore() {
+    return {
+      'name': name,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'targetDeadline': targetDeadline != null ? Timestamp.fromDate(targetDeadline!) : null,
+      'hoursPerDay': hoursPerDay,
+      'totalEstimatedHours': totalEstimatedHours,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
   }
 }
 

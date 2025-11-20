@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
-import 'package:sqflite/sqflite.dart';
-import '../../data/repositories/reminder_repository.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp, FieldValue, SetOptions;
+import '../../data/repositories/firestore_reminder_repository.dart';
 import '../../data/models/context_event.dart';
-import '../../data/database/database_helper.dart';
+import '../../core/services/firestore_service.dart';
 
 /// Service for learning user patterns and optimizing reminder timing
 class LearningService {
-  final ReminderRepository _repository;
+  final FirestoreReminderRepository _repository;
 
   LearningService(this._repository);
 
@@ -168,30 +168,43 @@ class LearningService {
     }
     
     try {
-      final db = await DatabaseHelper.instance.database;
-      final maps = await db.query(
-        'learning_patterns',
-        where: 'reminder_text_pattern = ?',
-        whereArgs: [reminderId],
-        orderBy: 'last_updated DESC',
-        limit: 1,
-      );
+      final firestoreService = FirestoreService();
+      final userDoc = firestoreService.userDoc;
+      if (userDoc == null) {
+        if (kDebugMode) {
+          print('   ⚠️ User not authenticated');
+        }
+        return null;
+      }
 
-      if (maps.isEmpty) {
+      final learningPatternsCollection = userDoc.collection('learning_patterns');
+      final snapshot = await learningPatternsCollection
+          .where('reminderId', isEqualTo: reminderId)
+          .orderBy('lastUpdated', descending: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
         if (kDebugMode) {
           print('   No learning pattern found');
         }
         return null;
       }
 
-      final map = maps.first;
+      final doc = snapshot.docs.first;
+      final data = doc.data();
+      
       final result = {
-        'optimalHour': map['optimal_time_hour'] as int,
-        'optimalMinute': map['optimal_time_minute'] as int? ?? 0,
-        'completionRate': map['completion_rate'] as double,
-        'avgResponseTime': map['avg_response_time_seconds'] as int,
-        'sampleCount': map['sample_count'] as int,
-        'lastUpdated': map['last_updated'] as String,
+        'optimalHour': data['optimalTimeHour'] as int,
+        'optimalMinute': data['optimalTimeMinute'] as int? ?? 0,
+        'completionRate': (data['completionRate'] as num?)?.toDouble() ?? 0.0,
+        'avgResponseTime': data['avgResponseTime'] as int? ?? 0,
+        'sampleCount': data['sampleCount'] as int,
+        'lastUpdated': data['lastUpdated'] != null
+            ? (data['lastUpdated'] is Timestamp
+                ? (data['lastUpdated'] as Timestamp).toDate().toIso8601String()
+                : data['lastUpdated'].toString())
+            : '',
       };
 
       if (kDebugMode) {
@@ -248,23 +261,23 @@ class LearningService {
     required int sampleCount,
   }) async {
     try {
-      final db = await DatabaseHelper.instance.database;
-      final now = DateTime.now().toIso8601String();
+      final firestoreService = FirestoreService();
+      final userDoc = firestoreService.userDoc;
+      if (userDoc == null) {
+        debugPrint('⚠️ Cannot save learning pattern: User not authenticated');
+        return;
+      }
 
-      await db.insert(
-        'learning_patterns',
-        {
-          'id': reminderId, // Use reminder ID as primary key
-          'reminder_text_pattern': reminderId,
-          'optimal_time_hour': optimalHour,
-          'optimal_time_minute': 0,
-          'completion_rate': completionRate ?? 0.0,
-          'avg_response_time_seconds': avgResponseTime ?? 0,
-          'sample_count': sampleCount,
-          'last_updated': now,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      final learningPatternsCollection = userDoc.collection('learning_patterns');
+      await learningPatternsCollection.doc(reminderId).set({
+        'reminderId': reminderId,
+        'optimalTimeHour': optimalHour,
+        'optimalTimeMinute': 0,
+        'completionRate': completionRate ?? 0.0,
+        'avgResponseTime': avgResponseTime ?? 0,
+        'sampleCount': sampleCount,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       if (kDebugMode) {
         print('✅ Saved learning pattern for reminder $reminderId: optimal hour = $optimalHour');

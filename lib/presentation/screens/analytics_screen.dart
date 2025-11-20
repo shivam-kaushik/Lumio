@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/reminder_provider.dart';
 import '../../core/services/weekly_insights_service.dart';
-import '../../data/repositories/reminder_repository.dart';
+import '../../data/repositories/firestore_reminder_repository.dart';
 import '../theme/app_theme.dart';
 
 /// Analytics screen showing completion statistics and weekly insights
@@ -29,7 +29,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Future<void> _loadInsights() async {
     setState(() => _loadingInsights = true);
     try {
-      final repository = ReminderRepository();
+      final repository = FirestoreReminderRepository();
       _insightsService = WeeklyInsightsService(repository);
       
       final trends = await _insightsService!.getWeeklyCompletionTrends();

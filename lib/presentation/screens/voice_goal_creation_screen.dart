@@ -6,7 +6,7 @@ import '../theme/app_theme.dart';
 import '../../core/services/privacy_gpt_service.dart';
 import '../../core/services/text_to_speech_service.dart';
 import '../../core/services/permission_service.dart';
-import '../../data/models/subtask.dart';
+import '../../data/models/subtask.dart' show Task;
 import 'goal_planning_screen.dart';
 
 /// Hands-free voice-based goal creation screen
@@ -276,8 +276,8 @@ class _VoiceGoalCreationScreenState extends State<VoiceGoalCreationScreen> {
 
       // Navigate to planning screen
       if (mounted) {
-        final subtasks = (_roadmap!['subtasks'] as List)
-            .map((s) => Subtask.fromMap(s as Map<String, dynamic>))
+        final tasks = (_roadmap!['subtasks'] as List)
+            .map((s) => Task.fromMap(s as Map<String, dynamic>))
             .toList();
 
         Navigator.of(context).pushReplacement(
@@ -285,7 +285,7 @@ class _VoiceGoalCreationScreenState extends State<VoiceGoalCreationScreen> {
             builder: (context) => GoalPlanningScreen(
               goalId: goalId,
               goalName: _goalDescription,
-              initialSubtasks: subtasks,
+              initialTasks: tasks,
               timeline: {
                 'deadline': _targetDeadline,
                 'hoursPerDay': _hoursPerDay,
@@ -318,8 +318,8 @@ class _VoiceGoalCreationScreenState extends State<VoiceGoalCreationScreen> {
       );
 
       if (mounted) {
-        final subtasks = (_roadmap!['subtasks'] as List)
-            .map((s) => Subtask.fromMap(s as Map<String, dynamic>))
+        final tasks = (_roadmap!['subtasks'] as List)
+            .map((s) => Task.fromMap(s as Map<String, dynamic>))
             .toList();
 
         Navigator.of(context).pushReplacement(
@@ -327,7 +327,7 @@ class _VoiceGoalCreationScreenState extends State<VoiceGoalCreationScreen> {
             builder: (context) => GoalPlanningScreen(
               goalId: goalId,
               goalName: _goalDescription,
-              initialSubtasks: subtasks,
+              initialTasks: tasks,
               timeline: {
                 'deadline': _targetDeadline,
                 'hoursPerDay': _hoursPerDay,

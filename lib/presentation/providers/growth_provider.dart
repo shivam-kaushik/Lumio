@@ -2,12 +2,12 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/goal.dart';
 import '../../data/models/goal_task.dart';
 import '../../data/models/goal_phase.dart';
-import '../../data/repositories/growth_repository.dart';
+import '../../data/repositories/firestore_growth_repository.dart';
 import '../../core/services/privacy_gpt_service.dart';
 
 /// Growth state management provider for goals and tasks
 class GrowthProvider with ChangeNotifier {
-  final GrowthRepository _repository;
+  final FirestoreGrowthRepository _repository;
 
   // State
   List<Goal> _goals = [];
@@ -16,7 +16,7 @@ class GrowthProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
-  GrowthProvider({required GrowthRepository repository})
+  GrowthProvider({required FirestoreGrowthRepository repository})
       : _repository = repository;
 
   // Getters

@@ -7,8 +7,8 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/reminder.dart';
 import 'weather_service.dart';
 import '../../data/models/context_event.dart';
-import '../../data/repositories/reminder_repository.dart';
-import '../../data/repositories/growth_repository.dart';
+import '../../data/repositories/firestore_reminder_repository.dart';
+import '../../data/repositories/firestore_growth_repository.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/date_time_utils.dart';
 import 'notification_service.dart';
@@ -19,12 +19,12 @@ import 'privacy_gpt_service.dart';
 /// Context trigger engine that monitors sensors and triggers reminders
 /// Integrated with HomeDetectionService for WiFi + GPS home detection
 class TriggerEngine {
-  final ReminderRepository _reminderRepository;
+  final FirestoreReminderRepository _reminderRepository;
   final NotificationService _notificationService;
   final HomeDetectionService _homeService = HomeDetectionService();
   final WeatherService _weatherService = WeatherService();
   final ActivityRecognitionService _activityService = ActivityRecognitionService();
-  final GrowthRepository _growthRepository = GrowthRepository();
+  final FirestoreGrowthRepository _growthRepository = FirestoreGrowthRepository();
   final PrivacyGptService _privacyGpt = PrivacyGptService();
 
   StreamSubscription<Position>? _positionSubscription;
@@ -35,7 +35,7 @@ class TriggerEngine {
   String? _previousActivity;
 
   TriggerEngine({
-    required ReminderRepository reminderRepository,
+    required FirestoreReminderRepository reminderRepository,
     required NotificationService notificationService,
   })  : _reminderRepository = reminderRepository,
         _notificationService = notificationService;

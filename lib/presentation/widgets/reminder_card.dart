@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/models/reminder.dart';
 import '../../data/models/reminder_occurrence.dart';
-import '../../data/repositories/reminder_repository.dart';
+import '../../data/repositories/firestore_reminder_repository.dart';
 import '../theme/app_theme.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../providers/reminder_provider.dart';
@@ -86,7 +86,7 @@ class _ReminderCardState extends State<ReminderCard>
                 if (widget.reminder.isRecurring) {
                   // For recurring reminders, check if there are completed occurrences
                   return FutureBuilder<List<ReminderOccurrence>>(
-                    future: ReminderRepository().getCompletedOccurrences(widget.reminder.id),
+                    future: FirestoreReminderRepository().getCompletedOccurrences(widget.reminder.id),
                     builder: (context, snapshot) {
                       final hasCompletedOccurrences = snapshot.hasData && snapshot.data!.isNotEmpty;
                       return GestureDetector(
@@ -350,7 +350,7 @@ class _ReminderCardState extends State<ReminderCard>
   /// Get next pending occurrence for a recurring reminder
   Future<DateTime?> _getNextOccurrence(Reminder reminder) async {
     try {
-      final repository = ReminderRepository();
+      final repository = FirestoreReminderRepository();
       final pending = await repository.getPendingOccurrences(reminder.id);
       
       if (pending.isNotEmpty) {

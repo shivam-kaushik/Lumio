@@ -1,8 +1,8 @@
-import '../../data/repositories/reminder_repository.dart';
+import '../../data/repositories/firestore_reminder_repository.dart';
 
 /// Service for analyzing weekly patterns and generating insights
 class WeeklyInsightsService {
-  final ReminderRepository _repository;
+  final FirestoreReminderRepository _repository;
 
   WeeklyInsightsService(this._repository);
 

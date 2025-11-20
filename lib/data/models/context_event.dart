@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show DocumentSnapshot, Timestamp, FieldValue;
 
 /// Context event model for tracking reminder triggers and outcomes
 class ContextEvent {
@@ -42,6 +43,37 @@ class ContextEvent {
       'triggerTime': triggerTime.toIso8601String(),
       'outcome': outcome,
       'metadata': metadata?.toString(),
+    };
+  }
+
+  /// Create ContextEvent from Firestore document
+  factory ContextEvent.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return ContextEvent(
+      id: doc.id,
+      reminderId: data['reminderId'] as String,
+      contextType: data['contextType'] as String,
+      triggerTime: data['triggerTime'] != null
+          ? (data['triggerTime'] is Timestamp
+              ? (data['triggerTime'] as Timestamp).toDate()
+              : DateTime.parse(data['triggerTime'] as String))
+          : DateTime.now(),
+      outcome: data['outcome'] as String,
+      metadata: data['metadata'] != null
+          ? Map<String, dynamic>.from(data['metadata'] as Map)
+          : null,
+    );
+  }
+
+  /// Convert ContextEvent to Firestore document
+  Map<String, dynamic> toFirestore() {
+    return {
+      'reminderId': reminderId,
+      'contextType': contextType,
+      'triggerTime': Timestamp.fromDate(triggerTime),
+      'outcome': outcome,
+      'metadata': metadata,
+      'updatedAt': FieldValue.serverTimestamp(),
     };
   }
 }

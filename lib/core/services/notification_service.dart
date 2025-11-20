@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:sqflite/sqflite.dart';
-
 import '../../core/constants/app_constants.dart';
-import '../../data/database/database_helper.dart';
-import '../../data/repositories/reminder_repository.dart';
-import '../../data/repositories/growth_repository.dart';
+import '../../data/repositories/firestore_reminder_repository.dart';
+import '../../data/repositories/firestore_growth_repository.dart';
+import '../../core/services/firestore_service.dart';
+import '../../data/models/context_event.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show FieldValue;
 import '../../data/models/context_event.dart';
 
 /// Notification service for managing local notifications
@@ -144,7 +144,7 @@ class NotificationService {
       }
       
       // Get reminder details from repository
-      final reminderRepository = ReminderRepository();
+      final reminderRepository = FirestoreReminderRepository();
       final reminder = await reminderRepository.getReminder(reminderId);
       
       if (reminder == null) {
@@ -216,7 +216,7 @@ class NotificationService {
         reminderId = payload;
       }
       
-      final reminderRepository = ReminderRepository();
+      final reminderRepository = FirestoreReminderRepository();
       
       // Mark occurrence as completed by notification ID
       await reminderRepository.completeOccurrenceByNotificationId(notificationId);
@@ -260,7 +260,7 @@ class NotificationService {
       }
       
       // Mark reminder as completed
-      final reminderRepository = ReminderRepository();
+      final reminderRepository = FirestoreReminderRepository();
       await reminderRepository.completeOccurrenceByNotificationId(notificationId);
       
       // Create context event
@@ -286,24 +286,22 @@ class NotificationService {
   static Future<void> _recordNotificationInteraction(
       String reminderId, String outcome,) async {
     try {
-      final dbHelper = DatabaseHelper.instance;
-      final db = await dbHelper.database;
+      final firestoreService = FirestoreService();
+      final collection = firestoreService.contextEventsCollection;
+      if (collection == null) {
+        debugPrint('⚠️ Cannot record notification interaction: User not authenticated');
+        return;
+      }
 
-      // Import uuid for generating event id
       final eventId = DateTime.now().millisecondsSinceEpoch.toString();
-
-      await db.insert(
-        AppConstants.contextEventsTable,
-        {
-          'id': eventId,
-          'reminderId': reminderId,
-          'contextType': 'notification_tap',
-          'triggerTime': DateTime.now().toIso8601String(),
-          'outcome': outcome,
-          'metadata': null,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+      final event = ContextEvent(
+        id: eventId,
+        reminderId: reminderId,
+        contextType: 'notification_tap',
+        outcome: outcome,
       );
+
+      await collection.doc(eventId).set(event.toFirestore());
 
       debugPrint(
           '✅ Recorded notification interaction for reminder $reminderId',);
@@ -316,23 +314,23 @@ class NotificationService {
   static Future<void> _recordScheduledNotification(
       String reminderId, DateTime scheduledTime,) async {
     try {
-      final dbHelper = DatabaseHelper.instance;
-      final db = await dbHelper.database;
+      final firestoreService = FirestoreService();
+      final collection = firestoreService.contextEventsCollection;
+      if (collection == null) {
+        debugPrint('⚠️ Cannot record scheduled notification: User not authenticated');
+        return;
+      }
 
       final eventId = 'sched_${DateTime.now().millisecondsSinceEpoch}';
-
-      await db.insert(
-        AppConstants.contextEventsTable,
-        {
-          'id': eventId,
-          'reminderId': reminderId,
-          'contextType': AppConstants.contextTypeTime,
-          'triggerTime': scheduledTime.toIso8601String(),
-          'outcome': AppConstants.outcomePending,
-          'metadata': null,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+      final event = ContextEvent(
+        id: eventId,
+        reminderId: reminderId,
+        contextType: AppConstants.contextTypeTime,
+        triggerTime: scheduledTime,
+        outcome: AppConstants.outcomePending,
       );
+
+      await collection.doc(eventId).set(event.toFirestore());
 
       debugPrint(
           '✅ Recorded scheduled notification for reminder $reminderId at $scheduledTime',);

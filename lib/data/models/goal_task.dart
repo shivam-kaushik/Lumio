@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show DocumentSnapshot, Timestamp, FieldValue;
+
 /// Goal task model for database storage
 class GoalTask {
   final int id;
@@ -145,6 +147,63 @@ class GoalTask {
       completedAt: completedAt ?? this.completedAt,
       createdAt: createdAt ?? this.createdAt,
     );
+  }
+
+  /// Create GoalTask from Firestore document
+  factory GoalTask.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return GoalTask(
+      id: int.parse(doc.id),
+      goalId: int.parse(data['goalId'] as String),
+      title: data['title'] as String,
+      description: data['description'] as String,
+      estimatedHours: (data['estimatedHours'] as num?)?.toDouble(),
+      priority: data['priority'] as String? ?? 'medium',
+      frequency: data['frequency'] as String? ?? 'one-time',
+      suggestedTime: data['suggestedTime'] as String? ?? 'any',
+      suggestedLocation: data['suggestedLocation'] as String? ?? 'any',
+      isMilestone: data['isMilestone'] as bool? ?? false,
+      motivationAnchor: data['motivationAnchor'] as String?,
+      scheduledDate: data['scheduledDate'] != null
+          ? (data['scheduledDate'] is Timestamp
+              ? (data['scheduledDate'] as Timestamp).toDate()
+              : DateTime.parse(data['scheduledDate'] as String))
+          : null,
+      phaseId: data['phaseId'] != null ? int.parse(data['phaseId'] as String) : null,
+      isCompleted: data['isCompleted'] as bool? ?? false,
+      completedAt: data['completedAt'] != null
+          ? (data['completedAt'] is Timestamp
+              ? (data['completedAt'] as Timestamp).toDate()
+              : DateTime.parse(data['completedAt'] as String))
+          : null,
+      createdAt: data['createdAt'] != null
+          ? (data['createdAt'] is Timestamp
+              ? (data['createdAt'] as Timestamp).toDate()
+              : DateTime.parse(data['createdAt'] as String))
+          : DateTime.now(),
+    );
+  }
+
+  /// Convert GoalTask to Firestore document
+  Map<String, dynamic> toFirestore() {
+    return {
+      'goalId': goalId.toString(),
+      'title': title,
+      'description': description,
+      'estimatedHours': estimatedHours,
+      'priority': priority,
+      'frequency': frequency,
+      'suggestedTime': suggestedTime,
+      'suggestedLocation': suggestedLocation,
+      'isMilestone': isMilestone,
+      'motivationAnchor': motivationAnchor,
+      'scheduledDate': scheduledDate != null ? Timestamp.fromDate(scheduledDate!) : null,
+      'phaseId': phaseId?.toString(),
+      'isCompleted': isCompleted,
+      'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
   }
 }
 
