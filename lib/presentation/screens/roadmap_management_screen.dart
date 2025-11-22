@@ -526,7 +526,12 @@ class _RoadmapManagementScreenState extends State<RoadmapManagementScreen> {
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(AppTheme.spacingMD),
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.spacingMD,
+              AppTheme.spacingMD,
+              AppTheme.spacingMD,
+              100, // Bottom padding for scrolling
+            ),
             itemCount: phases.length,
             itemBuilder: (context, index) {
               final phase = phases[index];
@@ -585,11 +590,14 @@ class _RoadmapManagementScreenState extends State<RoadmapManagementScreen> {
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert_rounded),
                           onSelected: (value) {
-                            if (value == 'edit') {
-                              _editPhase(phase);
-                            } else if (value == 'delete') {
-                              _deletePhase(phase);
-                            }
+                            // Defer action until after popup menu closes
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (value == 'edit') {
+                                _editPhase(phase);
+                              } else if (value == 'delete') {
+                                _deletePhase(phase);
+                              }
+                            });
                           },
                           itemBuilder: (context) => [
                             const PopupMenuItem(

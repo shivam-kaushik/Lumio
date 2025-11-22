@@ -316,6 +316,27 @@ class FirestoreGrowthRepository {
     return taskId;
   }
 
+  /// Mark task as uncompleted
+  Future<int> uncompleteTask(int taskId) async {
+    final task = await getTaskById(taskId);
+    if (task == null) {
+      throw Exception('Task not found: $taskId');
+    }
+
+    final collection = _firestoreService.getTasksCollection(task.goalId.toString());
+    if (collection == null) {
+      throw Exception('User not authenticated');
+    }
+
+    await collection.doc(taskId.toString()).update({
+      'isCompleted': false,
+      'completedAt': null,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    return taskId;
+  }
+
   /// Get tasks scheduled for a specific date
   Future<List<GoalTask>> getTasksForDate(DateTime date) async {
     final goalsCollection = _firestoreService.goalsCollection;

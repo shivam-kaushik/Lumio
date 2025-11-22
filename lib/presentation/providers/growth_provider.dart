@@ -158,7 +158,7 @@ class GrowthProvider with ChangeNotifier {
       // Complete the task
       await _repository.completeTask(taskId);
       
-      // Reload data
+      // Reload data to sync across screens
       await loadGrowthData();
       
       // Generate motivational message
@@ -173,6 +173,21 @@ class GrowthProvider with ChangeNotifier {
       );
       
       return message;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Uncomplete a task (mark as not completed)
+  Future<void> uncompleteTask(int taskId) async {
+    try {
+      // Uncomplete the task
+      await _repository.uncompleteTask(taskId);
+      
+      // Reload data to sync across screens
+      await loadGrowthData();
     } catch (e) {
       _error = e.toString();
       notifyListeners();

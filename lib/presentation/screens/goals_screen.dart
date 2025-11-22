@@ -554,14 +554,23 @@ class _GoalsScreenState extends State<GoalsScreen> {
               titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.add_rounded),
-                onPressed: _createGoal,
-                tooltip: 'Create Goal',
-              )
-                .animate()
-                .scale(delay: 200.ms, duration: 500.ms, curve: Curves.elasticOut)
-                .shimmer(delay: 700.ms, duration: 1500.ms, color: AppTheme.primaryColor.withOpacity(0.3)),
+              Padding(
+                padding: const EdgeInsets.only(right: AppTheme.spacingMD),
+                child: TextButton.icon(
+                  onPressed: _createGoal,
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  label: const Text(
+                    'Add Goal',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.primaryColor,
+                  ),
+                )
+                  .animate()
+                  .scale(delay: 200.ms, duration: 500.ms, curve: Curves.elasticOut)
+                  .shimmer(delay: 700.ms, duration: 1500.ms, color: AppTheme.primaryColor.withOpacity(0.3)),
+              ),
             ],
           ),
           
@@ -609,6 +618,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 ),
               );
             },
+          ),
+          // Bottom padding above bottom navigation bar
+          const SliverPadding(
+            padding: EdgeInsets.only(bottom: 100),
           ),
         ],
       ),

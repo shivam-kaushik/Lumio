@@ -64,6 +64,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
   Future<void> _loadExistingTasks() async {
     try {
       final growthProvider = context.read<GrowthProvider>();
+      await growthProvider.loadTasksForGoal(widget.goalId);
       final existingGoalTasks = growthProvider.getTasksForGoal(widget.goalId);
       
       // Convert GoalTask to Task model
@@ -105,11 +106,39 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       setState(() {
         _tasks.addAll(newTasks);
         _scheduleTasks();
+        _refreshScheduledTasksFromProvider();
       });
     } catch (e) {
       debugPrint('Error loading existing tasks: $e');
       // If loading fails, just schedule the initial tasks
       _scheduleTasks();
+    }
+  }
+
+  /// Refresh scheduled tasks with latest completion status from provider
+  Future<void> _refreshScheduledTasksFromProvider() async {
+    try {
+      final growthProvider = context.read<GrowthProvider>();
+      await growthProvider.loadTasksForGoal(widget.goalId);
+      final latestTasks = growthProvider.getTasksForGoal(widget.goalId);
+      
+      // Update completion status in _scheduledTasks
+      for (var entry in _scheduledTasks.entries) {
+        for (var i = 0; i < entry.value.length; i++) {
+          final scheduledTask = entry.value[i];
+          final latestTask = latestTasks.firstWhere(
+            (t) => t.id == scheduledTask.id,
+            orElse: () => scheduledTask,
+          );
+          entry.value[i] = latestTask;
+        }
+      }
+      
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Error refreshing scheduled tasks: $e');
     }
   }
 
@@ -350,7 +379,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     return _scheduledTasks[dateKey] ?? [];
   }
 
-  Future<void> _saveAndSchedule() async {
+  Future<void> _saveAndSchedule({bool shouldPop = true}) async {
     try {
       final growthProvider = context.read<GrowthProvider>();
       final reminderProvider = context.read<ReminderProvider>();
@@ -406,13 +435,17 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       debugPrint('📊 Summary: Created ${_scheduledTasks.values.fold(0, (sum, list) => sum + list.length)} tasks and reminders');
       
       if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Goal planned! Tasks scheduled.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (shouldPop) {
+          Navigator.pop(context, true);
+        }
+        if (shouldPop) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Goal planned! Tasks scheduled.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -431,6 +464,66 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         return ReminderPriority.low;
       default:
         return ReminderPriority.medium;
+    }
+  }
+
+  /// Save a single task and create its reminder
+  Future<void> _saveSingleTask(Task task, int? phaseId, DateTime? selectedDate) async {
+    try {
+      final growthProvider = context.read<GrowthProvider>();
+      final reminderProvider = context.read<ReminderProvider>();
+      
+      // Convert Task to GoalTask
+      final goalTask = GoalTask(
+        id: 0, // Will be assigned by Firestore
+        goalId: widget.goalId,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        estimatedHours: task.estimatedHours,
+        isCompleted: false,
+        isMilestone: task.isMilestone ?? false,
+        scheduledDate: selectedDate,
+        phaseId: phaseId,
+        createdAt: DateTime.now(),
+      );
+      
+      // Save task
+      await growthProvider.createTask(goalTask);
+      debugPrint('  ✅ Saved task "${goalTask.title}"');
+      
+      // Create reminder for task, linked to goal
+      DateTime? reminderTime = selectedDate;
+      
+      // If task has a reminder time preference, apply it to the scheduled date
+      if (selectedDate != null && task.reminderTime != null) {
+        reminderTime = DateTime(
+          selectedDate.year,
+          selectedDate.month,
+          selectedDate.day,
+          task.reminderTime!.hour,
+          task.reminderTime!.minute,
+        );
+      }
+      
+      if (reminderTime != null) {
+        final reminder = Reminder(
+          text: goalTask.description,
+          timeAt: reminderTime,
+          priority: _getReminderPriority(goalTask.priority),
+          linkedGoalId: widget.goalId,
+        );
+        debugPrint('📝 Creating reminder: "${reminder.text}" with linkedGoalId: ${widget.goalId}');
+        await reminderProvider.createReminder(reminder);
+        debugPrint('✅ Reminder created with ID: ${reminder.id}');
+      }
+      
+      // Reload growth data to get the new task ID
+      await growthProvider.loadGrowthData();
+      await reminderProvider.loadReminders();
+    } catch (e) {
+      debugPrint('Error saving task: $e');
+      rethrow;
     }
   }
 
@@ -453,12 +546,39 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       final task = result['task'] as Task;
       final phaseId = result['phaseId'] as int?;
       final selectedDate = result['selectedDate'] as DateTime?;
-      setState(() {
-        _tasks.add(task);
-        _taskPhaseMap[_getTaskKey(task)] = phaseId;
-        _taskDateMap[_getTaskKey(task)] = selectedDate;
-        _scheduleTasks();
-      });
+      
+      // Save and schedule the task immediately
+      try {
+        await _saveSingleTask(task, phaseId, selectedDate);
+        
+        // Add to local lists after successful save
+        setState(() {
+          _tasks.add(task);
+          _taskPhaseMap[_getTaskKey(task)] = phaseId;
+          _taskDateMap[_getTaskKey(task)] = selectedDate;
+          _scheduleTasks();
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Task "${task.title}" added and scheduled successfully!'),
+              backgroundColor: AppTheme.successColor,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error saving task: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -770,14 +890,26 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         elevation: 0,
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.add_rounded),
-            tooltip: 'Add Task',
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.add_rounded, size: 20),
+                  const SizedBox(width: 6),
+                  const Text('Add Task'),
+                ],
+              ),
+            ),
             onSelected: (value) {
-              if (value == 'manual') {
-                _addNewTask();
-              } else if (value == 'ai') {
-                _generateTasksWithAI();
-              }
+              // Defer action until after popup menu closes
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (value == 'manual') {
+                  _addNewTask();
+                } else if (value == 'ai') {
+                  _generateTasksWithAI();
+                }
+              });
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
@@ -819,11 +951,6 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           _buildTasksTab(),
           _buildCalendarTab(),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _saveAndSchedule,
-        label: const Text('Save & Schedule'),
-        icon: const Icon(Icons.check_rounded),
       ),
     );
   }
@@ -896,7 +1023,12 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(AppTheme.spacingMD),
+      padding: const EdgeInsets.fromLTRB(
+        AppTheme.spacingMD,
+        AppTheme.spacingMD,
+        AppTheme.spacingMD,
+        100, // Bottom padding above bottom navigation bar
+      ),
       itemCount: _tasks.length,
       itemBuilder: (context, index) {
         final task = _tasks[index];
@@ -919,10 +1051,50 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           }
         }
         
-        return ModernSmartCard(
-          margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
-          padding: const EdgeInsets.all(AppTheme.spacingMD),
-          child: Column(
+        return Dismissible(
+          key: Key('task_${task.title}_$index'),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+            ),
+            child: const Icon(
+              Icons.delete_rounded,
+              color: Colors.white,
+              size: 32,
+            ),
+          ),
+          confirmDismiss: (direction) async {
+            return await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Delete Task'),
+                content: Text('Are you sure you want to delete "${task.title}"?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    child: const Text('Delete'),
+                  ),
+                ],
+              ),
+            ) ?? false;
+          },
+          onDismissed: (direction) {
+            _deleteTask(index);
+          },
+          child: ModernSmartCard(
+            margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
+            padding: const EdgeInsets.all(AppTheme.spacingMD),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -981,13 +1153,16 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert_rounded, size: 20),
                     onSelected: (value) {
-                      if (value == 'edit') {
-                        _editTask(index);
-                      } else if (value == 'time') {
-                        _editTaskTime(index);
-                      } else if (value == 'delete') {
-                        _deleteTask(index);
-                      }
+                      // Defer action until after popup menu closes
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (value == 'edit') {
+                          _editTask(index);
+                        } else if (value == 'time') {
+                          _editTaskTime(index);
+                        } else if (value == 'delete') {
+                          _deleteTask(index);
+                        }
+                      });
                     },
                     itemBuilder: (context) => [
                       const PopupMenuItem(
@@ -1169,6 +1344,7 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
               ),
             ],
           ),
+          ),
         )
           .animate()
           .fadeIn(delay: (index * 100).ms, duration: 400.ms)
@@ -1230,20 +1406,124 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(AppTheme.spacingMD),
-            itemCount: _getTasksForDay(_selectedDay).length,
-            itemBuilder: (context, index) {
-              final task = _getTasksForDay(_selectedDay)[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
-                child: ListTile(
-                  title: Text(task.title),
-                  subtitle: Text(task.description),
-                  trailing: task.isMilestone
-                      ? Icon(Icons.flag_rounded, color: AppTheme.primaryColor)
-                      : null,
+          child: Consumer<GrowthProvider>(
+            builder: (context, growthProvider, child) {
+              final tasksForDay = _getTasksForDay(_selectedDay);
+              return ListView.builder(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.spacingMD,
+                  AppTheme.spacingMD,
+                  AppTheme.spacingMD,
+                  100, // Bottom padding above bottom navigation bar
                 ),
+                itemCount: tasksForDay.length,
+                itemBuilder: (context, index) {
+                  final task = tasksForDay[index];
+                  return Dismissible(
+                    key: Key('calendar_task_${task.id}_$index'),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                      ),
+                      child: const Icon(
+                        Icons.delete_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    confirmDismiss: (direction) async {
+                      return await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Task'),
+                          content: Text('Are you sure you want to delete "${task.title}"?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      ) ?? false;
+                    },
+                    onDismissed: (direction) async {
+                      await growthProvider.deleteTask(task.id);
+                      await _refreshScheduledTasksFromProvider();
+                    },
+                    child: Card(
+                      margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+                      child: ListTile(
+                      leading: GestureDetector(
+                        onTap: () async {
+                          if (task.isCompleted) {
+                            await growthProvider.uncompleteTask(task.id);
+                          } else {
+                            await growthProvider.completeTask(task.id);
+                          }
+                          // Refresh tasks to sync
+                          await _refreshScheduledTasksFromProvider();
+                        },
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: task.isCompleted
+                                  ? AppTheme.successColor
+                                  : AppTheme.borderColor,
+                              width: 2,
+                            ),
+                            color: task.isCompleted
+                                ? AppTheme.successColor
+                                : Colors.transparent,
+                          ),
+                          child: task.isCompleted
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  color: Colors.white,
+                                  size: 16,
+                                )
+                              : null,
+                        ),
+                      ),
+                      title: Text(
+                        task.title,
+                        style: TextStyle(
+                          decoration: task.isCompleted
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: task.isCompleted
+                              ? AppTheme.textSecondary
+                              : AppTheme.textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        task.description,
+                        style: TextStyle(
+                          decoration: task.isCompleted
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      trailing: task.isMilestone
+                          ? Icon(Icons.flag_rounded, color: AppTheme.primaryColor)
+                          : null,
+                    ),
+                    ),
+                  );
+                },
               );
             },
           ),

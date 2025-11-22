@@ -605,6 +605,8 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
                   );
                 },
               ),
+              // Bottom padding above bottom navigation bar
+              const SizedBox(height: 100),
             ],
           ),
         );
@@ -703,23 +705,75 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
   ) {
     final theme = Theme.of(context);
     
-    return GestureDetector(
-      onTap: () async {
-        if (!task.isCompleted) {
-          HapticFeedback.mediumImpact();
-          final message = await growthProvider.completeTask(task.id);
-          if (mounted && message != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(message),
-                backgroundColor: AppTheme.successColor,
-                duration: const Duration(seconds: 2),
+    return Dismissible(
+      key: Key('goal_task_${task.id}_$index'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+        ),
+        child: const Icon(
+          Icons.delete_rounded,
+          color: Colors.white,
+          size: 32,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Delete Task'),
+            content: Text('Are you sure you want to delete "${task.title}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
               ),
-            );
-          }
-        }
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ?? false;
       },
-      child: ModernSmartCard(
+      onDismissed: (direction) async {
+        await growthProvider.deleteTask(task.id);
+      },
+      child: (GestureDetector(
+        onTap: () async {
+          HapticFeedback.mediumImpact();
+          if (task.isCompleted) {
+            // Uncomplete the task
+            await growthProvider.uncompleteTask(task.id);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Task unmarked'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+            }
+          } else {
+            // Complete the task
+            final message = await growthProvider.completeTask(task.id);
+            if (mounted && message != null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(message),
+                  backgroundColor: AppTheme.successColor,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          }
+        },
+        child: ModernSmartCard(
         margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
         useGradient: false,
         elevationLevel: task.isCompleted ? 0 : 1,
@@ -825,10 +879,11 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
               ),
           ],
         ),
+        ),
       )
         .animate()
         .fadeIn(delay: (400 + index * 50).ms, duration: 500.ms)
-        .slideX(begin: -0.2, end: 0, duration: 500.ms, delay: (400 + index * 50).ms, curve: Curves.easeOutCubic),
+        .slideX(begin: -0.2, end: 0, duration: 500.ms, delay: (400 + index * 50).ms, curve: Curves.easeOutCubic)),
     );
   }
 }

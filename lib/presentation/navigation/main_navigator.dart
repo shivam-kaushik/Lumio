@@ -175,9 +175,6 @@ class _MainNavigatorState extends State<MainNavigator>
       return;
     }
 
-    // Store the outer context before showing dialog
-    final navigatorContext = Navigator.of(context);
-    
     final selectedGoal = await showDialog<Goal>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -212,20 +209,24 @@ class _MainNavigatorState extends State<MainNavigator>
     await Future.delayed(const Duration(milliseconds: 100));
     
     if (selectedGoal != null && mounted) {
-      // Navigate to goal planning screen using the stored navigator context
-      navigatorContext.push(
-        MaterialPageRoute(
-          builder: (context) => GoalPlanningScreen(
-            goalId: selectedGoal.id,
-            goalName: selectedGoal.name,
-            initialTasks: [],
-            timeline: {
-              'deadline': selectedGoal.targetDeadline ?? DateTime.now().add(const Duration(days: 30)),
-              'hoursPerDay': selectedGoal.hoursPerDay ?? 2.0,
-            },
+      // Navigate to goal planning screen using the current context
+      // Check if Navigator is available before navigating
+      final navigator = Navigator.maybeOf(context);
+      if (navigator != null) {
+        navigator.push(
+          MaterialPageRoute(
+            builder: (context) => GoalPlanningScreen(
+              goalId: selectedGoal.id,
+              goalName: selectedGoal.name,
+              initialTasks: [],
+              timeline: {
+                'deadline': selectedGoal.targetDeadline ?? DateTime.now().add(const Duration(days: 30)),
+                'hoursPerDay': selectedGoal.hoursPerDay ?? 2.0,
+              },
+            ),
           ),
-        ),
-      );
+        );
+      }
     }
   }
 

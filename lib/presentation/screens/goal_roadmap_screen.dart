@@ -252,7 +252,12 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppTheme.spacingMD),
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.spacingMD,
+                AppTheme.spacingMD,
+                AppTheme.spacingMD,
+                100, // Bottom padding above bottom navigation bar
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

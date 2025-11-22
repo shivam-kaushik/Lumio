@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/reminder_provider.dart';
+import '../providers/growth_provider.dart';
 import '../widgets/reminder_card.dart';
 import '../widgets/smart_reminder_dialog.dart';
 import '../theme/app_theme.dart';
 import '../../data/models/reminder.dart';
+import '../../data/models/goal_task.dart';
 
 /// Calendar view screen showing reminders organized by date
 class CalendarScreen extends StatefulWidget {
@@ -22,9 +24,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
-    // Load reminders when calendar opens
+    // Load reminders and goal tasks when calendar opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ReminderProvider>().loadReminders();
+      context.read<GrowthProvider>().loadGrowthData();
     });
   }
 
@@ -66,14 +69,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ),
         // Body content
         Expanded(
-          child: Consumer<ReminderProvider>(
-            builder: (context, provider, child) {
-              if (provider.isLoading) {
+          child: Consumer2<ReminderProvider, GrowthProvider>(
+            builder: (context, reminderProvider, growthProvider, child) {
+              if (reminderProvider.isLoading || growthProvider.isLoading) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final reminders = provider.reminders.where((r) => r.enabled).toList();
+              final reminders = reminderProvider.reminders.where((r) => r.enabled).toList();
               final remindersByDate = _groupRemindersByDate(reminders);
+              
+              // Get goal tasks with scheduled dates
+              final goalTasksByDate = _groupGoalTasksByDate(growthProvider);
 
               return Column(
                 children: [
@@ -93,7 +99,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeInOut,
                       height: _isExpanded ? 325 : 125, // Week view: 120px, Month view: 320px
-                      child: _buildMonthView(context, _selectedDate, remindersByDate),
+                      child: _buildMonthView(
+                        context,
+                        _selectedDate,
+                        remindersByDate,
+                        goalTasksByDate,
+                      ),
                     ),
                   ),
 
@@ -130,12 +141,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
                   const Divider(height: 1, color: AppTheme.dividerColor),
 
-                  // Selected date reminders - more space
+                  // Selected date reminders and tasks - more space
                   Expanded(
-                    child: _buildRemindersList(
+                    child: _buildItemsList(
                       context,
                       _selectedDate,
                       remindersByDate[_formatDate(_selectedDate)] ?? [],
+                      goalTasksByDate[_formatDate(_selectedDate)] ?? [],
                     ),
                   ),
                 ],
@@ -151,6 +163,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     BuildContext context,
     DateTime selectedDate,
     Map<String, List<Reminder>> remindersByDate,
+    Map<String, List<GoalTask>> goalTasksByDate,
   ) {
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -208,11 +221,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
           // Calendar grid - use Expanded when expanded, SizedBox when collapsed
           _isExpanded
               ? Expanded(
-                  child: _buildCalendarGrid(selectedDate, remindersByDate),
+                  child: _buildCalendarGrid(selectedDate, remindersByDate, goalTasksByDate),
                 )
               : SizedBox(
                   height: 65, // Further reduced height for week view
-                  child: _buildCalendarGrid(selectedDate, remindersByDate),
+                  child: _buildCalendarGrid(selectedDate, remindersByDate, goalTasksByDate),
                 ),
         ],
       ),
@@ -222,19 +235,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Widget _buildCalendarGrid(
     DateTime monthDate,
     Map<String, List<Reminder>> remindersByDate,
+    Map<String, List<GoalTask>> goalTasksByDate,
   ) {
     // If collapsed, show only current week
     if (!_isExpanded) {
-      return _buildWeekView(monthDate, remindersByDate);
+      return _buildWeekView(monthDate, remindersByDate, goalTasksByDate);
     }
 
     // Otherwise show full month
-    return _buildMonthGrid(monthDate, remindersByDate);
+    return _buildMonthGrid(monthDate, remindersByDate, goalTasksByDate);
   }
 
   Widget _buildWeekView(
     DateTime monthDate,
     Map<String, List<Reminder>> remindersByDate,
+    Map<String, List<GoalTask>> goalTasksByDate,
   ) {
     // Show the week containing the selected date (Monday to Sunday)
     final selectedWeekday = _selectedDate.weekday;
@@ -261,6 +276,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: _buildWeekDayCell(
                   startOfWeek,
                   remindersByDate,
+                  goalTasksByDate,
                   _selectedDate,
                 ),
               ),
@@ -285,6 +301,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: _buildWeekDayCell(
                   startOfWeek.add(const Duration(days: 1)),
                   remindersByDate,
+                  goalTasksByDate,
                   _selectedDate,
                 ),
               ),
@@ -309,6 +326,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: _buildWeekDayCell(
                   startOfWeek.add(const Duration(days: 2)),
                   remindersByDate,
+                  goalTasksByDate,
                   _selectedDate,
                 ),
               ),
@@ -333,6 +351,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: _buildWeekDayCell(
                   startOfWeek.add(const Duration(days: 3)),
                   remindersByDate,
+                  goalTasksByDate,
                   _selectedDate,
                 ),
               ),
@@ -357,6 +376,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: _buildWeekDayCell(
                   startOfWeek.add(const Duration(days: 4)),
                   remindersByDate,
+                  goalTasksByDate,
                   _selectedDate,
                 ),
               ),
@@ -381,6 +401,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: _buildWeekDayCell(
                   startOfWeek.add(const Duration(days: 5)),
                   remindersByDate,
+                  goalTasksByDate,
                   _selectedDate,
                 ),
               ),
@@ -405,6 +426,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: _buildWeekDayCell(
                   startOfWeek.add(const Duration(days: 6)),
                   remindersByDate,
+                  goalTasksByDate,
                   _selectedDate,
                 ),
               ),
@@ -418,12 +440,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Widget _buildWeekDayCell(
     DateTime date,
     Map<String, List<Reminder>> remindersByDate,
+    Map<String, List<GoalTask>> goalTasksByDate,
     DateTime selectedDate,
   ) {
     final isSelected = _isSameDay(date, selectedDate);
     final isToday = _isSameDay(date, DateTime.now());
     final dateStr = _formatDate(date);
     final reminderCount = remindersByDate[dateStr]?.length ?? 0;
+    final taskCount = goalTasksByDate[dateStr]?.length ?? 0;
+    final hasItems = reminderCount > 0 || taskCount > 0;
 
     return GestureDetector(
       onTap: () {
@@ -458,17 +483,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     : (isToday ? AppTheme.primaryColor : AppTheme.textPrimary),
               ),
             ),
-            if (reminderCount > 0) ...[
+            if (hasItems) ...[
               const SizedBox(height: 3),
-              Container(
-                width: 4,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? Colors.white
-                      : AppTheme.primaryColor,
-                  shape: BoxShape.circle,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (reminderCount > 0)
+                    Container(
+                      width: 4,
+                      height: 4,
+                      margin: const EdgeInsets.only(right: 2),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Colors.white
+                            : AppTheme.primaryColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  if (taskCount > 0)
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Colors.white
+                            : Colors.orange,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
               ),
             ],
           ],
@@ -480,16 +523,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Widget _buildMonthGrid(
     DateTime monthDate,
     Map<String, List<Reminder>> remindersByDate,
+    Map<String, List<GoalTask>> goalTasksByDate,
   ) {
     final firstDayOfMonth = DateTime(monthDate.year, monthDate.month, 1);
     final lastDayOfMonth = DateTime(monthDate.year, monthDate.month + 1, 0);
     final firstDayWeekday = firstDayOfMonth.weekday;
     final daysInMonth = lastDayOfMonth.day;
 
-    // Get reminder count for visualization
+    // Get reminder and task counts for visualization
     int getReminderCount(DateTime date) {
       final dateStr = _formatDate(date);
       return remindersByDate[dateStr]?.length ?? 0;
+    }
+    
+    int getTaskCount(DateTime date) {
+      final dateStr = _formatDate(date);
+      return goalTasksByDate[dateStr]?.length ?? 0;
     }
 
     return GridView.builder(
@@ -536,6 +585,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
         final isSelected = _isSameDay(date, _selectedDate);
         final isToday = _isSameDay(date, DateTime.now());
         final reminderCount = getReminderCount(date);
+        final taskCount = getTaskCount(date);
+        final hasItems = reminderCount > 0 || taskCount > 0;
 
         return GestureDetector(
           onTap: () {
@@ -570,17 +621,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         : (isToday ? AppTheme.primaryColor : AppTheme.textPrimary),
                   ),
                 ),
-                if (reminderCount > 0) ...[
+                if (hasItems) ...[
                   const SizedBox(height: 0.5), // Minimal spacing
-                  Container(
-                    width: 3, // Even smaller dot
-                    height: 3, // Even smaller dot
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.white
-                          : AppTheme.primaryColor,
-                      shape: BoxShape.circle,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (reminderCount > 0)
+                        Container(
+                          width: 3,
+                          height: 3,
+                          margin: const EdgeInsets.only(right: 1),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white
+                                : AppTheme.primaryColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      if (taskCount > 0)
+                        Container(
+                          width: 3,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white
+                                : Colors.orange,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ],
@@ -591,12 +660,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  Widget _buildRemindersList(
+  Widget _buildItemsList(
     BuildContext context,
     DateTime date,
     List<Reminder> reminders,
+    List<GoalTask> goalTasks,
   ) {
-    if (reminders.isEmpty) {
+    final hasItems = reminders.isNotEmpty || goalTasks.isNotEmpty;
+    
+    if (!hasItems) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -608,7 +680,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
             const SizedBox(height: AppTheme.spacingMD),
             Text(
-              'No reminders',
+              'No items',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: AppTheme.textSecondary,
               ),
@@ -645,31 +717,190 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
         ),
 
-        // Reminders
-        ...reminders.map((reminder) => ReminderCard(
-          reminder: reminder,
-          onTap: () async {
-            final result = await showDialog<Reminder>(
-              context: context,
-              builder: (context) => SmartReminderDialog(
-                reminder: reminder,
+        // Reminders section
+        if (reminders.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4, top: 4),
+            child: Text(
+              'Reminders',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textSecondary,
               ),
-            );
-            if (result != null && mounted) {
-              context.read<ReminderProvider>().updateReminder(result);
+            ),
+          ),
+          ...reminders.map((reminder) => ReminderCard(
+            reminder: reminder,
+            onTap: () async {
+              final result = await showDialog<Reminder>(
+                context: context,
+                builder: (context) => SmartReminderDialog(
+                  reminder: reminder,
+                ),
+              );
+              if (result != null && mounted) {
+                context.read<ReminderProvider>().updateReminder(result);
+              }
+            },
+            onToggle: (enabled) {
+              context.read<ReminderProvider>().toggleReminder(
+                reminder.id,
+                enabled,
+              );
+            },
+            onDelete: () {
+              context.read<ReminderProvider>().deleteReminder(reminder.id);
+            },
+          )),
+        ],
+
+        // Goal Tasks section
+        if (goalTasks.isNotEmpty) ...[
+          if (reminders.isNotEmpty) const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4, top: 4),
+            child: Text(
+              'Goal Tasks',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ),
+          ...goalTasks.map((task) => _buildGoalTaskCard(context, task)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildGoalTaskCard(BuildContext context, GoalTask task) {
+    final growthProvider = context.read<GrowthProvider>();
+    final goal = growthProvider.goals.firstWhere(
+      (g) => g.id == task.goalId,
+      orElse: () => throw Exception('Goal not found'),
+    );
+
+    return Dismissible(
+      key: Key('calendar_goal_task_${task.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+        ),
+        child: const Icon(
+          Icons.delete_rounded,
+          color: Colors.white,
+          size: 32,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Delete Task'),
+            content: Text('Are you sure you want to delete "${task.title}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
+      onDismissed: (direction) async {
+        await growthProvider.deleteTask(task.id);
+        growthProvider.loadGrowthData();
+      },
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: ListTile(
+        leading: GestureDetector(
+          onTap: () async {
+            if (task.isCompleted) {
+              await growthProvider.uncompleteTask(task.id);
+            } else {
+              await growthProvider.completeTask(task.id);
             }
           },
-          onToggle: (enabled) {
-            context.read<ReminderProvider>().toggleReminder(
-              reminder.id,
-              enabled,
-            );
-          },
-          onDelete: () {
-            context.read<ReminderProvider>().deleteReminder(reminder.id);
-          },
-        )),
-      ],
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: task.isCompleted
+                    ? AppTheme.successColor
+                    : AppTheme.borderColor,
+                width: 2,
+              ),
+              color: task.isCompleted
+                  ? AppTheme.successColor
+                  : Colors.transparent,
+            ),
+            child: task.isCompleted
+                ? const Icon(
+                    Icons.check_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  )
+                : null,
+          ),
+        ),
+        title: Text(
+          task.title,
+          style: TextStyle(
+            decoration: task.isCompleted
+                ? TextDecoration.lineThrough
+                : null,
+            color: task.isCompleted
+                ? AppTheme.textSecondary
+                : AppTheme.textPrimary,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (task.description.isNotEmpty)
+              Text(
+                task.description,
+                style: TextStyle(
+                  decoration: task.isCompleted
+                      ? TextDecoration.lineThrough
+                      : null,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.flag_rounded, size: 12, color: AppTheme.primaryColor),
+                const SizedBox(width: 4),
+                Text(
+                  goal.name,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: task.isMilestone
+            ? Icon(Icons.star_rounded, color: Colors.amber, size: 20)
+            : null,
+      ),
+      ),
     );
   }
 
@@ -691,6 +922,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
       remindersList.sort((a, b) {
         final timeA = a.timeAt ?? DateTime.now();
         final timeB = b.timeAt ?? DateTime.now();
+        return timeA.compareTo(timeB);
+      });
+    }
+
+    return grouped;
+  }
+
+  Map<String, List<GoalTask>> _groupGoalTasksByDate(GrowthProvider growthProvider) {
+    final Map<String, List<GoalTask>> grouped = {};
+
+    // Get all tasks from all goals
+    for (var goal in growthProvider.goals) {
+      final tasks = growthProvider.getTasksForGoal(goal.id);
+      for (var task in tasks) {
+        if (task.scheduledDate == null || task.isCompleted) continue;
+
+        final dateStr = _formatDate(task.scheduledDate!);
+        if (!grouped.containsKey(dateStr)) {
+          grouped[dateStr] = [];
+        }
+        grouped[dateStr]!.add(task);
+      }
+    }
+
+    // Sort tasks by scheduled time within each date
+    for (var tasksList in grouped.values) {
+      tasksList.sort((a, b) {
+        final timeA = a.scheduledDate ?? DateTime.now();
+        final timeB = b.scheduledDate ?? DateTime.now();
         return timeA.compareTo(timeB);
       });
     }
