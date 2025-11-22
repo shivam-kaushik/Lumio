@@ -233,10 +233,14 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(AppTheme.radiusMD),
               boxShadow: AppTheme.getElevationShadow(2, isDark: isDark),
             ),
-            child: const Icon(
-              Icons.notifications_active_rounded,
-              color: Colors.white,
-              size: 24,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+              child: Image.asset(
+                'assets/icons/Lumio_logo.png',
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
+              ),
             ),
           )
             .animate()

@@ -57,7 +57,65 @@ class ContextGroupCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(context, theme, icon, description),
-              ...reminders.map((reminder) => ReminderCard(
+              ...reminders.asMap().entries.map((entry) {
+                final index = entry.key;
+                final reminder = entry.value;
+                return Dismissible(
+                  key: Key('reminder_${reminder.id}_$index'),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: const [
+                        Text(
+                          'Delete',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(
+                          Icons.delete_rounded,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                      ],
+                    ),
+                  ),
+                  confirmDismiss: (direction) async {
+                    return await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete Task'),
+                        content: Text('Are you sure you want to delete "${reminder.text}"?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    ) ?? false;
+                  },
+                  onDismissed: (direction) {
+                    if (onDelete != null) {
+                      onDelete!(reminder.id);
+                    }
+                  },
+                  child: ReminderCard(
                     reminder: reminder,
                     onTap: onReminderTap != null
                         ? () => onReminderTap!(reminder)
@@ -68,7 +126,9 @@ class ContextGroupCard extends StatelessWidget {
                     onDelete: onDelete != null
                         ? () => onDelete!(reminder.id)
                         : null,
-                  )),
+                  ),
+                );
+              }),
             ],
           );
         }
@@ -181,22 +241,78 @@ class ContextGroupCard extends StatelessWidget {
                   statusText: 'Unknown',
                 ),
               );
-              return ReminderCard(
-                reminder: reminder,
-                onTap: onReminderTap != null
-                    ? () => onReminderTap!(reminder)
-                    : null,
-                onToggle: onToggle != null
-                    ? (enabled) => onToggle!(reminder.id, enabled)
-                    : null,
-                onDelete: onDelete != null
-                    ? () => onDelete!(reminder.id)
-                    : null,
-              )
-                .animate()
-                .fadeIn(duration: 500.ms, delay: (index * 80).ms)
-                .slideX(begin: -0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic)
-                .scale(begin: const Offset(0.95, 0.95), end: const Offset(1.0, 1.0), duration: 500.ms, curve: Curves.easeOutCubic);
+              return Dismissible(
+                key: Key('reminder_${reminder.id}_$index'),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: const [
+                      Text(
+                        'Delete',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Icon(
+                        Icons.delete_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ],
+                  ),
+                ),
+                confirmDismiss: (direction) async {
+                  return await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete Task'),
+                      content: Text('Are you sure you want to delete "${reminder.text}"?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  ) ?? false;
+                },
+                onDismissed: (direction) {
+                  if (onDelete != null) {
+                    onDelete!(reminder.id);
+                  }
+                },
+                child: ReminderCard(
+                  reminder: reminder,
+                  onTap: onReminderTap != null
+                      ? () => onReminderTap!(reminder)
+                      : null,
+                  onToggle: onToggle != null
+                      ? (enabled) => onToggle!(reminder.id, enabled)
+                      : null,
+                  onDelete: onDelete != null
+                      ? () => onDelete!(reminder.id)
+                      : null,
+                )
+                  .animate()
+                  .fadeIn(duration: 500.ms, delay: (index * 80).ms)
+                  .slideX(begin: -0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic)
+                  .scale(begin: const Offset(0.95, 0.95), end: const Offset(1.0, 1.0), duration: 500.ms, curve: Curves.easeOutCubic),
+              );
             }),
           ],
         );
