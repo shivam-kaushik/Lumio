@@ -6,7 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 /// Permission service for managing app permissions
 /// Handles both Android and iOS platforms
 class PermissionService {
-  static const _platform = MethodChannel('com.example.lumio/permissions');
+  static const _platform = MethodChannel('com.lumio.app/permissions');
 
   /// Check if exact alarm permission is granted (Android 12+)
   /// On iOS, always returns true (iOS doesn't have exact alarm permission)

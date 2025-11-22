@@ -1,0 +1,15 @@
+# Keystore properties for release signing
+# Copy this file to key.properties and fill in your actual values
+# DO NOT commit key.properties to version control!
+
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=lumio
+storeFile=YOUR_PATH_TO_KEYSTORE_FILE
+
+# Example for Windows:
+# storeFile=C:\\Users\\YourName\\lumio-release-key.jks
+
+# Example for Mac/Linux:
+# storeFile=/Users/YourName/lumio-release-key.jks
+

@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 /// Service for detecting device state changes (charging, screen unlock, etc.)
 /// This is a comprehensive device state monitoring service for context-aware reminders
 class DeviceStateService {
-  static const MethodChannel _channel = MethodChannel('com.example.lumio/device_state');
+  static const MethodChannel _channel = MethodChannel('com.lumio.app/device_state');
   static DeviceStateService? _instance;
   
   StreamController<DeviceStateEvent>? _stateController;

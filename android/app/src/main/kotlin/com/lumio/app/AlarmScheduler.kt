@@ -1,4 +1,4 @@
-package com.example.lumio
+package com.lumio.app
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -160,3 +160,4 @@ class AlarmScheduler(private val context: Context) {
         Log.d(TAG, "🗑️ Cancel all alarms requested")
     }
 }
+

@@ -1,4 +1,4 @@
-package com.example.lumio
+package com.lumio.app
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -93,3 +93,4 @@ class AlarmReceiver : BroadcastReceiver() {
         }
     }
 }
+

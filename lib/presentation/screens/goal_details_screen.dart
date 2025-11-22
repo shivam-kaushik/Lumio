@@ -711,15 +711,28 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
         decoration: BoxDecoration(
           color: Colors.red,
           borderRadius: BorderRadius.circular(AppTheme.radiusMD),
         ),
-        child: const Icon(
-          Icons.delete_rounded,
-          color: Colors.white,
-          size: 32,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: const [
+            Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+            ),
+            SizedBox(width: 8),
+            Icon(
+              Icons.delete_rounded,
+              color: Colors.white,
+              size: 32,
+            ),
+          ],
         ),
       ),
       confirmDismiss: (direction) async {
@@ -745,7 +758,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
       onDismissed: (direction) async {
         await growthProvider.deleteTask(task.id);
       },
-      child: (GestureDetector(
+      child: GestureDetector(
         onTap: () async {
           HapticFeedback.mediumImpact();
           if (task.isCompleted) {
@@ -773,6 +786,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
             }
           }
         },
+        behavior: HitTestBehavior.opaque,
         child: ModernSmartCard(
         margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
         useGradient: false,
@@ -883,7 +897,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen>
       )
         .animate()
         .fadeIn(delay: (400 + index * 50).ms, duration: 500.ms)
-        .slideX(begin: -0.2, end: 0, duration: 500.ms, delay: (400 + index * 50).ms, curve: Curves.easeOutCubic)),
+        .slideX(begin: -0.2, end: 0, duration: 500.ms, delay: (400 + index * 50).ms, curve: Curves.easeOutCubic),
     );
   }
 }

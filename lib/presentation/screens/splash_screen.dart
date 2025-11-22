@@ -50,7 +50,24 @@ class _SplashScreenState extends State<SplashScreen>
     // After the first frame, ensure notification permission is requested and
     // show a prompt to open settings if the permission was denied.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await PermissionService().ensureNotificationPermission(context);
+      final permissionService = PermissionService();
+      
+      // Request notification permission first
+      await permissionService.ensureNotificationPermission(
+        context,
+        rationale: 'Notifications are required to deliver reminders. Please enable notifications in app settings.',
+      );
+      
+      // Wait a bit before showing the next permission dialog to avoid overwhelming the user
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (!mounted) return;
+      
+      // Then request exact alarm permission (Android only, but safe to call on iOS)
+      await permissionService.ensureExactAlarmPermission(
+        context,
+        rationale: 'Exact alarms are needed for precise reminder delivery. Please enable "Alarms & reminders" in the app settings.',
+      );
     });
 
     _navigateToNext();

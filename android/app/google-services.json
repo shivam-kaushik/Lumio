@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:74766630364:android:a7b71ae25afe3c8ae46319",
         "android_client_info": {
-          "package_name": "com.example.lumio"
+          "package_name": "com.lumio.app"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "74766630364-j7deg4im7nt85bsndf1ctm726lp5sh0i.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.lumio",
+            "package_name": "com.lumio.app",
             "certificate_hash": "a1915ee40a1f56d5ab1e508db3a5d0fd51f18491"
           }
         },

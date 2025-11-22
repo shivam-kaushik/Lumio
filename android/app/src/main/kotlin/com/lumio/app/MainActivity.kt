@@ -1,4 +1,4 @@
-package com.example.lumio
+package com.lumio.app
 
 import android.app.AlarmManager
 import android.content.BroadcastReceiver
@@ -16,10 +16,10 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
-    private val CHANNEL = "com.example.lumio/permissions"
-    private val ALARM_CHANNEL = "com.example.lumio/alarms"
-    private val WIFI_CHANNEL = "com.example.lumio/wifi"
-    private val DEVICE_STATE_CHANNEL = "com.example.lumio/device_state"
+    private val CHANNEL = "com.lumio.app/permissions"
+    private val ALARM_CHANNEL = "com.lumio.app/alarms"
+    private val WIFI_CHANNEL = "com.lumio.app/wifi"
+    private val DEVICE_STATE_CHANNEL = "com.lumio.app/device_state"
     private lateinit var alarmScheduler: AlarmScheduler
     private var batteryReceiver: BroadcastReceiver? = null
     private lateinit var flutterEngine: FlutterEngine
@@ -312,3 +312,4 @@ class MainActivity: FlutterActivity() {
         }
     }
 }
+

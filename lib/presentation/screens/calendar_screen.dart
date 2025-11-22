@@ -786,15 +786,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
           color: Colors.red,
           borderRadius: BorderRadius.circular(AppTheme.radiusMD),
         ),
-        child: const Icon(
-          Icons.delete_rounded,
-          color: Colors.white,
-          size: 32,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: const [
+            Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+            ),
+            SizedBox(width: 8),
+            Icon(
+              Icons.delete_rounded,
+              color: Colors.white,
+              size: 32,
+            ),
+          ],
         ),
       ),
       confirmDismiss: (direction) async {

@@ -73,5 +73,10 @@ app.*.map.json
 .env.local
 .env.production
 
+# Android Keystore (DO NOT COMMIT!)
+android/key.properties
+*.jks
+*.keystore
+
 # VS Code
 .vscode/

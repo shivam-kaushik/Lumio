@@ -62,12 +62,13 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _openNotificationSettings() async {
+    if (!mounted) return;
     // Open system notification settings
     final granted = await _permissionService.ensureNotificationPermission(
       context,
       rationale: 'Notifications are required to deliver reminders. Please enable notifications in app settings.',
     );
-    if (granted) {
+    if (granted && mounted) {
       _refreshStatuses();
     }
   }
@@ -277,6 +278,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     children: [
                       ListTile(
                         contentPadding: EdgeInsets.zero,
+                        enabled: false,
                         leading: Icon(
                           Icons.schedule_rounded,
                           color: isDark 
@@ -305,34 +307,44 @@ class _SettingsScreenState extends State<SettingsScreen>
                             fontSize: 12,
                           ),
                         ),
-                        trailing: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: isDark 
-                                  ? AppTheme.darkBorder 
-                                  : AppTheme.borderColor,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-                            ),
-                          ),
-                          onPressed: () async {
-                            final granted =
-                                await _permissionService.ensureExactAlarmPermission(
-                              context,
-                              rationale:
-                                  'Exact alarms are needed for precise reminder delivery.',
-                            );
-                            if (granted) {
-                              _refreshStatuses();
-                            }
-                          },
-                          child: Text(
-                            'Manage',
-                            style: TextStyle(
-                              color: isDark 
-                                  ? AppTheme.darkTextPrimary 
-                                  : AppTheme.textPrimary,
+                        trailing: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () async {
+                              final granted =
+                                  await _permissionService.ensureExactAlarmPermission(
+                                context,
+                                rationale:
+                                    'Exact alarms are needed for precise reminder delivery.',
+                              );
+                              if (granted && mounted) {
+                                _refreshStatuses();
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDark 
+                                      ? AppTheme.darkBorder 
+                                      : AppTheme.borderColor,
+                                ),
+                                borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                              ),
+                              child: Text(
+                                'Manage',
+                                style: TextStyle(
+                                  color: isDark 
+                                      ? AppTheme.darkTextPrimary 
+                                      : AppTheme.textPrimary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -345,6 +357,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ),
                       ListTile(
                         contentPadding: EdgeInsets.zero,
+                        enabled: false,
                         leading: Icon(
                           Icons.location_on_rounded,
                           color: isDark 
@@ -375,34 +388,44 @@ class _SettingsScreenState extends State<SettingsScreen>
                             fontSize: 12,
                           ),
                         ),
-                        trailing: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: isDark 
-                                  ? AppTheme.darkBorder 
-                                  : AppTheme.borderColor,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-                            ),
-                          ),
-                          onPressed: () async {
-                            final granted =
-                                await _permissionService.ensureLocationPermission(
-                              context,
-                              rationale:
-                                  'Location is needed for location-based reminders.',
-                            );
-                            if (granted) {
-                              _refreshStatuses();
-                            }
-                          },
-                          child: Text(
-                            'Manage',
-                            style: TextStyle(
-                              color: isDark 
-                                  ? AppTheme.darkTextPrimary 
-                                  : AppTheme.textPrimary,
+                        trailing: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () async {
+                              final granted =
+                                  await _permissionService.ensureLocationPermission(
+                                context,
+                                rationale:
+                                    'Location is needed for location-based reminders.',
+                              );
+                              if (granted && mounted) {
+                                _refreshStatuses();
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDark 
+                                      ? AppTheme.darkBorder 
+                                      : AppTheme.borderColor,
+                                ),
+                                borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                              ),
+                              child: Text(
+                                'Manage',
+                                style: TextStyle(
+                                  color: isDark 
+                                      ? AppTheme.darkTextPrimary 
+                                      : AppTheme.textPrimary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -415,6 +438,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ),
                       ListTile(
                         contentPadding: EdgeInsets.zero,
+                        enabled: false,
                         leading: Icon(
                           Icons.mic_rounded,
                           color: isDark 
@@ -443,34 +467,44 @@ class _SettingsScreenState extends State<SettingsScreen>
                             fontSize: 12,
                           ),
                         ),
-                        trailing: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: isDark 
-                                  ? AppTheme.darkBorder 
-                                  : AppTheme.borderColor,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-                            ),
-                          ),
-                          onPressed: () async {
-                            final granted =
-                                await _permissionService.ensureMicrophonePermission(
-                              context,
-                              rationale:
-                                  'Microphone is needed for voice input when creating reminders.',
-                            );
-                            if (granted) {
-                              _refreshStatuses();
-                            }
-                          },
-                          child: Text(
-                            'Manage',
-                            style: TextStyle(
-                              color: isDark 
-                                  ? AppTheme.darkTextPrimary 
-                                  : AppTheme.textPrimary,
+                        trailing: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () async {
+                              final granted =
+                                  await _permissionService.ensureMicrophonePermission(
+                                context,
+                                rationale:
+                                    'Microphone is needed for voice input when creating reminders.',
+                              );
+                              if (granted && mounted) {
+                                _refreshStatuses();
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDark 
+                                      ? AppTheme.darkBorder 
+                                      : AppTheme.borderColor,
+                                ),
+                                borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                              ),
+                              child: Text(
+                                'Manage',
+                                style: TextStyle(
+                                  color: isDark 
+                                      ? AppTheme.darkTextPrimary 
+                                      : AppTheme.textPrimary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ),
                         ),
