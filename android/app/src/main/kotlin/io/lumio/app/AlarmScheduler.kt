@@ -1,4 +1,4 @@
-package com.lumio.app
+package io.lumio.app
 
 import android.app.AlarmManager
 import android.app.PendingIntent

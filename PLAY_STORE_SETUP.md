@@ -4,7 +4,7 @@ This guide will help you prepare your Lumio app for Google Play Store publishing
 
 ## ✅ Completed Steps
 
-1. ✅ Package name changed from `com.example.lumio` to `com.lumio.app`
+1. ✅ Package name changed from `com.example.lumio` to `io.lumio.app`
 2. ✅ All Kotlin files updated with new package name
 3. ✅ Method channel names updated
 4. ✅ Build configuration updated for release signing
@@ -63,7 +63,7 @@ Since you changed the package name, you need to:
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Select your project (`lumio-44058`)
 3. Go to Project Settings → Your apps
-4. Add a new Android app with package name: `com.lumio.app`
+4. Add a new Android app with package name: `io.lumio.app`
 5. Download the new `google-services.json`
 6. Replace `android/app/google-services.json` with the new file
 
@@ -149,7 +149,7 @@ Required items:
 
 ## ⚠️ Important Notes
 
-1. **Package Name**: Once published, you CANNOT change `com.lumio.app`. Make sure this is what you want.
+1. **Package Name**: Once published, you CANNOT change `io.lumio.app`. Make sure this is what you want.
 
 2. **Version Code**: Must increase with each update (1, 2, 3, etc.)
 
@@ -168,8 +168,8 @@ Required items:
 
 ## 📝 Current Configuration
 
-- **Package Name**: `com.lumio.app`
-- **Namespace**: `com.lumio.app`
+- **Package Name**: `io.lumio.app`
+- **Namespace**: `io.lumio.app`
 - **App Version**: `1.0.0+1` (check `pubspec.yaml`)
 - **Min SDK**: Check `android/app/build.gradle.kts`
 - **Target SDK**: Check `android/app/build.gradle.kts`
@@ -181,7 +181,7 @@ Required items:
 - Check that the file path is correct
 
 ### "Package name mismatch" error
-- Verify `applicationId` in `build.gradle.kts` is `com.lumio.app`
+- Verify `applicationId` in `build.gradle.kts` is `io.lumio.app`
 - Check Firebase `google-services.json` matches the package name
 
 ### "Keystore password incorrect"

@@ -9,15 +9,119 @@
       "client_info": {
         "mobilesdk_app_id": "1:74766630364:android:a7b71ae25afe3c8ae46319",
         "android_client_info": {
+          "package_name": "com.example.lumio"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "74766630364-66g5f2s1urq980kv36f9gn3rah1n1q0p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lumio",
+            "certificate_hash": "74d3c68506a7a6ce8fd523c0ca20e4c67f89282f"
+          }
+        },
+        {
+          "client_id": "74766630364-j7deg4im7nt85bsndf1ctm726lp5sh0i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lumio",
+            "certificate_hash": "a1915ee40a1f56d5ab1e508db3a5d0fd51f18491"
+          }
+        },
+        {
+          "client_id": "74766630364-rbmhfik0bvicbcrb1fjc58jdhok83ptj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvVp2ueO7KrhYSNtpcgcZnyfaLtqXuMoo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "74766630364-rbmhfik0bvicbcrb1fjc58jdhok83ptj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "74766630364-u7ssstd42l21k91pvphebptvp47fr4k8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.lumio"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:74766630364:android:ddbf411d9ddd0659e46319",
+        "android_client_info": {
           "package_name": "com.lumio.app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "74766630364-j7deg4im7nt85bsndf1ctm726lp5sh0i.apps.googleusercontent.com",
+          "client_id": "74766630364-1kh6b11oha6k6shbn32c2fsoerff65c1.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.lumio.app",
+            "certificate_hash": "a1915ee40a1f56d5ab1e508db3a5d0fd51f18491"
+          }
+        },
+        {
+          "client_id": "74766630364-rbmhfik0bvicbcrb1fjc58jdhok83ptj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvVp2ueO7KrhYSNtpcgcZnyfaLtqXuMoo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "74766630364-rbmhfik0bvicbcrb1fjc58jdhok83ptj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "74766630364-u7ssstd42l21k91pvphebptvp47fr4k8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.lumio"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:74766630364:android:547c3df8cbe1ec0ee46319",
+        "android_client_info": {
+          "package_name": "io.lumio.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "74766630364-mak8516ulqpo43oop4tp89d40i03cbd2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "io.lumio.app",
+            "certificate_hash": "74d3c68506a7a6ce8fd523c0ca20e4c67f89282f"
+          }
+        },
+        {
+          "client_id": "74766630364-makjr13b8uu7jv92hpjmpdgng1la0ug8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "io.lumio.app",
             "certificate_hash": "a1915ee40a1f56d5ab1e508db3a5d0fd51f18491"
           }
         },

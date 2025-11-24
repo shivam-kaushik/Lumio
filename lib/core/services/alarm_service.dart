@@ -8,7 +8,7 @@ import 'package:timezone/timezone.dart' as tz;
 /// Android: Uses native AlarmManager for exact timing
 /// iOS: Uses flutter_local_notifications (iOS doesn't have exact alarms)
 class AlarmService {
-  static const _channel = MethodChannel('com.lumio.app/alarms');
+  static const _channel = MethodChannel('io.lumio.app/alarms');
   static final FlutterLocalNotificationsPlugin _iosNotifications = 
       FlutterLocalNotificationsPlugin();
 
@@ -119,7 +119,7 @@ class AlarmService {
         debugPrint('🤖 Platform: Android - Using native AlarmManager');
         
         debugPrint('📞 Invoking native method channel:');
-        debugPrint('   Channel: com.lumio.app/alarms');
+        debugPrint('   Channel: io.lumio.app/alarms');
         debugPrint('   Method: scheduleExactAlarm');
         debugPrint('   Arguments:');
         debugPrint('     - id: $id');
