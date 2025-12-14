@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../../data/models/reminder.dart';
+import 'premium_service.dart';
 
 /// GPT-powered Natural Language Understanding service for reminder parsing
 class GptNluService {
@@ -11,8 +12,18 @@ class GptNluService {
   static const String _model = 'gpt-3.5-turbo'; // Fast and cost-effective
 
   /// Parse reminder text using GPT API with structured output
+  /// Returns null if user is not premium (will use fallback parser)
   static Future<ParsedReminderData?> parseReminderText(String text) async {
     try {
+      // Check premium status first
+      final premiumService = PremiumService();
+      final isPremium = await premiumService.isPremium();
+      
+      if (!isPremium) {
+        debugPrint('⚠️ GPT parsing requires premium subscription, using fallback parser');
+        return null; // Return null to indicate fallback should be used
+      }
+
       final apiKey = dotenv.env['OPENAI_API_KEY'];
 
       if (apiKey == null ||
@@ -20,7 +31,7 @@ class GptNluService {
           apiKey == 'your_openai_api_key_here') {
         debugPrint(
             '⚠️ OpenAI API key not configured, falling back to basic parser',);
-        return _fallbackParser(text);
+        return null; // Return null to use fallback parser
       }
 
       final prompt = _buildPrompt(text);

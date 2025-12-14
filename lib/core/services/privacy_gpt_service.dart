@@ -3,20 +3,32 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import '../models/conversation_models.dart';
+import 'premium_service.dart';
 
 /// Privacy-preserving GPT service
 /// Anonymizes data before sending to GPT API
+/// Requires premium subscription for AI-powered features
 class PrivacyGptService {
   static const String _baseUrl = 'https://api.openai.com/v1/chat/completions';
   static const String _model = 'gpt-3.5-turbo'; // Fast and cost-effective
 
   /// Ask clarifying question using GPT with privacy protection
+  /// Returns fallback response if user is not premium
   Future<GptResponse> askClarifyingQuestion({
     required Map<String, dynamic> localExtracted,
     required List<String> missingFields,
     required String conversationContext,
   }) async {
     try {
+      // Check premium status first
+      final premiumService = PremiumService();
+      final isPremium = await premiumService.isPremium();
+      
+      if (!isPremium) {
+        debugPrint('⚠️ GPT clarifying questions require premium subscription');
+        return _fallbackQuestion(missingFields);
+      }
+
       final apiKey = dotenv.env['OPENAI_API_KEY'];
 
       if (apiKey == null ||
@@ -246,12 +258,22 @@ Return JSON:
   }
 
   /// Generate detailed business roadmap with deadline and capacity (Solopreneur Execution Assistant)
+  /// Returns fallback roadmap if user is not premium
   Future<Map<String, dynamic>?> generateDetailedRoadmap(
     String goalDescription, {
     required DateTime targetDeadline,
     required double hoursPerDay,
   }) async {
     try {
+      // Check premium status first
+      final premiumService = PremiumService();
+      final isPremium = await premiumService.isPremium();
+      
+      if (!isPremium) {
+        debugPrint('⚠️ AI roadmap generation requires premium subscription');
+        return _fallbackDetailedRoadmap(goalDescription, targetDeadline, hoursPerDay);
+      }
+
       final apiKey = dotenv.env['OPENAI_API_KEY'];
 
       if (apiKey == null ||
@@ -586,6 +608,7 @@ Return ONLY valid JSON in this format:
   }
 
   /// Generate motivational message for reminder (Solopreneur Execution Assistant)
+  /// Returns fallback message if user is not premium
   Future<String?> generateMotivationalMessage({
     required String goalName,
     required String taskDescription,
@@ -595,6 +618,20 @@ Return ONLY valid JSON in this format:
     String? motivationAnchor,
   }) async {
     try {
+      // Check premium status first
+      final premiumService = PremiumService();
+      final isPremium = await premiumService.isPremium();
+      
+      if (!isPremium) {
+        debugPrint('⚠️ AI motivational messages require premium subscription');
+        return _fallbackMotivationalMessage(
+          goalName: goalName,
+          taskDescription: taskDescription,
+          // skillName deprecated
+          motivationAnchor: motivationAnchor,
+        );
+      }
+
       final apiKey = dotenv.env['OPENAI_API_KEY'];
 
       if (apiKey == null ||

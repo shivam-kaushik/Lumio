@@ -1,13 +1,28 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// Service for managing premium subscription status
 class PremiumService {
   static const String _premiumKey = 'is_premium_user';
   static const String _premiumExpiryKey = 'premium_expiry_date';
+  
+  // Test premium user email - this account will have access to AI features
+  static const String _testPremiumUserEmail = 'premium@lumio.test';
 
   /// Check if user has premium subscription
+  /// Checks both stored premium status and test premium user email
   Future<bool> isPremium() async {
     try {
+      // First, check if current user is the test premium user
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null && currentUser.email != null) {
+        if (currentUser.email!.toLowerCase() == _testPremiumUserEmail.toLowerCase()) {
+          // Test premium user - always has premium access
+          return true;
+        }
+      }
+      
+      // Otherwise, check stored premium status
       final prefs = await SharedPreferences.getInstance();
       final isPremium = prefs.getBool(_premiumKey) ?? false;
       

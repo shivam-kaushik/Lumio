@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/auth_provider.dart' as app_auth;
 import '../theme/app_theme.dart';
 import '../widgets/modern_smart_card.dart';
+import '../../core/services/premium_service.dart';
 import 'settings_screen.dart';
 import 'login_screen.dart';
 
@@ -217,46 +218,64 @@ class AccountScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: AppTheme.spacingSM),
                           
-                          // Account Type Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppTheme.spacingMD,
-                              vertical: AppTheme.spacingXS,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(AppTheme.radiusRound),
-                              border: Border.all(
-                                color: AppTheme.primaryColor.withOpacity(0.3),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  user.providerData.any(
-                                        (info) => info.providerId == 'google.com',
-                                      )
-                                      ? Icons.account_circle_rounded
-                                      : Icons.email_rounded,
-                                  size: 16,
-                                  color: AppTheme.primaryColor,
+                          // Premium Status Badge
+                          FutureBuilder<bool>(
+                            future: PremiumService().isPremium(),
+                            builder: (context, snapshot) {
+                              final isPremium = snapshot.data ?? false;
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppTheme.spacingMD,
+                                  vertical: AppTheme.spacingXS,
                                 ),
-                                const SizedBox(width: AppTheme.spacingXS),
-                                Text(
-                                  user.providerData.any(
-                                        (info) => info.providerId == 'google.com',
-                                      )
-                                      ? 'Google Account'
-                                      : 'Email Account',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.primaryColor,
-                                    fontWeight: FontWeight.w600,
+                                decoration: BoxDecoration(
+                                  color: isPremium
+                                      ? Colors.amber.withOpacity(0.2)
+                                      : AppTheme.primaryColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(AppTheme.radiusRound),
+                                  border: Border.all(
+                                    color: isPremium
+                                        ? Colors.amber.withOpacity(0.5)
+                                        : AppTheme.primaryColor.withOpacity(0.3),
+                                    width: 1,
                                   ),
                                 ),
-                              ],
-                            ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isPremium
+                                          ? Icons.star_rounded
+                                          : (user.providerData.any(
+                                                (info) => info.providerId == 'google.com',
+                                              )
+                                              ? Icons.account_circle_rounded
+                                              : Icons.email_rounded),
+                                      size: 16,
+                                      color: isPremium
+                                          ? Colors.amber
+                                          : AppTheme.primaryColor,
+                                    ),
+                                    const SizedBox(width: AppTheme.spacingXS),
+                                    Text(
+                                      isPremium
+                                          ? 'Premium Member'
+                                          : (user.providerData.any(
+                                                (info) => info.providerId == 'google.com',
+                                              )
+                                              ? 'Google Account'
+                                              : 'Email Account'),
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: isPremium
+                                            ? Colors.amber.shade700
+                                            : AppTheme.primaryColor,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(height: AppTheme.spacingMD),
                         ],

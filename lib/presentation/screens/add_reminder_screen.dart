@@ -71,7 +71,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     });
 
     try {
-      // First try GPT-powered parsing
+      // First try GPT-powered parsing (premium feature)
       final gptParsed = await GptNluService.parseReminderText(text);
 
       if (gptParsed != null) {
