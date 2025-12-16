@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../screens/home_screen.dart';
+import '../screens/hands_free_screen.dart';
 import '../screens/goals_screen.dart';
 import '../screens/subtasks_calendar_screen.dart';
 import '../screens/settings_screen.dart';
@@ -11,6 +12,7 @@ import '../screens/add_reminder_screen.dart';
 import '../screens/goal_planning_screen.dart';
 import '../providers/growth_provider.dart';
 import '../theme/app_theme.dart';
+import '../screens/chat_screen.dart'; // Add this import
 import '../../data/models/goal.dart';
 
 /// Main navigation wrapper with bottom tab bar
@@ -139,6 +141,14 @@ class _MainNavigatorState extends State<MainNavigator>
         onCreateSubtask: () {
           Navigator.pop(context);
           _selectGoalForSubtask(context);
+        },
+        onStartHandsFree: () {
+          Navigator.pop(context);
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const ChatScreen(), // Navigate to ChatScreen
+            ),
+          );
         },
       ),
     );
@@ -503,11 +513,13 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
   final VoidCallback onCreateTask;
   final VoidCallback onCreateGoal;
   final VoidCallback onCreateSubtask;
+  final VoidCallback onStartHandsFree;
 
   const _CreateOptionsBottomSheet({
     required this.onCreateTask,
     required this.onCreateGoal,
     required this.onCreateSubtask,
+    required this.onStartHandsFree,
   });
 
   @override
@@ -577,6 +589,15 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
                 subtitle: 'Add a subtask to an existing goal',
                 color: AppTheme.secondaryColor,
                 onTap: onCreateSubtask,
+              ),
+              const SizedBox(height: AppTheme.spacingSM),
+
+              _CreateOptionTile(
+                icon: Icons.mic_rounded,
+                title: 'Hands-Free Mode',
+                subtitle: 'Voice-guided goal planning',
+                color: Colors.purpleAccent,
+                onTap: onStartHandsFree,
               ),
               
               const SizedBox(height: AppTheme.spacingMD),

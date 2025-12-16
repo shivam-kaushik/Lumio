@@ -18,6 +18,9 @@ class GoalTask {
   final bool isCompleted;
   final DateTime? completedAt;
   final DateTime createdAt;
+  final int order; // Display order index
+  final int indentLevel; // 0 = root, 1 = subtask, etc.
+  final List<GoalTask> subtasks; // Recursive subtasks
 
   GoalTask({
     required this.id,
@@ -36,6 +39,9 @@ class GoalTask {
     this.isCompleted = false,
     this.completedAt,
     required this.createdAt,
+    this.order = 0,
+    this.indentLevel = 0,
+    this.subtasks = const [],
   });
 
   /// Create GoalTask from database map
@@ -45,11 +51,7 @@ class GoalTask {
       goalId: map['goal_id'] as int,
       title: map['title'] as String,
       description: map['description'] as String,
-      estimatedHours: map['estimated_hours'] != null
-          ? (map['estimated_hours'] is double
-              ? map['estimated_hours'] as double
-              : (map['estimated_hours'] as num).toDouble())
-          : null,
+      estimatedHours: (map['estimated_hours'] as num?)?.toDouble(),
       priority: map['priority'] as String? ?? 'medium',
       frequency: map['frequency'] as String? ?? 'one-time',
       suggestedTime: map['suggested_time'] as String? ?? 'any',
@@ -57,14 +59,20 @@ class GoalTask {
       isMilestone: (map['is_milestone'] as int? ?? 0) == 1,
       motivationAnchor: map['motivation_anchor'] as String?,
       scheduledDate: map['scheduled_date'] != null
-          ? DateTime.parse(map['scheduled_date'] as String)
+          ? DateTime.tryParse(map['scheduled_date'] as String)
           : null,
       phaseId: map['phase_id'] as int?,
       isCompleted: (map['is_completed'] as int? ?? 0) == 1,
       completedAt: map['completed_at'] != null
-          ? DateTime.parse(map['completed_at'] as String)
+          ? DateTime.tryParse(map['completed_at'] as String)
           : null,
       createdAt: DateTime.parse(map['created_at'] as String),
+      order: map['order_index'] as int? ?? 0,
+      indentLevel: map['indent_level'] as int? ?? 0,
+      subtasks: (map['subtasks'] as List<dynamic>?)
+              ?.map((x) => GoalTask.fromMap(Map<String, dynamic>.from(x as Map)))
+              .toList() ??
+          [],
     );
   }
 
@@ -87,6 +95,9 @@ class GoalTask {
       'is_completed': isCompleted ? 1 : 0,
       'completed_at': completedAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
+      'order_index': order,
+      'indent_level': indentLevel,
+      'subtasks': subtasks.map((x) => x.toMap()).toList(),
     };
   }
 
@@ -107,6 +118,9 @@ class GoalTask {
       'phase_id': phaseId,
       'is_completed': 0,
       'created_at': DateTime.now().toIso8601String(),
+      'order_index': order,
+      'indent_level': indentLevel,
+      'subtasks': subtasks.map((x) => x.toInsertMap()).toList(),
     };
   }
 
@@ -128,6 +142,9 @@ class GoalTask {
     bool? isCompleted,
     DateTime? completedAt,
     DateTime? createdAt,
+    int? order,
+    int? indentLevel,
+    List<GoalTask>? subtasks,
   }) {
     return GoalTask(
       id: id ?? this.id,
@@ -146,47 +163,77 @@ class GoalTask {
       isCompleted: isCompleted ?? this.isCompleted,
       completedAt: completedAt ?? this.completedAt,
       createdAt: createdAt ?? this.createdAt,
+      order: order ?? this.order,
+      indentLevel: indentLevel ?? this.indentLevel,
+      subtasks: subtasks ?? this.subtasks,
     );
   }
 
   /// Create GoalTask from Firestore document
   factory GoalTask.fromFirestore(DocumentSnapshot doc) {
+    // If constructed from a Map inside a document
+    // We need to handle both DocumentSnapshot and Map<String,dynamic> cases
+    // But this factory expects DocumentSnapshot.
+    // Let's create a helper for Map parsing for subtasks.
     final data = doc.data() as Map<String, dynamic>;
-    return GoalTask(
-      id: int.parse(doc.id),
-      goalId: int.parse(data['goalId'] as String),
-      title: data['title'] as String,
-      description: data['description'] as String,
-      estimatedHours: (data['estimatedHours'] as num?)?.toDouble(),
+    return _fromFirestoreMap(data, id: int.tryParse(doc.id));
+  }
+
+  static GoalTask _fromFirestoreMap(Map<String, dynamic> data, {int? id}) {
+     // Safe parsing for subtasks
+     List<GoalTask> parsedSubtasks = [];
+     if (data['subtasks'] != null && data['subtasks'] is List) {
+       for (var item in data['subtasks']) {
+         if (item is Map) {
+           try {
+             parsedSubtasks.add(_fromFirestoreMap(Map<String, dynamic>.from(item)));
+           } catch (e) {
+             // Skip malformed subtasks but don't crash the whole load
+             print("Error parsing subtask: $e");
+           }
+         }
+       }
+     }
+
+     return GoalTask(
+      id: id ?? (int.tryParse(data['id'].toString()) ?? DateTime.now().millisecondsSinceEpoch), // Robust ID parsing
+      goalId: int.tryParse(data['goalId'].toString()) ?? int.tryParse(data['goal_id'].toString()) ?? 0,
+      title: data['title'] as String? ?? 'Untitled',
+      description: data['description'] as String? ?? '',
+      estimatedHours: (data['estimatedHours'] as num?)?.toDouble() ?? (data['estimated_hours'] as num?)?.toDouble(),
       priority: data['priority'] as String? ?? 'medium',
       frequency: data['frequency'] as String? ?? 'one-time',
       suggestedTime: data['suggestedTime'] as String? ?? 'any',
       suggestedLocation: data['suggestedLocation'] as String? ?? 'any',
-      isMilestone: data['isMilestone'] as bool? ?? false,
-      motivationAnchor: data['motivationAnchor'] as String?,
+      isMilestone: (data['isMilestone'] ?? data['is_milestone']) == true || (data['isMilestone'] ?? data['is_milestone']) == 1,
+      motivationAnchor: data['motivationAnchor'] as String? ?? data['motivation_anchor'] as String?,
       scheduledDate: data['scheduledDate'] != null
           ? (data['scheduledDate'] is Timestamp
               ? (data['scheduledDate'] as Timestamp).toDate()
-              : DateTime.parse(data['scheduledDate'] as String))
+              : DateTime.tryParse(data['scheduledDate'].toString()))
           : null,
-      phaseId: data['phaseId'] != null ? int.parse(data['phaseId'] as String) : null,
-      isCompleted: data['isCompleted'] as bool? ?? false,
+      phaseId: data['phaseId'] != null ? int.tryParse(data['phaseId'].toString()) : null,
+      isCompleted: (data['isCompleted'] ?? data['is_completed']) == true || (data['isCompleted'] ?? data['is_completed']) == 1,
       completedAt: data['completedAt'] != null
           ? (data['completedAt'] is Timestamp
               ? (data['completedAt'] as Timestamp).toDate()
-              : DateTime.parse(data['completedAt'] as String))
+              : DateTime.tryParse(data['completedAt'].toString()))
           : null,
       createdAt: data['createdAt'] != null
           ? (data['createdAt'] is Timestamp
               ? (data['createdAt'] as Timestamp).toDate()
-              : DateTime.parse(data['createdAt'] as String))
+              : DateTime.tryParse(data['createdAt'].toString())) ?? DateTime.now()
           : DateTime.now(),
+      order: (data['order'] as num?)?.toInt() ?? (data['order_index'] as num?)?.toInt() ?? 0,
+      indentLevel: (data['indentLevel'] as num?)?.toInt() ?? (data['indent_level'] as num?)?.toInt() ?? 0,
+      subtasks: parsedSubtasks,
     );
   }
 
   /// Convert GoalTask to Firestore document
-  Map<String, dynamic> toFirestore() {
+  Map<String, dynamic> toFirestore({bool allowServerTimestamp = true}) {
     return {
+      'id': id, // Save ID in the map too for subtasks
       'goalId': goalId.toString(),
       'title': title,
       'description': description,
@@ -202,8 +249,12 @@ class GoalTask {
       'isCompleted': isCompleted,
       'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
       'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': FieldValue.serverTimestamp(),
+      // Only use serverTimestamp for top-level documents
+      'updatedAt': allowServerTimestamp ? FieldValue.serverTimestamp() : Timestamp.now(),
+      'order': order,
+      'indentLevel': indentLevel,
+      // Pass false to subtasks recursively
+      'subtasks': subtasks.map((x) => x.toFirestore(allowServerTimestamp: false)).toList(),
     };
   }
 }
-

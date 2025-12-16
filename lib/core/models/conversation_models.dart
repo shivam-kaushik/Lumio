@@ -37,3 +37,16 @@ class GptResponse {
     this.extractedData,
   });
 }
+
+/// Response for session-based conversation
+class ConversationResponse {
+  final String responseText;
+  final bool isAction;
+  final Map<String, dynamic>? actionData;
+
+  ConversationResponse({
+    required this.responseText,
+    required this.isAction,
+    this.actionData,
+  });
+}

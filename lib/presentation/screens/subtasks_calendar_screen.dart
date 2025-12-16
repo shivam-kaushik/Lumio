@@ -381,31 +381,46 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
             children: [
               Row(
                 children: [
-                  // Checkbox/Icon
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: task.isCompleted
-                            ? AppTheme.successColor
-                            : (isDark ? AppTheme.darkBorder : AppTheme.borderColor),
-                        width: 2,
-                      ),
-                      color: task.isCompleted
-                          ? AppTheme.successColor
-                          : Colors.transparent,
+                  // Complete button (Moved to Left)
+                  IconButton(
+                    icon: Icon(
+                      task.isCompleted
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      color: task.isCompleted 
+                          ? AppTheme.successColor 
+                          : (isDark 
+                              ? AppTheme.darkTextSecondary 
+                              : AppTheme.textSecondary),
                     ),
-                    child: task.isCompleted
-                        ? const Icon(
-                            Icons.check_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          )
-                        : null,
+                    onPressed: () async {
+                      if (task.isCompleted) {
+                        // Uncomplete the task
+                        await growthProvider.uncompleteTask(task.id);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Task unmarked'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      } else {
+                        // Complete the task
+                        final message = await growthProvider.completeTask(task.id);
+                        if (mounted && message != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(message),
+                              backgroundColor: Colors.green,
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+                        }
+                      }
+                    },
                   ),
-                  const SizedBox(width: AppTheme.spacingMD),
+                  const SizedBox(width: AppTheme.spacingSM),
                   // Title and content
                   Expanded(
                     child: Column(
@@ -454,45 +469,6 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
                         ],
                       ],
                     ),
-                  ),
-                  // Complete button
-                  IconButton(
-                    icon: Icon(
-                      task.isCompleted
-                          ? Icons.check_circle_rounded
-                          : Icons.radio_button_unchecked_rounded,
-                      color: task.isCompleted 
-                          ? AppTheme.successColor 
-                          : (isDark 
-                              ? AppTheme.darkTextSecondary 
-                              : AppTheme.textSecondary),
-                    ),
-                    onPressed: () async {
-                      if (task.isCompleted) {
-                        // Uncomplete the task
-                        await growthProvider.uncompleteTask(task.id);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Task unmarked'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                        }
-                      } else {
-                        // Complete the task
-                        final message = await growthProvider.completeTask(task.id);
-                        if (mounted && message != null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(message),
-                              backgroundColor: Colors.green,
-                              duration: const Duration(seconds: 4),
-                            ),
-                          );
-                        }
-                      }
-                    },
                   ),
                 ],
               ),

@@ -11,10 +11,11 @@ import '../widgets/animated_progress_bar.dart';
 import '../widgets/3d_card.dart';
 import '../../core/services/permission_service.dart';
 import '../../core/services/premium_service.dart';
-import 'goal_details_screen.dart';
-import 'goal_planning_screen.dart';
+import '../../core/services/premium_service.dart';
+import 'unified_goal_editor_screen.dart'; // Unified Editor
 import 'roadmap_management_screen.dart';
 import '../../data/models/goal.dart';
+import '../../data/models/goal_task.dart'; // Import GoalTask
 import '../../core/services/privacy_gpt_service.dart';
 import '../../data/models/subtask.dart' show Task;
 
@@ -260,14 +261,20 @@ class _GoalsScreenState extends State<GoalsScreen> {
       );
       
       if (mounted) {
-        // Navigate to planning screen with empty tasks
+        // Navigate to Unified Editor
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => GoalPlanningScreen(
-              goalId: goalId,
-              goalName: goalName,
-              initialTasks: [], // Empty tasks for manual creation
-              timeline: timeline,
+            builder: (context) => UnifiedGoalEditorScreen(
+              isNew: false, // Created but now editing/filling
+              existingGoal: Goal(
+                  id: goalId, 
+                  name: goalName, 
+                  createdAt: DateTime.now(), 
+                  targetDeadline: deadline, 
+                  hoursPerDay: hoursPerDay,
+                  totalEstimatedHours: 0
+              ),
+              initialTasks: [],
             ),
           ),
         );
@@ -325,16 +332,36 @@ class _GoalsScreenState extends State<GoalsScreen> {
             totalEstimatedHours: roadmap['totalEstimatedHours'] as int?,
           );
           
-          // Navigate to planning screen with roadmap data
+          // Navigate to Unified Editor with AI results
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => GoalPlanningScreen(
-                goalId: goalId,
-                goalName: goalName,
-                initialTasks: (roadmap['tasks'] as List)
-                    .map((s) => Task.fromMap(s as Map<String, dynamic>))
-                    .toList(),
-                timeline: timeline,
+              builder: (context) => UnifiedGoalEditorScreen(
+                isNew: false, 
+                existingGoal: Goal(
+                  id: goalId,
+                  name: goalName,
+                  createdAt: DateTime.now(),
+                  targetDeadline: deadline,
+                  hoursPerDay: hoursPerDay,
+                  totalEstimatedHours: roadmap['totalEstimatedHours'] as int?,
+                ),
+                initialTasks: (roadmap['tasks'] as List).map<GoalTask>((s) {
+                  final t = Task.fromMap(s as Map<String, dynamic>);
+                  return GoalTask(
+                    id: 0, // Temporary ID for new tasks
+                    goalId: goalId,
+                    title: t.title,
+                    description: t.description,
+                    estimatedHours: t.estimatedHours,
+                    priority: t.priority,
+                    frequency: t.frequency, 
+                    suggestedTime: t.suggestedTime,
+                    suggestedLocation: t.suggestedLocation,
+                    isMilestone: t.isMilestone,
+                    motivationAnchor: t.motivationAnchor,
+                    createdAt: DateTime.now(),
+                  );
+                }).toList(),
               ),
             ),
           );
@@ -538,7 +565,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
             expandedHeight: 120,
             floating: false,
             pinned: true,
-            backgroundColor: Colors.transparent,
+            backgroundColor: isDark ? Colors.black : AppTheme.backgroundColor,
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
               title: const Text(
@@ -604,12 +631,24 @@ class _GoalsScreenState extends State<GoalsScreen> {
                     (context, index) {
                       final goal = goals[index];
                       final tasks = growthProvider.getTasksForGoal(goal.id);
-                      final completedTasks = tasks.where((t) => t.isCompleted).length;
+                      
+                      int totalTasks = 0;
+                      int completedCount = 0;
+                      
+                      void countRecursive(List<GoalTask> list) {
+                          for (var t in list) {
+                              totalTasks++;
+                              if (t.isCompleted) completedCount++;
+                              if (t.subtasks.isNotEmpty) countRecursive(t.subtasks);
+                          }
+                      }
+                      countRecursive(tasks);
+
                       return _buildGoalCard(
                         context,
                         goal,
-                        tasks.length,
-                        completedTasks,
+                        totalTasks,
+                        completedCount,
                         index,
                       );
                     },
@@ -727,7 +766,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => GoalDetailsScreen(goalId: goal.id),
+          builder: (context) => UnifiedGoalEditorScreen(
+            isNew: false,
+            existingGoal: goal,
+            initialTasks: context.read<GrowthProvider>().getTasksForGoal(goal.id),
+          ),
           ),
         );
       },
@@ -784,7 +827,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: AppTheme.spacingXS),
-                        Row(
+                        Wrap(
+                          spacing: AppTheme.spacingSM,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             // Status Badge
                             Container(
@@ -809,8 +855,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                 ),
                               ),
                             ),
-                            if (daysRemaining.isNotEmpty) ...[
-                              const SizedBox(width: AppTheme.spacingSM),
+                            if (daysRemaining.isNotEmpty)
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: AppTheme.spacingSM,
@@ -852,13 +897,62 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                   ],
                                 ),
                               ),
-                            ],
                           ],
                         ),
                       ],
                     ),
                   ),
                   
+                  
+                  // Delete Button
+                  IconButton(
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      color: AppTheme.errorColor.withOpacity(0.7),
+                      size: 24,
+                    ),
+                    onPressed: () async {
+                      // Prevent card tap
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Goal?'),
+                          content: Text('Are you sure you want to delete "${goal.name}"? This action cannot be undone.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.errorColor,
+                              ),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true && context.mounted) {
+                        try {
+                          await context.read<GrowthProvider>().deleteGoal(goal.id);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Goal deleted')),
+                            );
+                          }
+                        } catch (e) {
+                           if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error deleting goal: $e')),
+                            );
+                          }
+                        }
+                      }
+                    },
+                  ),
+
                   // Chevron Icon
                   Icon(
                     Icons.chevron_right_rounded,

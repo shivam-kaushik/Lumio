@@ -133,6 +133,18 @@ class GrowthProvider with ChangeNotifier {
     }
   }
 
+  /// Replace all tasks for a goal
+  Future<void> replaceTasksForGoal(int goalId, List<GoalTask> rootTasks) async {
+    try {
+      await _repository.replaceTasksForGoal(goalId, rootTasks);
+      await loadGrowthData();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   /// Delete a task
   Future<void> deleteTask(int taskId) async {
     try {

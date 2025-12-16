@@ -770,4 +770,251 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
       field: nextField,
     );
   }
+  /// Continue a conversation (Session-based) for Hands-Free mode
+  Future<ConversationResponse?> continueConversation(List<Map<String, String>> history) async {
+    try {
+      // Check premium status
+      final premiumService = PremiumService();
+      final isPremium = await premiumService.isPremium();
+      
+      if (!isPremium) {
+        // Simple fallback logic for non-premium
+        return _fallbackConversationLogic(history);
+      }
+
+      final apiKey = dotenv.env['OPENAI_API_KEY'];
+      if (apiKey == null || apiKey.isEmpty) {
+        return _fallbackConversationLogic(history);
+      }
+
+      // Convert history to OpenAI format
+      final messages = [
+        {
+          'role': 'system',
+          'content': _buildConversationalSystemPrompt(),
+        },
+        ...history.map((m) => {
+          'role': m['role'] == 'user' ? 'user' : 'assistant', 
+          'content': m['content'],
+        }),
+      ];
+
+      // STRONG STEER: Check if last message is a "stop" phrase
+      if (history.isNotEmpty && history.last['role'] == 'user') {
+        final lastMsg = history.last['content']!.toLowerCase().trim();
+        final stopPhrases = ['no', 'nope', 'nothing else', 'that\'s it', 'done', 'nothing', 'stop', 'finished', 'no more'];
+        final isStop = stopPhrases.any((phrase) => lastMsg.contains(phrase));
+        
+        if (isStop) {
+           debugPrint('🛑 User signaled stop. Forcing plan generation.');
+           messages.add({
+             'role': 'system',
+             'content': 'USER INSTRUCTION: I am done providing information. STOP asking questions. GENERATE the valid JSON Action Plan NOW. Use rational defaults (deadline: 30 days, effort: 2 hours/day) for missing fields.',
+           });
+        }
+      }
+
+      debugPrint('🚀 Sending request to GPT...');
+      
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer \$apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': messages,
+          'temperature': 0.7,
+          'max_tokens': 1000, 
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['choices'][0]['message']['content'] as String;
+        debugPrint('📥 GPT Raw Response: $content');
+        return _parseGptResponse(content);
+      } else {
+        debugPrint('❌ GPT Error: ${response.statusCode} ${response.body}');
+        return _fallbackConversationLogic(history);
+      }
+    } catch (e) {
+      debugPrint('GPT Conversation Error: \$e');
+      return _fallbackConversationLogic(history);
+    }
+  }
+
+  String _buildConversationalSystemPrompt() {
+    return '''
+You are Lumio, a hands-free execution assistant. Your goal is to help the user define a clear goal and create a plan.
+
+STATE MACHINE:
+1. GATHER_INFO: Ask questions to clarify the user's goal.
+2. CREATE_PLAN: Once you have enough info (What, When, How much effort) OR IF THE USER SAYS THEY ARE DONE, generate a plan.
+
+REQUIRED INFO:
+- Goal Description (What)
+- Deadline (When)
+- Effort/Capacity (e.g., hours per week)
+
+CRITICAL INSTRUCTION:
+If the user says "that's it", "nothing else", "I'm done", or similar, YOU MUST PROCEED TO CREATE_PLAN immediately, even if some info is missing (use defaults: 30 days, 2 hours/day).
+
+OUTPUT FORMAT:
+Return JSON ONLY.
+
+If you need more info (and user hasn't said they are done):
+{
+  "type": "question",
+  "text": "Your question here?"
 }
+
+If you have enough info to create a plan OR user is done:
+{
+  "type": "action",
+  "text": "Great! I've created your roadmap to [Goal Name]. It starts with [First Task].",
+  "action_data": {
+     "goal": "...",
+     "deadline": "...",
+     "tasks": [
+        {"title": "Task 1", "description": "...", "estimatedHours": 1.0, "priority": "high"},
+        {"title": "Task 2", "description": "...", "estimatedHours": 2.0, "priority": "medium"}
+     ]
+  }
+}
+
+Keep questions SHORT and conversational (spoken by TTS).
+''';
+  }
+
+  ConversationResponse _parseGptResponse(String content) {
+    try {
+      String jsonStr = content.trim();
+      if (jsonStr.contains('```json')) {
+        jsonStr = jsonStr.split('```json')[1].split('```')[0].trim();
+      } else if (jsonStr.contains('```')) {
+         jsonStr = jsonStr.split('```')[1].split('```')[0].trim();
+      }
+
+      final data = jsonDecode(jsonStr);
+      return ConversationResponse(
+        responseText: data['text'],
+        isAction: data['type'] == 'action',
+        actionData: data['action_data'],
+      );
+    } catch (e) {
+      // If parsing fails, treat entire content as a question
+      return ConversationResponse(
+        responseText: content,
+        isAction: false,
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> breakDownTask(String taskTitle) async {
+    final apiKey = dotenv.env['OPENAI_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      // Fallback
+      return [
+        {'title': 'Step 1 for $taskTitle', 'description': 'First sub-step'},
+        {'title': 'Step 2 for $taskTitle', 'description': 'Second sub-step'},
+      ];
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': [
+            {
+              'role': 'system',
+              'content': 'You are a task decomposition expert. Break down the user\'s task into 3-5 actionable subtasks. Return JSON: {"subtasks": [{"title": "...", "description": "..."}]}'
+            },
+            {
+              'role': 'user',
+              'content': 'Break down this task: "$taskTitle"'
+            }
+          ],
+          'temperature': 0.7,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final content = jsonDecode(response.body)['choices'][0]['message']['content'];
+        String jsonStr = content.trim();
+        if (jsonStr.contains('```json')) {
+             jsonStr = jsonStr.split('```json')[1].split('```')[0].trim();
+        } else if (jsonStr.contains('```')) {
+             jsonStr = jsonStr.split('```')[1].split('```')[0].trim();
+        }
+        final data = jsonDecode(jsonStr);
+        return List<Map<String, dynamic>>.from(data['subtasks']);
+      }
+    } catch (e) {
+      debugPrint("GPT Subtask Error: $e");
+    }
+    
+    // Fallback if error
+    return [
+       {'title': 'Research $taskTitle', 'description': 'Look into details'},
+       {'title': 'Plan $taskTitle', 'description': 'Outline steps'},
+    ];
+  }
+
+  ConversationResponse _fallbackConversationLogic(List<Map<String, String>> history) {
+    String lastUserMsg = '';
+    if (history.isNotEmpty && history.last['role'] == 'user') {
+      lastUserMsg = history.last['content']?.toLowerCase().trim() ?? '';
+    }
+    
+    // Check for stop signals in fallback mode too
+    final stopPhrases = ['no', 'nope', 'nothing else', 'that\'s it', 'done', 'nothing', 'stop', 'finished', 'no more'];
+    final isStop = stopPhrases.any((phrase) => lastUserMsg.contains(phrase));
+
+    if (isStop) {
+       // Try to find the goal in history (usually the first user message)
+       String goalName = "New Goal";
+       if (history.isNotEmpty) {
+           final firstUserMsg = history.firstWhere((m) => m['role'] == 'user', orElse: () => {'content': 'New Goal'});
+           goalName = firstUserMsg['content'] ?? "New Goal";
+           // Truncate if too long for a title
+           if (goalName.length > 50) {
+               goalName = goalName.substring(0, 47) + "...";
+           }
+       }
+
+       return ConversationResponse(
+        responseText: "Understood. Creating your plan now.",
+        isAction: true,
+        actionData: {
+          'goal': goalName,
+          'deadline': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+          'tasks': [
+             {'title': 'Review Goal', 'description': 'Review and clear up the details of this goal', 'priority': 'high'},
+             {'title': 'First Step', 'description': 'Identify the immediate next step', 'priority': 'medium'},
+          ]
+        },
+      );
+    }
+    
+    // Very basic heuristic
+    if (history.length < 2) {
+      return ConversationResponse(
+        responseText: "Got it. And when do you want to finish this by?",
+        isAction: false,
+      );
+    } else {
+      return ConversationResponse(
+        responseText: "Okay, I've noted that down. Anything else?",
+        isAction: false,
+      );
+    }
+  }
+}
+

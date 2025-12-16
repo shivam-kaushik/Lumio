@@ -177,60 +177,45 @@ class FirestoreGrowthRepository {
     return int.parse(taskId);
   }
 
+  // ==================== Tasks (Recursive) ====================
+
+  /// Replace all tasks for a goal with a new list of root tasks (which contain subtasks)
+  Future<void> replaceTasksForGoal(int goalId, List<GoalTask> rootTasks) async {
+    final collection = _firestoreService.getTasksCollection(goalId.toString());
+    if (collection == null) throw Exception('User not authenticated');
+
+    final batch = _firestoreService.batch();
+
+    // 1. Delete ALL existing tasks for this goal to avoid orphans
+    // Note: In a real app with many tasks, we might want to do this smarter (diffing),
+    // but for < 100 tasks, deleting and rewriting is safe and ensures consistency with the new "nested" structure.
+    final existingParams = await collection.get();
+    for (final doc in existingParams.docs) {
+      batch.delete(doc.reference);
+    }
+
+    // 2. Write new root tasks
+    for (final task in rootTasks) {
+       final docRef = collection.doc(task.id.toString());
+       batch.set(docRef, task.toFirestore());
+    }
+
+    await batch.commit();
+  }
+
   /// Get all tasks for a goal
   Future<List<GoalTask>> getTasksForGoal(int goalId) async {
     final collection = _firestoreService.getTasksCollection(goalId.toString());
     if (collection == null) return [];
 
+    // Fetch root tasks (we assume all documents in the collection are roots now)
+    // Subtasks are stored INSIDE these documents.
     final snapshot = await collection
-        .orderBy('scheduledDate', descending: false)
+        .orderBy('order', descending: false)
         .orderBy('createdAt', descending: false)
         .get();
 
-    return snapshot.docs.map((doc) {
-      try {
-        final taskId = int.parse(doc.id);
-        final task = GoalTask.fromFirestore(doc);
-        return GoalTask(
-          id: taskId,
-          goalId: task.goalId,
-          title: task.title,
-          description: task.description,
-          estimatedHours: task.estimatedHours,
-          priority: task.priority,
-          frequency: task.frequency,
-          suggestedTime: task.suggestedTime,
-          suggestedLocation: task.suggestedLocation,
-          isMilestone: task.isMilestone,
-          motivationAnchor: task.motivationAnchor,
-          scheduledDate: task.scheduledDate,
-          phaseId: task.phaseId,
-          isCompleted: task.isCompleted,
-          completedAt: task.completedAt,
-          createdAt: task.createdAt,
-        );
-      } catch (e) {
-        final task = GoalTask.fromFirestore(doc);
-        return GoalTask(
-          id: doc.id.hashCode,
-          goalId: task.goalId,
-          title: task.title,
-          description: task.description,
-          estimatedHours: task.estimatedHours,
-          priority: task.priority,
-          frequency: task.frequency,
-          suggestedTime: task.suggestedTime,
-          suggestedLocation: task.suggestedLocation,
-          isMilestone: task.isMilestone,
-          motivationAnchor: task.motivationAnchor,
-          scheduledDate: task.scheduledDate,
-          phaseId: task.phaseId,
-          isCompleted: task.isCompleted,
-          completedAt: task.completedAt,
-          createdAt: task.createdAt,
-        );
-      }
-    }).toList();
+    return snapshot.docs.map((doc) => GoalTask.fromFirestore(doc)).toList();
   }
 
   /// Get task by ID
