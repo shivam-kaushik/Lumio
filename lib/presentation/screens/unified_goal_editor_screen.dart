@@ -542,10 +542,22 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
            // Break down the main goal
            final subtasks = await service.breakDownTask("Goal: ${_titleController.text}");
 
+           // Calculate dates
+           final now = DateTime.now();
+           final goalDeadline = widget.existingGoal?.targetDeadline ?? now.add(const Duration(days: 30));
+           final totalDays = goalDeadline.difference(now).inDays;
+           final daysPerTask = (totalDays / (subtasks.isEmpty ? 1 : subtasks.length)).floor(); // Simple distribution
+
            setState(() {
                // Append new tasks to the end
-               for (var s in subtasks) {
+               for (var i = 0; i < subtasks.length; i++) {
+                   final s = subtasks[i];
                    final cleanMetadata = Map<String, dynamic>.from(s)..remove('id'); // Remove potential AI fake IDs
+                   
+                   // Assign date
+                   final taskDeadline = now.add(Duration(days: (i + 1) * daysPerTask));
+                   cleanMetadata['scheduledDate'] = taskDeadline.toIso8601String();
+
                    _blocks.add(PlanBlock.task(
                        s['title'] ?? 'Task', 
                        indentationLevel: 0, // Top level
@@ -581,12 +593,40 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
            // Use the new method name 'breakDownTask'
            final subtasks = await service.breakDownTask(parentBlock.content);
 
+           // Determine Parent Date Context
+           final now = DateTime.now();
+           DateTime parentDeadline = now.add(const Duration(days: 30)); // Default fallback
+           if (parentBlock.metadata != null && parentBlock.metadata!['scheduledDate'] != null) {
+                try {
+                    parentDeadline = DateTime.parse(parentBlock.metadata!['scheduledDate']);
+                } catch (_) {}
+           } else if (widget.existingGoal?.targetDeadline != null) {
+                // If parent has no date, upper bound is goal deadline
+                parentDeadline = widget.existingGoal!.targetDeadline!;
+           }
+
+           final totalDays = parentDeadline.difference(now).inDays;
+           // Ensure at least 1 day per subtask if possible, or distribute tight
+           final daysAvailable = totalDays > 0 ? totalDays : 1;
+           final double daysPerSubtask = daysAvailable / (subtasks.isEmpty ? 1 : subtasks.length);
+
            setState(() {
                int currentLevel = parentBlock.indentationLevel + 1;
                // Insert subtasks
                for (var i = 0; i < subtasks.length; i++) {
                    final s = subtasks[i];
                    final cleanMetadata = Map<String, dynamic>.from(s)..remove('id'); // Remove potential AI fake IDs
+                   
+                   // Calculate Subtask Deadline
+                   // It should be strictly BEFORE or ON the parent deadline
+                   // We spread them out leading up to it
+                   final offsetDays = ((i + 1) * daysPerSubtask).floor();
+                   final subtaskDeadline = now.add(Duration(days: offsetDays));
+                   
+                   // Safety clamp: Ensure it doesn't exceed parent deadline
+                   final finalDate = subtaskDeadline.isAfter(parentDeadline) ? parentDeadline : subtaskDeadline;
+                   cleanMetadata['scheduledDate'] = finalDate.toIso8601String();
+
                    _blocks.insert(index + 1 + i, PlanBlock.task(
                        s['title'] ?? 'Subtask', 
                        indentationLevel: currentLevel,

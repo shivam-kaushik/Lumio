@@ -345,23 +345,37 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   hoursPerDay: hoursPerDay,
                   totalEstimatedHours: roadmap['totalEstimatedHours'] as int?,
                 ),
-                initialTasks: (roadmap['tasks'] as List).map<GoalTask>((s) {
-                  final t = Task.fromMap(s as Map<String, dynamic>);
-                  return GoalTask(
-                    id: 0, // Temporary ID for new tasks
-                    goalId: goalId,
-                    title: t.title,
-                    description: t.description,
-                    estimatedHours: t.estimatedHours,
-                    priority: t.priority,
-                    frequency: t.frequency, 
-                    suggestedTime: t.suggestedTime,
-                    suggestedLocation: t.suggestedLocation,
-                    isMilestone: t.isMilestone,
-                    motivationAnchor: t.motivationAnchor,
-                    createdAt: DateTime.now(),
-                  );
-                }).toList(),
+                initialTasks: () {
+                    final rawTasks = roadmap['tasks'] as List;
+                    final totalDays = deadline.difference(DateTime.now()).inDays;
+                    final daysPerTask = (totalDays / (rawTasks.isEmpty ? 1 : rawTasks.length)).floor();
+                    final now = DateTime.now();
+
+                    return rawTasks.asMap().entries.map<GoalTask>((entry) {
+                      final i = entry.key;
+                      final s = entry.value as Map<String, dynamic>;
+                      final t = Task.fromMap(s);
+                      
+                      // Calculate distributed date
+                      final taskDeadline = now.add(Duration(days: (i + 1) * daysPerTask));
+
+                      return GoalTask(
+                        id: 0, // Temporary ID for new tasks
+                        goalId: goalId,
+                        title: t.title,
+                        description: t.description,
+                        estimatedHours: t.estimatedHours,
+                        priority: t.priority,
+                        frequency: t.frequency, 
+                        suggestedTime: t.suggestedTime,
+                        suggestedLocation: t.suggestedLocation,
+                        isMilestone: t.isMilestone,
+                        motivationAnchor: t.motivationAnchor,
+                        scheduledDate: taskDeadline, // Assign calculated date
+                        createdAt: DateTime.now(),
+                      );
+                    }).toList();
+                }(),
               ),
             ),
           );
