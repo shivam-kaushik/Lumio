@@ -3,16 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../screens/home_screen.dart';
-import '../screens/hands_free_screen.dart';
 import '../screens/goals_screen.dart';
 import '../screens/subtasks_calendar_screen.dart';
-import '../screens/settings_screen.dart';
 import '../screens/account_screen.dart';
 import '../screens/add_reminder_screen.dart';
 import '../screens/goal_planning_screen.dart';
 import '../providers/growth_provider.dart';
 import '../theme/app_theme.dart';
-import '../screens/chat_screen.dart'; // Add this import
+import '../screens/chat_screen.dart';
+import '../screens/day_planner_screen.dart'; // Added
 import '../../data/models/goal.dart';
 
 /// Main navigation wrapper with bottom tab bar
@@ -31,15 +30,7 @@ class _MainNavigatorState extends State<MainNavigator>
   late final List<GlobalKey<NavigatorState>> _navigatorKeys;
   late final List<AnimationController> _fadeControllers;
 
-  // Tab pages (MVP: Simplified navigation)
-  final List<Widget> _pages = [
-    const HomeScreen(), // Tasks list
-    const GoalsScreen(), // Goals
-    const SubtasksCalendarScreen(), // Calendar (showing subtasks)
-    const AccountScreen(), // Account
-  ];
-
-  // Tab configurations (MVP: Simplified)
+  // Tab configurations
   final List<NavigationTab> _tabs = [
     NavigationTab(
       icon: Icons.list_outlined,
@@ -65,6 +56,14 @@ class _MainNavigatorState extends State<MainNavigator>
       label: 'Account',
       badge: null,
     ),
+  ];
+
+  // Tab pages
+  final List<Widget> _pages = [
+    const HomeScreen(), // Tasks list
+    const GoalsScreen(), // Goals
+    const SubtasksCalendarScreen(), // Calendar (showing subtasks)
+    const AccountScreen(), // Account
   ];
 
   @override
@@ -138,9 +137,13 @@ class _MainNavigatorState extends State<MainNavigator>
           Navigator.pop(context);
           _createGoal(context);
         },
-        onCreateSubtask: () {
+        onPlanDay: () {
           Navigator.pop(context);
-          _selectGoalForSubtask(context);
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const DayPlannerScreen(),
+            ),
+          );
         },
         onStartHandsFree: () {
           Navigator.pop(context);
@@ -162,82 +165,6 @@ class _MainNavigatorState extends State<MainNavigator>
     
     // Wait for the tab to switch, then trigger goal creation
     await Future.delayed(const Duration(milliseconds: 300));
-    
-    // The GoalsScreen has a create button in the app bar
-    // User can tap it to create a goal, or we could programmatically trigger it
-    // For now, just switching to the Goals tab is sufficient
-  }
-
-  Future<void> _selectGoalForSubtask(BuildContext context) async {
-    final growthProvider = context.read<GrowthProvider>();
-    await growthProvider.loadGrowthData();
-    
-    final goals = growthProvider.goals;
-    
-    if (goals.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please create a goal first before adding subtasks'),
-          ),
-        );
-      }
-      return;
-    }
-
-    final selectedGoal = await showDialog<Goal>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Select Goal'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: goals.length,
-            itemBuilder: (context, index) {
-              final goal = goals[index];
-              return ListTile(
-                title: Text(goal.name),
-                subtitle: goal.targetDeadline != null
-                    ? Text('Deadline: ${goal.targetDeadline!.toString().split(' ')[0]}')
-                    : null,
-                onTap: () => Navigator.pop(dialogContext, goal),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-
-    // Wait a bit to ensure dialog is fully closed
-    await Future.delayed(const Duration(milliseconds: 100));
-    
-    if (selectedGoal != null && mounted) {
-      // Navigate to goal planning screen using the current context
-      // Check if Navigator is available before navigating
-      final navigator = Navigator.maybeOf(context);
-      if (navigator != null) {
-        navigator.push(
-          MaterialPageRoute(
-            builder: (context) => GoalPlanningScreen(
-              goalId: selectedGoal.id,
-              goalName: selectedGoal.name,
-              initialTasks: [],
-              timeline: {
-                'deadline': selectedGoal.targetDeadline ?? DateTime.now().add(const Duration(days: 30)),
-                'hoursPerDay': selectedGoal.hoursPerDay ?? 2.0,
-              },
-            ),
-          ),
-        );
-      }
-    }
   }
 
   @override
@@ -512,13 +439,13 @@ class NavigationTab {
 class _CreateOptionsBottomSheet extends StatelessWidget {
   final VoidCallback onCreateTask;
   final VoidCallback onCreateGoal;
-  final VoidCallback onCreateSubtask;
+  final VoidCallback onPlanDay;
   final VoidCallback onStartHandsFree;
 
   const _CreateOptionsBottomSheet({
     required this.onCreateTask,
     required this.onCreateGoal,
-    required this.onCreateSubtask,
+    required this.onPlanDay,
     required this.onStartHandsFree,
   });
 
@@ -541,7 +468,6 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle bar
               Center(
                 child: Container(
                   width: 40,
@@ -553,8 +479,6 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
                   ),
                 ),
               ),
-              
-              // Title
               Text(
                 'Create New',
                 style: theme.textTheme.headlineSmall?.copyWith(
@@ -563,8 +487,6 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppTheme.spacingMD),
-              
-              // Options
               _CreateOptionTile(
                 icon: Icons.task_rounded,
                 title: 'Create Task',
@@ -573,7 +495,6 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
                 onTap: onCreateTask,
               ),
               const SizedBox(height: AppTheme.spacingSM),
-              
               _CreateOptionTile(
                 icon: Icons.flag_rounded,
                 title: 'Create Goal',
@@ -582,16 +503,14 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
                 onTap: onCreateGoal,
               ),
               const SizedBox(height: AppTheme.spacingSM),
-              
               _CreateOptionTile(
-                icon: Icons.checklist_rounded,
-                title: 'Create Subtask',
-                subtitle: 'Add a subtask to an existing goal',
-                color: AppTheme.secondaryColor,
-                onTap: onCreateSubtask,
+                icon: Icons.wb_sunny_rounded,
+                title: 'Plan Task for the Day',
+                subtitle: 'Structure your day with AI',
+                color: Colors.amber,
+                onTap: onPlanDay,
               ),
               const SizedBox(height: AppTheme.spacingSM),
-
               _CreateOptionTile(
                 icon: Icons.mic_rounded,
                 title: 'Hands-Free Mode',
@@ -599,21 +518,20 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
                 color: Colors.purpleAccent,
                 onTap: onStartHandsFree,
               ),
-              
               const SizedBox(height: AppTheme.spacingMD),
             ],
           ),
         ),
       ),
     )
-      .animate()
-      .slideY(
-        begin: 1,
-        end: 0,
-        duration: 300.ms,
-        curve: Curves.easeOutCubic,
-      )
-      .fadeIn(duration: 300.ms);
+    .animate()
+    .slideY(
+      begin: 1,
+      end: 0,
+      duration: 300.ms,
+      curve: Curves.easeOutCubic,
+    )
+    .fadeIn(duration: 300.ms);
   }
 }
 
@@ -712,4 +630,3 @@ class _CreateOptionTile extends StatelessWidget {
     );
   }
 }
-
