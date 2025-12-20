@@ -649,7 +649,13 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
               return SliverPadding(
                 padding: const EdgeInsets.all(AppTheme.spacingMD),
-                sliver: SliverList(
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: AppTheme.spacingMD,
+                    mainAxisSpacing: AppTheme.spacingMD,
+                    childAspectRatio: 0.75, // Reduce height to minimize blank space
+                  ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final goal = goals[index];
@@ -667,17 +673,18 @@ class _GoalsScreenState extends State<GoalsScreen> {
                       }
                       countRecursive(tasks);
 
-                      // Staggered animation for list items
+                      // Staggered animation for grid items
                       return _buildGoalCard(
                         context,
                         goal,
                         totalTasks,
                         completedCount,
                         index,
+                        tasks,
                       )
                         .animate()
-                        .fadeIn(duration: 400.ms, delay: (100 * index).ms)
-                        .slideY(begin: 0.2, end: 0, duration: 400.ms, delay: (100 * index).ms, curve: Curves.easeOutCubic);
+                        .fadeIn(duration: 400.ms, delay: (50 * index).ms)
+                        .scale(begin: const Offset(0.9, 0.9), delay: (50 * index).ms, duration: 400.ms, curve: Curves.easeOutCubic);
                     },
                     childCount: goals.length,
                   ),
@@ -793,6 +800,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
     int taskCount,
     int completedTasks,
     int index,
+    List<GoalTask> tasks,
   ) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -801,110 +809,125 @@ class _GoalsScreenState extends State<GoalsScreen> {
     final statusColor = _getStatusColor(status);
     final daysRemaining = _getDaysRemaining(goal.targetDeadline);
     
-    return GestureDetector(
+    // Get preview tasks (fill space - top 4)
+    final previewTasks = tasks.where((t) => !t.isCompleted).take(4).toList();
+    if (previewTasks.isEmpty && tasks.isNotEmpty) {
+      previewTasks.addAll(tasks.take(4));
+    }
+
+    return ModernSmartCard(
       onTap: () {
-        HapticFeedback.mediumImpact();
-        Navigator.push(
-          context,
+        // Navigate to Unified Editor
+        Navigator.of(context).push(
           MaterialPageRoute(
-          builder: (context) => UnifiedGoalEditorScreen(
-            isNew: false,
-            existingGoal: goal,
-            initialTasks: context.read<GrowthProvider>().getTasksForGoal(goal.id),
-          ),
+            builder: (context) => UnifiedGoalEditorScreen(
+              isNew: false,
+              existingGoal: goal,
+              initialTasks: tasks, // Pass actual tasks
+            ),
           ),
         );
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
-        child: ModernSmartCard(
-          useGradient: false,
-          elevationLevel: 1,
-          child: Padding(
+      padding: EdgeInsets.zero, // We handle padding inside
+      child: Stack(
+        children: [
+          Padding(
             padding: const EdgeInsets.all(AppTheme.spacingMD),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header: Title and Days Remaining badge
+                // Title + Delete
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            goal.name,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
-                              height: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          // Stats row
-                          Row(
-                            children: [
-                               Icon(
-                                Icons.checklist_rounded, 
-                                size: 14, 
-                                color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$taskCount tasks • $completedTasks done',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                   color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                      child: Text(
+                        goal.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
                       ),
                     ),
-                    if (daysRemaining.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-                          border: Border.all(
-                            color: statusColor.withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          daysRemaining,
-                          style: TextStyle(
-                            color: statusColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                    const SizedBox(width: 8),
+                    // Dustbin (Delete) Icon
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => _showDeleteConfirmation(context, goal),
+                        child: Container(
+                          padding: const EdgeInsets.all(4), 
+                          alignment: Alignment.topRight,
+                          child: Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                            color: isDark ? Colors.white38 : Colors.black38,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      // Dustbin (Delete) Icon
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(20),
-                          onTap: () => _showDeleteConfirmation(context, goal),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            child: Icon(
-                              Icons.delete_outline_rounded,
-                              size: 18,
-                              color: isDark ? Colors.white38 : Colors.black38,
-                            ),
-                          ),
-                        ),
-                      ),
+                    ),
                   ],
                 ),
                 
-                const SizedBox(height: AppTheme.spacingMD),
+                const SizedBox(height: 8),
                 
-                // Progress Bar
+                // Content Preview (Mini Task List)
+                Expanded(
+                  child: previewTasks.isEmpty
+                      ? Text(
+                          "No tasks yet",
+                          style: TextStyle(
+                            color: isDark ? Colors.white38 : Colors.black38,
+                            fontSize: 12,
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ...previewTasks.map((t) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    t.isCompleted ? Icons.check_circle_outline : Icons.circle_outlined,
+                                    size: 10,
+                                    color: isDark ? Colors.white54 : Colors.black54,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      t.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? Colors.white70 : Colors.black87,
+                                        decoration: t.isCompleted ? TextDecoration.lineThrough : null,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )),
+                            if (tasks.length > 4)
+                              Text(
+                                "+ ${tasks.length - 4} more",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: isDark ? Colors.white38 : Colors.black38,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                          ],
+                        ),
+                ),
+                
+                const SizedBox(height: 12),
+                
+                // Footer: Progress
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -912,36 +935,37 @@ class _GoalsScreenState extends State<GoalsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          status,
-                          style: TextStyle(
-                            color: statusColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
                           '${(progress * 100).toInt()}%',
                           style: TextStyle(
-                            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                            color: statusColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
+                        if (daysRemaining.isNotEmpty)
+                          Text(
+                            daysRemaining.split(' ').first + (daysRemaining.contains('left') ? ' days' : ''), // Shorten text
+                            style: TextStyle(
+                              color: isDark ? Colors.white38 : Colors.black38,
+                              fontSize: 10,
+                            ),
+                          ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                      AnimatedProgressBar(
-                        progress: progress,
-                        height: 8,
-                        backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0),
-                        progressColor: statusColor,
-                      ),
+                    const SizedBox(height: 4),
+                    AnimatedProgressBar(
+                      progress: progress,
+                      height: 4,
+                      backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0),
+                      progressColor: statusColor,
+                      showPercentage: false, // Disable duplicate percentage
+                    ),
                   ],
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
