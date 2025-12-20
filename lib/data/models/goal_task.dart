@@ -7,6 +7,9 @@ class GoalTask {
   final String title;
   final String description;
   final double? estimatedHours;
+  final int? estimatedMinutes; // For Day Planner
+  final int? actualMinutes;    // For Day Planner Tracking
+  final DateTime? startedAt;   // For Live Tracking
   final String priority; // 'high', 'medium', 'low'
   final String frequency; // 'daily', 'weekly', 'monthly', 'one-time'
   final String suggestedTime; // 'morning', 'afternoon', 'evening', 'any'
@@ -28,6 +31,9 @@ class GoalTask {
     required this.title,
     required this.description,
     this.estimatedHours,
+    this.estimatedMinutes,
+    this.actualMinutes,
+    this.startedAt,
     this.priority = 'medium',
     this.frequency = 'one-time',
     this.suggestedTime = 'any',
@@ -44,6 +50,15 @@ class GoalTask {
     this.subtasks = const [],
   });
 
+  /// Computed efficiency score
+  int get efficiencyScore {
+    if (actualMinutes == null || actualMinutes == 0) return 0;
+    // Use estimatedMinutes if available, else convert estimatedHours
+    final est = estimatedMinutes ?? ((estimatedHours ?? 0) * 60).round();
+    if (est == 0) return 0;
+    return (est / actualMinutes! * 100).toInt();
+  }
+
   /// Create GoalTask from database map
   factory GoalTask.fromMap(Map<String, dynamic> map) {
     return GoalTask(
@@ -52,6 +67,9 @@ class GoalTask {
       title: map['title'] as String,
       description: map['description'] as String,
       estimatedHours: (map['estimated_hours'] as num?)?.toDouble(),
+      estimatedMinutes: (map['estimated_minutes'] as num?)?.toInt(),
+      actualMinutes: (map['actual_minutes'] as num?)?.toInt(),
+      startedAt: map['started_at'] != null ? DateTime.tryParse(map['started_at'] as String) : null,
       priority: map['priority'] as String? ?? 'medium',
       frequency: map['frequency'] as String? ?? 'one-time',
       suggestedTime: map['suggested_time'] as String? ?? 'any',
@@ -84,6 +102,9 @@ class GoalTask {
       'title': title,
       'description': description,
       'estimated_hours': estimatedHours,
+      'estimated_minutes': estimatedMinutes,
+      'actual_minutes': actualMinutes,
+      'started_at': startedAt?.toIso8601String(),
       'priority': priority,
       'frequency': frequency,
       'suggested_time': suggestedTime,
@@ -108,6 +129,9 @@ class GoalTask {
       'title': title,
       'description': description,
       'estimated_hours': estimatedHours,
+      'estimated_minutes': estimatedMinutes,
+      'actual_minutes': actualMinutes,
+      'started_at': startedAt?.toIso8601String(),
       'priority': priority,
       'frequency': frequency,
       'suggested_time': suggestedTime,
@@ -131,6 +155,10 @@ class GoalTask {
     String? title,
     String? description,
     double? estimatedHours,
+    int? estimatedMinutes,
+    int? actualMinutes,
+    DateTime? startedAt,
+    bool clearStartedAt = false,
     String? priority,
     String? frequency,
     String? suggestedTime,
@@ -152,6 +180,9 @@ class GoalTask {
       title: title ?? this.title,
       description: description ?? this.description,
       estimatedHours: estimatedHours ?? this.estimatedHours,
+      estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
+      actualMinutes: actualMinutes ?? this.actualMinutes,
+      startedAt: clearStartedAt ? null : (startedAt ?? this.startedAt),
       priority: priority ?? this.priority,
       frequency: frequency ?? this.frequency,
       suggestedTime: suggestedTime ?? this.suggestedTime,
@@ -201,6 +232,13 @@ class GoalTask {
       title: data['title'] as String? ?? 'Untitled',
       description: data['description'] as String? ?? '',
       estimatedHours: (data['estimatedHours'] as num?)?.toDouble() ?? (data['estimated_hours'] as num?)?.toDouble(),
+      estimatedMinutes: (data['estimatedMinutes'] as num?)?.toInt() ?? (data['estimated_minutes'] as num?)?.toInt(),
+      actualMinutes: (data['actualMinutes'] as num?)?.toInt() ?? (data['actual_minutes'] as num?)?.toInt(),
+      startedAt: data['startedAt'] != null
+          ? (data['startedAt'] is Timestamp
+              ? (data['startedAt'] as Timestamp).toDate()
+              : DateTime.tryParse(data['startedAt'].toString()))
+          : null,
       priority: data['priority'] as String? ?? 'medium',
       frequency: data['frequency'] as String? ?? 'one-time',
       suggestedTime: data['suggestedTime'] as String? ?? 'any',
@@ -238,6 +276,9 @@ class GoalTask {
       'title': title,
       'description': description,
       'estimatedHours': estimatedHours,
+      'estimatedMinutes': estimatedMinutes,
+      'actualMinutes': actualMinutes,
+      'startedAt': startedAt != null ? Timestamp.fromDate(startedAt!) : null,
       'priority': priority,
       'frequency': frequency,
       'suggestedTime': suggestedTime,

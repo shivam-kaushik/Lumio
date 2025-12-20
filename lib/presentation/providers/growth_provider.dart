@@ -4,6 +4,7 @@ import '../../data/models/goal_task.dart';
 import '../../data/models/goal_phase.dart';
 import '../../data/repositories/firestore_growth_repository.dart';
 import '../../core/services/privacy_gpt_service.dart';
+import '../../core/services/sound_service.dart';
 
 /// Growth state management provider for goals and tasks
 class GrowthProvider with ChangeNotifier {
@@ -157,40 +158,7 @@ class GrowthProvider with ChangeNotifier {
     }
   }
 
-  /// Complete a task and return motivational message
-  Future<String?> completeTask(int taskId) async {
-    try {
-      // Get task details before completing
-      final task = _tasksByGoal.values
-          .expand((list) => list)
-          .firstWhere((t) => t.id == taskId);
-      
-      final goal = _goals.firstWhere((g) => g.id == task.goalId);
-      
-      // Complete the task
-      await _repository.completeTask(taskId);
-      
-      // Reload data to sync across screens
-      await loadGrowthData();
-      
-      // Generate motivational message
-      final privacyGpt = PrivacyGptService();
-      final message = await privacyGpt.generateMotivationalMessage(
-        goalName: goal.name,
-        taskDescription: task.description,
-        skillName: null, // No skills anymore
-        streakCount: 0, // No streaks anymore
-        totalReps: 0, // No reps anymore
-        motivationAnchor: task.motivationAnchor,
-      );
-      
-      return message;
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-      rethrow;
-    }
-  }
+
 
   /// Uncomplete a task (mark as not completed)
   Future<void> uncompleteTask(int taskId) async {
@@ -251,6 +219,97 @@ class GrowthProvider with ChangeNotifier {
     try {
       await _repository.deletePhase(phaseId);
       await loadGrowthData();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Day Architect: Ensure a daily goal exists for the given date
+  Future<int> ensureDailyGoal(DateTime date) async {
+    final dateStr = "${date.year}-${date.month}-${date.day}";
+    final goalName = "Daily Plan - $dateStr";
+
+    // Check if exists
+    try {
+      final existing = _goals.firstWhere((g) => g.name == goalName);
+      return existing.id;
+    } catch (e) {
+      // Create new
+      return await createGoal(
+        goalName,
+        targetDeadline: date.add(const Duration(hours: 24)),
+        hoursPerDay: 24, // Full day available
+      );
+    }
+  }
+
+  /// Day Architect: Start/Stop timer
+  Future<void> toggleTaskTimer(int taskId) async {
+    try {
+      final taskList = _tasksByGoal.values.expand((l) => l);
+      final task = taskList.firstWhere((t) => t.id == taskId);
+      final soundService = SoundService();
+
+      if (task.startedAt == null) {
+        // Start
+        final updated = task.copyWith(startedAt: DateTime.now());
+        await updateTask(updated);
+        soundService.playStart();
+      } else {
+        // Stop
+        final now = DateTime.now();
+        final sessionDuration = now.difference(task.startedAt!);
+        final currentActual = task.actualMinutes ?? 0;
+        final updated = task.copyWith(
+          clearStartedAt: true, // Clear active session
+          actualMinutes: currentActual + sessionDuration.inMinutes,
+        );
+        
+        // Use repository directly to avoid full reload if fast toggle
+        await _repository.updateTask(updated);
+        // We do want to reload to update UI
+        await loadGrowthData();
+        soundService.playStop();
+      }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  /// Complete a task and return motivational message
+  Future<String?> completeTask(int taskId) async {
+    try {
+      // Get task details before completing
+      final task = _tasksByGoal.values
+          .expand((list) => list)
+          .firstWhere((t) => t.id == taskId);
+      
+      final goal = _goals.firstWhere((g) => g.id == task.goalId);
+      
+      // Complete the task
+      await _repository.completeTask(taskId);
+      
+      // Reload data to sync across screens
+      await loadGrowthData();
+      
+      // Play Sound
+      SoundService().playSuccess();
+      
+      // Generate motivational message
+      final privacyGpt = PrivacyGptService();
+      final message = await privacyGpt.generateMotivationalMessage(
+        goalName: goal.name,
+        taskDescription: task.description,
+        skillName: null, // No skills anymore
+        streakCount: 0, // No streaks anymore
+        totalReps: 0, // No reps anymore
+        motivationAnchor: task.motivationAnchor,
+      );
+      
+      return message;
     } catch (e) {
       _error = e.toString();
       notifyListeners();
