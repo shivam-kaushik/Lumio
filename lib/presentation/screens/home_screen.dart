@@ -16,6 +16,12 @@ import '../../data/models/reminder.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../../core/services/home_detection_service.dart';
 
+// Day Architect Imports
+import 'day_planner_screen.dart';
+import '../widgets/execution_card.dart';
+import '../widgets/day_planner_widgets.dart';
+import '../../data/models/goal_task.dart';
+
 /// Premium home screen with minimal, elegant design
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -91,15 +97,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   
                   return Consumer<GrowthProvider>(
                     builder: (context, growthProvider, _) {
+                      // Find active task (Day Architect)
+                      GoalTask? activeTask;
+                      for (var list in growthProvider.tasksByGoal.values) {
+                        for (var t in list) {
+                          if (t.startedAt != null) {
+                            activeTask = t;
+                            break;
+                          }
+                        }
+                        if (activeTask != null) break;
+                      }
+
                       // Group tasks by goals
                       final groups = _groupTasksByGoals(
                         visibleReminders,
                         growthProvider,
                       );
-
-                      if (groups.isEmpty) {
-                        return _buildEmptyState(context);
-                      }
 
                       return RefreshIndicator(
                         onRefresh: () async {
@@ -109,11 +123,73 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                         child: CustomScrollView(
                           slivers: [
-                            // Stats header (optional)
+                            // Stats header
                             SliverToBoxAdapter(
                               child: _buildStatsHeader(context, reminderProvider),
                             ),
                             
+                            // Day Architect: Dynamic Hero Section
+                            Builder(
+                              builder: (context) {
+                                // 1. Check for Active Plan
+                                final today = DateTime.now();
+                                final dateStr = "${today.year}-${today.month}-${today.day}";
+                                final goalName = "Daily Plan - $dateStr";
+                                int? dayGoalId;
+                                try {
+                                  final goal = growthProvider.goals.firstWhere((g) => g.name == goalName);
+                                  dayGoalId = goal.id;
+                                } catch (_) {}
+                                
+                                final hasPlan = dayGoalId != null && growthProvider.getTasksForGoal(dayGoalId).isNotEmpty;
+                                
+                                // State 2: Active Execution (Priority)
+                                if (activeTask != null) {
+                                  return SliverPadding(
+                                    padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD, vertical: 8),
+                                    sliver: SliverToBoxAdapter(
+                                      child: ExecutionCard(task: activeTask!),
+                                    ),
+                                  );
+                                }
+
+                                // State 3: Plan Exists, Idle -> Daily Summary
+                                if (hasPlan) {
+                                  final tasks = growthProvider.getTasksForGoal(dayGoalId!);
+                                  final completed = tasks.where((t) => t.isCompleted).length;
+                                  
+                                  return SliverPadding(
+                                    padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD, vertical: 8),
+                                    sliver: SliverToBoxAdapter(
+                                      child: DailySummaryCard(
+                                        completedTasks: completed,
+                                        totalTasks: tasks.length,
+                                        onTap: () {
+                                          Navigator.push(context, MaterialPageRoute(builder: (_) => const DayPlannerScreen()));
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                // State 1: No Plan -> Morning Hero
+                                return SliverPadding(
+                                  padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD, vertical: 8),
+                                  sliver: SliverToBoxAdapter(
+                                    child: MorningHeroCard(
+                                      userName: "Shivam", // TODO: Get from profile
+                                      onTap: () {
+                                        Navigator.push(context, MaterialPageRoute(builder: (_) => const DayPlannerScreen()));
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+
+                            if (groups.isEmpty)
+                               SliverFillRemaining(child: _buildEmptyState(context)),
+
                             // Task groups by goals
                             ...groups.entries.map((entry) {
                               return SliverPadding(
@@ -456,7 +532,7 @@ class _HomeScreenState extends State<HomeScreen> {
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: AppTheme.textSecondary,
-              ),
+                ),
             ),
             const SizedBox(height: AppTheme.spacingXL),
             ElevatedButton(
