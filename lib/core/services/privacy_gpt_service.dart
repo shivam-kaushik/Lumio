@@ -1016,5 +1016,91 @@ Keep questions SHORT and conversational (spoken by TTS).
       );
     }
   }
+  /// Generate a daily schedule from unstructured text (Day Architect)
+  Future<List<Map<String, dynamic>>> generateDailySchedule(String rawText) async {
+    final apiKey = dotenv.env['OPENAI_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      return _fallbackDailySchedule(rawText);
+    }
+
+    try {
+      final prompt = '''
+You are a Daily Planning Architect. Convert the user's unstructured brain dump into a structured daily schedule.
+
+User Input: "$rawText"
+Current Time: ${DateTime.now().toLocal()}
+
+CRITICAL RULES:
+1. Extract every distinct task mentioned.
+2. Estimate duration in MINUTES for each task (be realistic).
+3. Assign a priority (high/medium/low).
+4. If the user mentions specific times (e.g., "call at 2pm"), use them.
+5. If no times mentioned, suggest a logical order.
+
+Return ONLY a JSON Array:
+[
+  {
+    "title": "Task Name",
+    "description": "Brief details",
+    "estimatedMinutes": 60,
+    "priority": "high",
+    "suggestedTime": "morning" // or afternoon, evening
+  }
+]
+''';
+
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': [
+            {
+              'role': 'system',
+              'content': 'You are a scheduling assistant. Return valid JSON arrays only.'
+            },
+            {
+              'role': 'user',
+              'content': prompt
+            }
+          ],
+          'temperature': 0.5,
+        }),
+      ).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        final content = jsonDecode(response.body)['choices'][0]['message']['content'];
+        String jsonStr = content.trim();
+        if (jsonStr.contains('```json')) {
+            jsonStr = jsonStr.split('```json')[1].split('```')[0].trim();
+        } else if (jsonStr.contains('```')) {
+            jsonStr = jsonStr.split('```')[1].split('```')[0].trim();
+        }
+        
+        final List<dynamic> list = jsonDecode(jsonStr);
+        return List<Map<String, dynamic>>.from(list);
+      }
+    } catch (e) {
+      debugPrint("GPT Daily Schedule Error: $e");
+    }
+
+    return _fallbackDailySchedule(rawText);
+  }
+
+  List<Map<String, dynamic>> _fallbackDailySchedule(String rawText) {
+    // Simple fallback: split by commas or periods if possible, else return one big task
+    return [
+      {
+        'title': 'Process: $rawText',
+        'description': 'Manual breakdown required',
+        'estimatedMinutes': 60,
+        'priority': 'medium',
+        'suggestedTime': 'any'
+      }
+    ];
+  }
 }
 
