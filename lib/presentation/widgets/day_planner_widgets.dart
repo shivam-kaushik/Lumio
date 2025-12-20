@@ -9,14 +9,26 @@ class MorningHeroCard extends StatelessWidget {
   const MorningHeroCard({
     super.key, 
     required this.onTap, 
-    this.userName = "User" // MVP default
+    this.userName = "User" 
   });
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return "Good Morning! ☀️";
+    } else if (hour < 17) {
+      return "Good Afternoon! 🌤️";
+    } else {
+      return "Good Evening! 🌙";
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD, vertical: 8),
+      // Reduced margin
+      margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD, vertical: 4),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -26,12 +38,12 @@ class MorningHeroCard extends StatelessWidget {
             Color(0xFFFF8FB1), // Soft Pink
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20), // Slightly smaller radius
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF6B8EFF).withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 8),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -39,60 +51,61 @@ class MorningHeroCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            // Reduced padding to make it smaller
+            padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.wb_sunny_rounded, color: Colors.white, size: 24),
+                      child: const Icon(Icons.wb_sunny_rounded, color: Colors.white, size: 20),
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.black12,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text(
                         "Start Here",
-                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  "Good Morning! ☀️",
-                  style: TextStyle(
+                const SizedBox(height: 12),
+                Text(
+                  _getGreeting(),
+                  style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 24,
+                    fontSize: 20, // Reduced font size
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 const Text(
                   "Ready to design your day?",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
+                    fontSize: 14, // Reduced font size
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -102,10 +115,11 @@ class MorningHeroCard extends StatelessWidget {
                         style: TextStyle(
                           color: AppTheme.primaryColor,
                           fontWeight: FontWeight.bold,
+                          fontSize: 13,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Icon(Icons.arrow_forward_rounded, color: AppTheme.primaryColor, size: 16),
+                      const SizedBox(width: 6),
+                      Icon(Icons.arrow_forward_rounded, color: AppTheme.primaryColor, size: 14),
                     ],
                   ),
                 ),
@@ -140,7 +154,7 @@ class DailySummaryCard extends StatelessWidget {
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white, // Light mode default, logic needed for dark mode in parent or here
+         // Logic to handle dark/light mode for gradient if needed, keeping static for now as requested
         gradient: LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
@@ -160,13 +174,18 @@ class DailySummaryCard extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.all(16.0), // Reduced from 20
             child: Row(
               children: [
-                CircularProgressIndicator(
-                  value: progress,
-                  backgroundColor: Colors.white24,
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.greenAccent),
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: CircularProgressIndicator(
+                    value: progress,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.greenAccent),
+                    strokeWidth: 3,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -177,19 +196,19 @@ class DailySummaryCard extends StatelessWidget {
                         totalTasks == completedTasks ? "All Done! 🎉" : "Your Plan",
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 18,
+                          fontSize: 16, // Reduced size
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         "$completedTasks of $totalTasks tasks completed",
-                        style: const TextStyle(color: Colors.white54, fontSize: 13),
+                        style: const TextStyle(color: Colors.white54, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.white54),
+                const Icon(Icons.chevron_right, color: Colors.white54, size: 20),
               ],
             ),
           ),

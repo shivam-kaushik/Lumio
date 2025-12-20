@@ -231,7 +231,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                             trailing: IconButton(
                               icon: Icon(
                                 task.startedAt != null ? Icons.stop_circle : Icons.play_circle_fill,
-                                color: task.startedAt != null ? Colors.redAccent : AppTheme.primaryColor,
+                                color: task.startedAt != null ? AppTheme.errorColor : AppTheme.primaryColor,
                               ),
                               onPressed: () {
                                 provider.toggleTaskTimer(task.id);
@@ -254,9 +254,10 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                         icon: const Icon(Icons.summarize),
                         label: const Text("View Daily Retro"),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isDark ? Colors.white10 : Colors.black12,
+                          backgroundColor: isDark ? AppTheme.darkSurfaceElevated : AppTheme.surfaceColor,
                           foregroundColor: textColor,
                           elevation: 0,
+                          side: BorderSide(color: isDark ? AppTheme.darkBorder : AppTheme.borderColor),
                         ),
                       ),
                     ),
@@ -324,7 +325,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                                 padding: const EdgeInsets.all(8.0),
                                 child: FloatingActionButton.small(
                                   onPressed: _toggleListening,
-                                  backgroundColor: _isListening ? Colors.redAccent : AppTheme.primaryColor,
+                                  backgroundColor: _isListening ? AppTheme.errorColor : AppTheme.primaryColor,
                                   child: Icon(_isListening ? Icons.stop : Icons.mic, color: Colors.white),
                                 ),
                               ),
@@ -404,7 +405,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                             child: ElevatedButton(
                               onPressed: _isConverting ? null : _confirmAndSave,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
+                                backgroundColor: AppTheme.successColor,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
                                 ),

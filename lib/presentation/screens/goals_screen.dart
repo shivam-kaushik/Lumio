@@ -8,12 +8,9 @@ import '../providers/growth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/modern_smart_card.dart';
 import '../widgets/animated_progress_bar.dart';
-import '../widgets/3d_card.dart';
 import '../../core/services/permission_service.dart';
 import '../../core/services/premium_service.dart';
-import '../../core/services/premium_service.dart';
 import 'unified_goal_editor_screen.dart'; // Unified Editor
-import 'roadmap_management_screen.dart';
 import '../../data/models/goal.dart';
 import '../../data/models/goal_task.dart'; // Import GoalTask
 import '../../core/services/privacy_gpt_service.dart';
@@ -115,7 +112,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 suffixIcon: IconButton(
                   icon: Icon(
                     isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                    color: isListening ? Colors.red : null,
+                    color: isListening ? AppTheme.errorColor : null,
                   ),
                   onPressed: () async {
                     setDialogState(() => isListening = true);
@@ -185,10 +182,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.auto_awesome, color: Colors.amber),
+              leading: Icon(Icons.auto_awesome, color: AppTheme.warningColor),
               title: const Text('AI-Powered (Premium)'),
               subtitle: const Text('Let AI create tasks and roadmap'),
-              trailing: const Icon(Icons.star, color: Colors.amber, size: 20),
+              trailing: Icon(Icons.star, color: AppTheme.warningColor, size: 20),
               onTap: () => Navigator.pop(context, 'ai'),
             ),
           ],
@@ -207,11 +204,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.star, color: Colors.amber),
-            SizedBox(width: 8),
-            Text('Premium Feature'),
+            Icon(Icons.star, color: AppTheme.warningColor),
+            const SizedBox(width: 8),
+            const Text('Premium Feature'),
           ],
         ),
         content: const Text(
@@ -224,8 +221,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              // TODO: Implement premium upgrade flow
-              // For now, just show a message
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Premium upgrade coming soon! For now, you can create goals manually.'),
@@ -234,7 +229,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
               Navigator.pop(context, false);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
+              backgroundColor: AppTheme.warningColor,
             ),
             child: const Text('Upgrade'),
           ),
@@ -411,9 +406,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                   Text(
                     'When do you want to complete this goal?',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
                   ),
                   const SizedBox(height: AppTheme.spacingMD),
                   _buildTimelineOption(dialogContext, setState, '1 day', 1, 'days', () => hoursPerDay),
@@ -428,9 +423,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   _buildCustomTimelineOption(dialogContext, setState, () => hoursPerDay),
                   const Divider(),
                   const SizedBox(height: AppTheme.spacingSM),
-                  const Text(
+                   Text(
                     'How many hours per day can you dedicate?',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
                   ),
                   const SizedBox(height: AppTheme.spacingSM),
                   Slider(
@@ -439,6 +434,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                     max: 8.0,
                     divisions: 15,
                     label: '${hoursPerDay.toStringAsFixed(1)} hours/day',
+                    activeColor: AppTheme.primaryColor,
                     onChanged: (value) {
                       setState(() {
                         hoursPerDay = value;
@@ -482,6 +478,19 @@ class _GoalsScreenState extends State<GoalsScreen> {
           initialDate: DateTime.now().add(const Duration(days: 30)),
           firstDate: DateTime.now(),
           lastDate: DateTime.now().add(const Duration(days: 365 * 5)), // 5 years max
+          builder: (context, child) {
+            return Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: ColorScheme.light(
+                  primary: AppTheme.primaryColor,
+                  onPrimary: Colors.white,
+                  surface: AppTheme.surfaceColor,
+                  onSurface: AppTheme.textPrimary,
+                ),
+              ),
+              child: child!,
+            );
+          },
         );
         
         if (selectedDate != null) {
@@ -574,43 +583,45 @@ class _GoalsScreenState extends State<GoalsScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // App Bar
+          // Modern App Bar with large title
           SliverAppBar(
             expandedHeight: 120,
             floating: false,
             pinned: true,
-            backgroundColor: isDark ? Colors.black : AppTheme.backgroundColor,
+            backgroundColor: isDark ? const Color(0xFF0F0F0F) : AppTheme.backgroundColor,
+            scrolledUnderElevation: 0,
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
-              title: const Text(
-                'Goals',
-                style: TextStyle(
+              title: Text(
+                'My Goals',
+                style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  fontSize: 28,
+                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+                  letterSpacing: -0.5,
                 ),
               )
                 .animate()
                 .fadeIn(duration: 500.ms)
                 .slideX(begin: -0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+              titlePadding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD, vertical: AppTheme.spacingMD),
+              centerTitle: false,
             ),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: AppTheme.spacingMD),
-                child: TextButton.icon(
-                  onPressed: _createGoal,
-                  icon: const Icon(Icons.add_rounded, size: 20),
-                  label: const Text(
-                    'Add Goal',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
                   ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppTheme.primaryColor,
+                  child: IconButton(
+                    onPressed: _createGoal,
+                    icon: const Icon(Icons.add_rounded, color: AppTheme.primaryColor),
+                    tooltip: 'Add Goal',
                   ),
                 )
                   .animate()
-                  .scale(delay: 200.ms, duration: 500.ms, curve: Curves.elasticOut)
-                  .shimmer(delay: 700.ms, duration: 1500.ms, color: AppTheme.primaryColor.withOpacity(0.3)),
+                  .scale(delay: 200.ms, duration: 500.ms, curve: Curves.elasticOut),
               ),
             ],
           ),
@@ -623,9 +634,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   child: Center(
                     child: CircularProgressIndicator(
                       color: AppTheme.primaryColor,
-                    )
-                      .animate()
-                      .scale(duration: 500.ms, curve: Curves.easeOutCubic),
+                    ),
                   ),
                 );
               }
@@ -639,7 +648,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
               }
 
               return SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD),
+                padding: const EdgeInsets.all(AppTheme.spacingMD),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -658,13 +667,17 @@ class _GoalsScreenState extends State<GoalsScreen> {
                       }
                       countRecursive(tasks);
 
+                      // Staggered animation for list items
                       return _buildGoalCard(
                         context,
                         goal,
                         totalTasks,
                         completedCount,
                         index,
-                      );
+                      )
+                        .animate()
+                        .fadeIn(duration: 400.ms, delay: (100 * index).ms)
+                        .slideY(begin: 0.2, end: 0, duration: 400.ms, delay: (100 * index).ms, curve: Curves.easeOutCubic);
                     },
                     childCount: goals.length,
                   ),
@@ -672,7 +685,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
               );
             },
           ),
-          // Bottom padding above bottom navigation bar
+          // Bottom padding
           const SliverPadding(
             padding: EdgeInsets.only(bottom: 100),
           ),
@@ -682,6 +695,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppTheme.spacingXL),
@@ -692,16 +708,18 @@ class _GoalsScreenState extends State<GoalsScreen> {
               padding: const EdgeInsets.all(AppTheme.spacingXL),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    AppTheme.primaryColor.withOpacity(0.1),
-                    AppTheme.primaryLight.withOpacity(0.1),
-                  ],
-                ),
+                color: isDark ? AppTheme.darkSurfaceElevated : AppTheme.surfaceColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.15),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
               ),
               child: Icon(
                 Icons.flag_rounded,
-                size: 80,
+                size: 64,
                 color: AppTheme.primaryColor,
               ),
             )
@@ -710,52 +728,61 @@ class _GoalsScreenState extends State<GoalsScreen> {
               .shimmer(delay: 800.ms, duration: 2000.ms, color: AppTheme.primaryColor.withOpacity(0.3)),
             const SizedBox(height: AppTheme.spacingXL),
             Text(
-              'No goals yet',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              'No goals, just dreams',
+              style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w700,
+                color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
               ),
-            )
-              .animate()
-              .fadeIn(delay: 400.ms, duration: 500.ms)
-              .slideY(begin: 0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
+            ),
             const SizedBox(height: AppTheme.spacingSM),
             Text(
-              'Create your first goal to start turning\ndreams into reality',
+              'Create your first goal to start turning\nyour dreams into reality',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 16,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                height: 1.5,
               ),
-            )
-              .animate()
-              .fadeIn(delay: 600.ms, duration: 500.ms)
-              .slideY(begin: 0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
+            ),
             const SizedBox(height: AppTheme.spacingXL),
             ElevatedButton.icon(
               onPressed: _createGoal,
               icon: const Icon(Icons.add_rounded),
-              label: const Text(
-                'Create Your First Goal',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
+              label: const Text('Start New Goal'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
+                elevation: 4,
+                shadowColor: AppTheme.primaryColor.withOpacity(0.4),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.spacingLG,
+                  horizontal: AppTheme.spacingXL,
                   vertical: AppTheme.spacingMD,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMD),
-                ),
-                elevation: 4,
               ),
-            )
-              .animate()
-              .fadeIn(delay: 800.ms, duration: 500.ms)
-              .scale(delay: 800.ms, duration: 500.ms, curve: Curves.elasticOut),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, Goal goal) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Goal?'),
+        content: Text('Are you sure you want to delete "${goal.name}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<GrowthProvider>().deleteGoal(goal.id);
+            },
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }
@@ -791,334 +818,130 @@ class _GoalsScreenState extends State<GoalsScreen> {
       child: Container(
         margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
         child: ModernSmartCard(
-          useGradient: true,
-          elevationLevel: 2,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Row
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Goal Icon/Emoji
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.primaryColor.withOpacity(0.2),
-                          AppTheme.primaryLight.withOpacity(0.2),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMD),
-                    ),
-                    child: Icon(
-                      Icons.flag_rounded,
-                      color: AppTheme.primaryColor,
-                      size: 24,
-                    ),
-                  )
-                    .animate()
-                    .scale(delay: (index * 50).ms, duration: 400.ms, curve: Curves.elasticOut),
-                  
-                  const SizedBox(width: AppTheme.spacingMD),
-                  
-                  // Goal Title and Status
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          goal.name,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 20,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: AppTheme.spacingXS),
-                        Wrap(
-                          spacing: AppTheme.spacingSM,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            // Status Badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppTheme.spacingSM,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-                                border: Border.all(
-                                  color: statusColor.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                status,
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            if (daysRemaining.isNotEmpty)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppTheme.spacingSM,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: goal.targetDeadline != null &&
-                                          goal.targetDeadline!.isBefore(DateTime.now())
-                                      ? AppTheme.errorColor.withOpacity(0.15)
-                                      : AppTheme.textSecondary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      goal.targetDeadline != null &&
-                                              goal.targetDeadline!.isBefore(DateTime.now())
-                                          ? Icons.warning_rounded
-                                          : Icons.schedule_rounded,
-                                      size: 12,
-                                      color: goal.targetDeadline != null &&
-                                              goal.targetDeadline!.isBefore(DateTime.now())
-                                          ? AppTheme.errorColor
-                                          : AppTheme.textSecondary,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      daysRemaining,
-                                      style: TextStyle(
-                                        color: goal.targetDeadline != null &&
-                                                goal.targetDeadline!.isBefore(DateTime.now())
-                                            ? AppTheme.errorColor
-                                            : AppTheme.textSecondary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  
-                  // Delete Button
-                  IconButton(
-                    icon: Icon(
-                      Icons.delete_outline_rounded,
-                      color: AppTheme.errorColor.withOpacity(0.7),
-                      size: 24,
-                    ),
-                    onPressed: () async {
-                      // Prevent card tap
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Delete Goal?'),
-                          content: Text('Are you sure you want to delete "${goal.name}"? This action cannot be undone.'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancel'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.errorColor,
-                              ),
-                              child: const Text('Delete'),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (confirm == true && context.mounted) {
-                        try {
-                          await context.read<GrowthProvider>().deleteGoal(goal.id);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Goal deleted')),
-                            );
-                          }
-                        } catch (e) {
-                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error deleting goal: $e')),
-                            );
-                          }
-                        }
-                      }
-                    },
-                  ),
-
-                  // Chevron Icon
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppTheme.textSecondary,
-                    size: 24,
-                  ),
-                ],
-              ),
-              
-              // Progress Section
-              if (taskCount > 0) ...[
-                const SizedBox(height: AppTheme.spacingMD),
+          useGradient: false,
+          elevationLevel: 1,
+          child: Padding(
+            padding: const EdgeInsets.all(AppTheme.spacingMD),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: Title and Days Remaining badge
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Text(
+                            goal.name,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // Stats row
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Progress',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: AppTheme.textSecondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                               Icon(
+                                Icons.checklist_rounded, 
+                                size: 14, 
+                                color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary
                               ),
+                              const SizedBox(width: 4),
                               Text(
-                                '$completedTasks / $taskCount tasks',
+                                '$taskCount tasks • $completedTasks done',
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: AppTheme.textSecondary,
-                                  fontWeight: FontWeight.w600,
+                                   color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: AppTheme.spacingSM),
-                          AnimatedProgressBar(
-                            progress: progress,
-                            height: 8,
-                            showPercentage: false,
-                            progressColor: statusColor,
-                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: AppTheme.spacingMD),
-                    // Progress Percentage Circle
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [
-                            statusColor.withOpacity(0.2),
-                            statusColor.withOpacity(0.1),
-                          ],
+                    if (daysRemaining.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                          border: Border.all(
+                            color: statusColor.withOpacity(0.3),
+                            width: 1,
+                          ),
                         ),
-                      ),
-                      child: Center(
                         child: Text(
-                          '${(progress * 100).toInt()}%',
+                          daysRemaining,
                           style: TextStyle(
                             color: statusColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                    )
-                      .animate()
-                      .scale(delay: (index * 50 + 200).ms, duration: 400.ms, curve: Curves.elasticOut),
+                      const SizedBox(width: 8),
+                      // Dustbin (Delete) Icon
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => _showDeleteConfirmation(context, goal),
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            child: Icon(
+                              Icons.delete_outline_rounded,
+                              size: 18,
+                              color: isDark ? Colors.white38 : Colors.black38,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-              ] else ...[
+                
                 const SizedBox(height: AppTheme.spacingMD),
-                Container(
-                  padding: const EdgeInsets.all(AppTheme.spacingMD),
-                  decoration: BoxDecoration(
-                    color: AppTheme.textSecondary.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMD),
-                    border: Border.all(
-                      color: AppTheme.borderColor,
-                      width: 1,
+                
+                // Progress Bar
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          status,
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${(progress * 100).toInt()}%',
+                          style: TextStyle(
+                            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.add_task_rounded,
-                        size: 20,
-                        color: AppTheme.textSecondary,
+                    const SizedBox(height: 6),
+                      AnimatedProgressBar(
+                        progress: progress,
+                        height: 8,
+                        backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0),
+                        progressColor: statusColor,
                       ),
-                      const SizedBox(width: AppTheme.spacingSM),
-                      Text(
-                        'No tasks yet - Add tasks to get started',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
               ],
-              
-              // Deadline Info
-              if (goal.targetDeadline != null) ...[
-                const SizedBox(height: AppTheme.spacingMD),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppTheme.spacingSM,
-                    vertical: AppTheme.spacingXS,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.calendar_today_rounded,
-                        size: 14,
-                        color: AppTheme.primaryColor,
-                      ),
-                      const SizedBox(width: AppTheme.spacingXS),
-                      Text(
-                        DateFormat('MMM d, y').format(goal.targetDeadline!),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppTheme.primaryColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
-        )
-          .animate()
-          .fadeIn(duration: 600.ms, delay: (index * 80).ms)
-          .slideY(begin: 0.2, end: 0, duration: 600.ms, delay: (index * 80).ms, curve: Curves.easeOutCubic)
-          .scale(
-            begin: const Offset(0.95, 0.95),
-            end: const Offset(1.0, 1.0),
-            duration: 600.ms,
-            delay: (index * 80).ms,
-            curve: Curves.easeOutCubic,
-          ),
+        ),
       ),
     );
   }
