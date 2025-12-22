@@ -5,6 +5,9 @@ import '../../data/models/goal_phase.dart';
 import '../../data/repositories/firestore_growth_repository.dart';
 import '../../core/services/privacy_gpt_service.dart';
 import '../../core/services/sound_service.dart';
+import '../../data/models/user_location.dart'; // NEW
+import 'package:shared_preferences/shared_preferences.dart'; // NEW
+import 'dart:convert'; // NEW
 
 /// Growth state management provider for goals and tasks
 class GrowthProvider with ChangeNotifier {
@@ -14,6 +17,7 @@ class GrowthProvider with ChangeNotifier {
   List<Goal> _goals = [];
   Map<int, List<GoalTask>> _tasksByGoal = {}; // goalId -> tasks
   Map<int, List<GoalPhase>> _phasesByGoal = {}; // goalId -> phases
+  List<UserLocation> _savedLocations = []; // NEW: Saved Locations
   bool _isLoading = false;
   String? _error;
 
@@ -24,6 +28,7 @@ class GrowthProvider with ChangeNotifier {
   List<Goal> get goals => _goals;
   Map<int, List<GoalTask>> get tasksByGoal => _tasksByGoal;
   Map<int, List<GoalPhase>> get phasesByGoal => _phasesByGoal;
+  List<UserLocation> get savedLocations => _savedLocations; // NEW
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -50,7 +55,11 @@ class GrowthProvider with ChangeNotifier {
       for (var goal in _goals) {
         _tasksByGoal[goal.id] = await _repository.getTasksForGoal(goal.id);
         _phasesByGoal[goal.id] = await _repository.getPhasesForGoal(goal.id);
+        _phasesByGoal[goal.id] = await _repository.getPhasesForGoal(goal.id);
       }
+
+      // Load Saved Locations
+      await _loadSavedLocations();
 
       _isLoading = false;
       notifyListeners();
@@ -111,11 +120,15 @@ class GrowthProvider with ChangeNotifier {
 
   /// Create a task
   Future<int> createTask(GoalTask task) async {
+    debugPrint('🌱 GrowthProvider: createTask called for "${task.title}" (GoalID: ${task.goalId})');
     try {
       final id = await _repository.createTask(task);
+      debugPrint('🌱 GrowthProvider: Task created in repo (ID: $id). Reloading data...');
       await loadGrowthData();
+      debugPrint('🌱 GrowthProvider: Data reloaded successfully.');
       return id;
     } catch (e) {
+      debugPrint('🛑 GrowthProvider Error: $e');
       _error = e.toString();
       notifyListeners();
       rethrow;
@@ -283,20 +296,44 @@ class GrowthProvider with ChangeNotifier {
   Future<String?> completeTask(int taskId) async {
     try {
       // Get task details before completing
-      final task = _tasksByGoal.values
-          .expand((list) => list)
-          .firstWhere((t) => t.id == taskId);
+      final allTasks = _tasksByGoal.values.expand((list) => list).toList();
+      final task = allTasks.firstWhere(
+          (t) => t.id == taskId, 
+          orElse: () => throw Exception("Task with ID $taskId not found in provider")
+      );
       
-      final goal = _goals.firstWhere((g) => g.id == task.goalId);
+      final goal = _goals.firstWhere(
+          (g) => g.id == task.goalId, 
+          orElse: () => Goal(id: task.goalId, name: 'Unknown Goal', createdAt: DateTime.now())
+      );
       
-      // Complete the task
-      await _repository.completeTask(taskId);
+      // OPTIMISTIC UPDATE: Update local state immediately for UI responsiveness
+      final updatedTask = task.copyWith(
+        isCompleted: true, 
+        completedAt: DateTime.now()
+      );
       
-      // Reload data to sync across screens
-      await loadGrowthData();
-      
+      // Update the subtask in the list (this handles top-level tasks)
+      // Note: If it's a subtask, deep update recursive logic would be needed.
+      // Assuming flat list for now or top-level. 
+      // Actually, _tasksByGoal contains lists of tasks. If 'task' is from there, we can replace it.
+      if (_tasksByGoal.containsKey(task.goalId)) {
+        final list = _tasksByGoal[task.goalId]!;
+        final index = list.indexWhere((t) => t.id == taskId);
+        if (index != -1) {
+          list[index] = updatedTask;
+          notifyListeners(); // Trigger UI update instantly
+        }
+      }
+
       // Play Sound
       SoundService().playSuccess();
+
+      // Complete the task in backend
+      await _repository.completeTask(taskId);
+      
+      // Reload data to ensure consistency (background)
+      loadGrowthData(); 
       
       // Generate motivational message
       final privacyGpt = PrivacyGptService();
@@ -320,5 +357,40 @@ class GrowthProvider with ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  // ==================== Saved Locations ====================
+
+  Future<void> _loadSavedLocations() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? jsonStr = prefs.getString('saved_locations');
+      if (jsonStr != null) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        _savedLocations = decoded.map((e) => UserLocation.fromMap(e)).toList();
+      } else {
+        _savedLocations = [];
+      }
+    } catch (e) {
+      debugPrint("Error loading locations: $e");
+    }
+  }
+
+  Future<void> addSavedLocation(UserLocation loc) async {
+    _savedLocations.add(loc);
+    notifyListeners();
+    await _persistSavedLocations();
+  }
+
+  Future<void> deleteSavedLocation(String id) async {
+    _savedLocations.removeWhere((l) => l.id == id);
+    notifyListeners();
+    await _persistSavedLocations();
+  }
+
+  Future<void> _persistSavedLocations() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String jsonStr = jsonEncode(_savedLocations.map((e) => e.toMap()).toList());
+    await prefs.setString('saved_locations', jsonStr);
   }
 }

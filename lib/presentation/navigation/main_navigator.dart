@@ -13,6 +13,8 @@ import '../theme/app_theme.dart';
 import '../screens/chat_screen.dart';
 import '../screens/day_planner_screen.dart'; // Added
 import '../../data/models/goal.dart';
+import '../../data/models/goal_task.dart';
+import '../widgets/quick_task_input_sheet.dart';
 
 /// Main navigation wrapper with bottom tab bar
 /// Provides smooth transitions and consistent navigation structure
@@ -180,6 +182,107 @@ class _MainNavigatorState extends State<MainNavigator>
       ),
       bottomNavigationBar: _buildBottomNavBar(context),
       extendBody: true,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: _currentIndex == 0 
+        ? Padding(
+            padding: const EdgeInsets.only(bottom: 50.0), // Adjust to be above navbar
+            child: FloatingActionButton(
+              onPressed: () => _showQuickTaskSheet(context),
+              backgroundColor: AppTheme.primaryColor,
+              elevation: 4,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
+          )
+        : null,
+    );
+  }
+
+  void _showQuickTaskSheet(BuildContext parentContext) {
+    showModalBottomSheet(
+      context: parentContext,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => QuickTaskInputSheet(
+        onSubmit: (title, date, priority, tags, repeat, location) async {
+          // Close the sheet first
+          Navigator.pop(sheetContext);
+          
+          if (title.isEmpty) return;
+
+          try {
+            // Use parentContext which is still valid
+            final provider = parentContext.read<GrowthProvider>();
+            
+            // Find or Create 'Inbox' Goal
+            Goal? inboxGoal;
+            
+            // Check if goals are loaded, otherwise load them
+            if (provider.goals.isEmpty) {
+                await provider.loadGrowthData();
+            }
+            
+            try {
+              inboxGoal = provider.goals.firstWhere((g) => g.name == 'Inbox', orElse: () => Goal(id: -1, name: 'temp', createdAt: DateTime.now()));
+            } catch (_) { }
+
+            int goalId;
+            if (inboxGoal == null || inboxGoal.id == -1) {
+              debugPrint('📥 Creating new Inbox goal...');
+              goalId = await provider.createGoal('Inbox');
+            } else {
+              goalId = inboxGoal.id;
+            }
+            
+            debugPrint('📥 Using Inbox Goal ID: $goalId for new task');
+
+            // Create Task
+            final newTask = GoalTask(
+              id: 0, // Placeholder
+              goalId: goalId,
+              title: title,
+              description: tags.join(' '), 
+              createdAt: DateTime.now(),
+              scheduledDate: date,
+              priority: priority,
+              frequency: repeat ?? 'one-time', 
+              suggestedLocation: location ?? 'any', 
+              isCompleted: false,
+              estimatedHours: 0.5, 
+              order: 0,
+              indentLevel: 0,
+              subtasks: [],
+            );
+
+            await provider.createTask(newTask);
+
+            // Use parentWidget's context for checking mounted property if possible, 
+            // but since we are in a closure, we can't easily check parentContext.mounted 
+            // without linter warnings in older Flutter. 
+            // However, ScaffoldMessenger needs a valid context.
+            if (parentContext.mounted) {
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                SnackBar(
+                  content: Text('Task added to Inbox 📥'),
+                  action: SnackBarAction(
+                    label: 'Undo',
+                    onPressed: () {
+                         // TODO: Undo logic
+                    },
+                  ),
+                ),
+              );
+            }
+          } catch (e) {
+            debugPrint('Error creating task: $e');
+            if (parentContext.mounted) {
+               ScaffoldMessenger.of(parentContext).showSnackBar(
+                 SnackBar(content: Text('Error adding task: $e')),
+               );
+            }
+          }
+        },
+      ),
     );
   }
 

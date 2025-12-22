@@ -125,7 +125,7 @@ class _LocationReminderDialogState extends State<LocationReminderDialog> {
                       children: [
                         Text(
                           widget.forLocationSelectionOnly 
-                              ? 'Select Location' 
+                              ? 'Confirm Location' 
                               : 'Add Location Reminder',
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w700,
@@ -134,7 +134,7 @@ class _LocationReminderDialogState extends State<LocationReminderDialog> {
                         const SizedBox(height: 4),
                         Text(
                           widget.forLocationSelectionOnly
-                              ? 'Choose location for your reminder'
+                              ? 'Save this spot for easier access later'
                               : 'Set reminder for this location',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: AppTheme.textSecondary,
@@ -196,12 +196,29 @@ class _LocationReminderDialogState extends State<LocationReminderDialog> {
 
               const SizedBox(height: AppTheme.spacingLG),
 
+              // Location Type Chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildTypeChip('Home', '🏠'),
+                    _buildTypeChip('Work', '💼'),
+                    _buildTypeChip('Grocery', '🛒'),
+                    _buildTypeChip('Gym', '💪'),
+                    _buildTypeChip('School', '📚'),
+                    _buildTypeChip('Other', '📍'),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: AppTheme.spacingMD),
+
               // Location name input
               TextField(
                 controller: _locationNameController,
                 decoration: InputDecoration(
                   labelText: 'Location Name',
-                  hintText: 'e.g., Home, Work, Gym',
+                  hintText: 'e.g., Coffee Shop',
                   prefixIcon: const Icon(Icons.place_rounded),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppTheme.radiusMD),
@@ -214,23 +231,24 @@ class _LocationReminderDialogState extends State<LocationReminderDialog> {
 
               const SizedBox(height: AppTheme.spacingMD),
 
-              // Reminder text input (optional if for location selection only)
-              TextField(
-                controller: _reminderTextController,
-                decoration: InputDecoration(
-                  labelText: widget.forLocationSelectionOnly 
-                      ? 'Reminder Text (Optional)' 
-                      : 'Reminder Text *',
-                  hintText: 'What should I remind you?',
-                  prefixIcon: const Icon(Icons.note_rounded),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+              if (!widget.forLocationSelectionOnly) ...[
+                  const SizedBox(height: AppTheme.spacingMD),
+                  // Reminder text input (optional if for location selection only)
+                  TextField(
+                    controller: _reminderTextController,
+                    decoration: InputDecoration(
+                      labelText: 'Reminder Text *',
+                      hintText: 'What should I remind you?',
+                      prefixIcon: const Icon(Icons.note_rounded),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                      ),
+                      filled: true,
+                      fillColor: AppTheme.surfaceColor,
+                    ),
+                    maxLines: 2,
                   ),
-                  filled: true,
-                  fillColor: AppTheme.surfaceColor,
-                ),
-                maxLines: 2,
-              ),
+              ],
 
               const SizedBox(height: AppTheme.spacingLG),
 
@@ -242,42 +260,24 @@ class _LocationReminderDialogState extends State<LocationReminderDialog> {
                 ),
               ),
               const SizedBox(height: AppTheme.spacingSM),
-              Row(
+               Row(
                 children: [
                   Expanded(
-                    child: FilterChip(
-                      label: const Text('On Arrive'),
-                      selected: _onArrive,
-                      onSelected: (selected) {
-                        setState(() {
-                          _onArrive = selected;
-                          if (selected && !_onLeave) {
-                            // At least one must be selected
-                          }
-                        });
-                        HapticFeedback.selectionClick();
-                      },
-                      selectedColor: AppTheme.primaryColor.withOpacity(0.2),
-                      checkmarkColor: AppTheme.primaryColor,
-                    ),
+                    child: _buildTriggerChip('On Arrive', _onArrive, (v) {
+                         setState(() {
+                           _onArrive = v;
+                           if (v && !_onLeave) {} // Logic kept
+                         });
+                    }),
                   ),
                   const SizedBox(width: AppTheme.spacingSM),
                   Expanded(
-                    child: FilterChip(
-                      label: const Text('On Leave'),
-                      selected: _onLeave,
-                      onSelected: (selected) {
-                        setState(() {
-                          _onLeave = selected;
-                          if (selected && !_onArrive) {
-                            // At least one must be selected
-                          }
-                        });
-                        HapticFeedback.selectionClick();
-                      },
-                      selectedColor: AppTheme.primaryColor.withOpacity(0.2),
-                      checkmarkColor: AppTheme.primaryColor,
-                    ),
+                    child: _buildTriggerChip('On Leave', _onLeave, (v) {
+                         setState(() {
+                           _onLeave = v;
+                           if (v && !_onArrive) {} // Logic kept
+                         });
+                    }),
                   ),
                 ],
               ),
@@ -313,9 +313,12 @@ class _LocationReminderDialogState extends State<LocationReminderDialog> {
               Wrap(
                 spacing: AppTheme.spacingSM,
                 children: [50.0, 100.0, 200.0, 500.0].map((radius) {
+                  final isSelected = (_radius - radius).abs() < 1.0;
+                  final theme = Theme.of(context);
+                  final isDark = theme.brightness == Brightness.dark;
                   return ChoiceChip(
                     label: Text('${radius.toInt()}m'),
-                    selected: (_radius - radius).abs() < 1.0,
+                    selected: isSelected,
                     onSelected: (selected) {
                       if (selected) {
                         setState(() {
@@ -324,7 +327,16 @@ class _LocationReminderDialogState extends State<LocationReminderDialog> {
                         HapticFeedback.selectionClick();
                       }
                     },
-                    selectedColor: AppTheme.primaryColor.withOpacity(0.2),
+                    selectedColor: AppTheme.primaryColor,
+                    backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                    labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black87),
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(color: isSelected ? AppTheme.primaryColor : Colors.transparent),
+                    ),
                   );
                 }).toList(),
               ),
@@ -377,6 +389,70 @@ class _LocationReminderDialogState extends State<LocationReminderDialog> {
         ),
       ),
     );
+  }
+  
+  Widget _buildTypeChip(String label, String emoji) {
+      final isSelected = _locationNameController.text == label;
+      final theme = Theme.of(context);
+      final isDark = theme.brightness == Brightness.dark;
+      
+      return Padding(
+        padding: const EdgeInsets.only(right: 8.0),
+        child: ChoiceChip(
+            label: Text('$emoji $label'),
+            selected: isSelected,
+            onSelected: (selected) {
+                if (selected) {
+                    setState(() {
+                        if (label == 'Other') {
+                            _locationNameController.clear();
+                        } else {
+                            _locationNameController.text = label;
+                        }
+                    });
+                    HapticFeedback.selectionClick();
+                }
+            },
+            selectedColor: AppTheme.primaryColor,
+            backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+            labelStyle: TextStyle(
+                color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black87),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: isSelected ? AppTheme.primaryColor : Colors.transparent,
+              ),
+            ),
+        ),
+      );
+  }
+
+  Widget _buildTriggerChip(String label, bool isSelected, Function(bool) onSelected) {
+      final theme = Theme.of(context);
+      final isDark = theme.brightness == Brightness.dark;
+      return ChoiceChip(
+            label: Text(label),
+            selected: isSelected,
+            onSelected: (v) {
+                onSelected(v);
+                HapticFeedback.selectionClick();
+            },
+            selectedColor: AppTheme.primaryColor,
+            backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+            labelStyle: TextStyle(
+                color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black87),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: isSelected ? AppTheme.primaryColor : Colors.transparent,
+              ),
+            ),
+      );
   }
 }
 

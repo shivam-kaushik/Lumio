@@ -320,10 +320,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
     final statusColor = _getStatusColor(status);
     final daysRemaining = _getDaysRemaining(goal.targetDeadline);
     
-    // Get preview tasks (fill space - top 3)
-    final previewTasks = tasks.where((t) => !t.isCompleted).take(3).toList();
+    // Get preview tasks (fill space - top 5)
+    final previewTasks = tasks.where((t) => !t.isCompleted).take(5).toList();
     if (previewTasks.isEmpty && tasks.isNotEmpty) {
-      previewTasks.addAll(tasks.take(3));
+      previewTasks.addAll(tasks.take(5));
     }
 
     return ModernSmartCard(
@@ -423,9 +423,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                 ],
                               ),
                             )),
-                            if (tasks.length > 3)
+                            if (tasks.length > 5)
                               Text(
-                                "+ ${tasks.length - 3} more",
+                                "+ ${tasks.length - 5} more",
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: isDark ? Colors.white38 : Colors.black38,

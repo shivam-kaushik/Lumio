@@ -166,14 +166,17 @@ class FirestoreGrowthRepository {
 
   /// Create a task for a goal
   Future<int> createTask(GoalTask task) async {
+    debugPrint('🔥 FirestoreGrowthRepository: Creating task "${task.title}" for Goal ID ${task.goalId}...');
     final collection = _firestoreService.getTasksCollection(task.goalId.toString());
     if (collection == null) {
+      debugPrint('❌ FirestoreGrowthRepository: User not authenticated');
       throw Exception('User not authenticated');
     }
 
     // Generate unique ID
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
     await collection.doc(taskId).set(task.toFirestore());
+    debugPrint('✅ FirestoreGrowthRepository: Task created successfully with ID $taskId');
     return int.parse(taskId);
   }
 

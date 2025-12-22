@@ -35,7 +35,8 @@ class _ReminderCardState extends State<ReminderCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
-
+  late bool _isCompleted;
+  
   @override
   void initState() {
     super.initState();
@@ -46,6 +47,22 @@ class _ReminderCardState extends State<ReminderCard>
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.97).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
+    _initializeState();
+  }
+
+  @override
+  void didUpdateWidget(ReminderCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.reminder.enabled != widget.reminder.enabled || 
+        oldWidget.reminder.isRecurring != widget.reminder.isRecurring) {
+      _initializeState();
+    }
+  }
+
+  void _initializeState() {
+    _isCompleted = widget.reminder.isRecurring
+        ? false // recurrings calculate async, keep default
+        : !widget.reminder.enabled;
   }
 
   @override
@@ -54,10 +71,46 @@ class _ReminderCardState extends State<ReminderCard>
     super.dispose();
   }
 
+  void _handleTap() {
+    HapticFeedback.mediumImpact();
+    
+    // OPTIMISTIC LOCAL UPDATE
+    setState(() {
+      _isCompleted = !_isCompleted;
+    });
+
+    if (widget.onToggle != null) {
+      // If we are now "completed" (true), pass false (enabled=false)
+      // If we are now "uncompleted" (false), pass true (enabled=true)
+      // Conveniently, we can just pass !_isCompleted as the new 'enabled' state
+      widget.onToggle!(!_isCompleted);
+      return;
+    }
+    
+    // Fallback for providers if onToggle not used (legacy)
+    final provider = Provider.of<ReminderProvider>(context, listen: false);
+    if (!_isCompleted) { 
+       // State is already flipped locally to "uncompleted", so we want to uncomplete remotely? 
+       // Check logic: 
+       // We tapped. 
+       // Old state: Completed (true) -> New local state: Uncompleted (false).
+       // Action: Uncomplete.
+       provider.uncompleteReminder(widget.reminder.id);
+    } else {
+       // Old state: Uncompleted (false) -> New local state: Completed (true).
+       // Action: Complete.
+       provider.completeReminder(widget.reminder.id);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
+    // Use local state for visual properties
+    final isDone = _isCompleted;
+    final isEnabled = !isDone;
+
     return ScaleTransition(
       scale: _scaleAnimation,
       child: ModernSmartCard(
@@ -66,8 +119,8 @@ class _ReminderCardState extends State<ReminderCard>
           horizontal: 12,
           vertical: 8,
         ),
-        elevationLevel: widget.reminder.enabled ? 1 : 0,
-        borderColor: widget.reminder.enabled 
+        elevationLevel: isEnabled ? 1 : 0,
+        borderColor: isEnabled 
             ? AppTheme.primaryColor.withOpacity(0.1)
             : null,
         onTap: widget.onTap,
@@ -75,110 +128,90 @@ class _ReminderCardState extends State<ReminderCard>
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Complete checkbox - Leftmost
-            Consumer<ReminderProvider>(
+            isDone || !widget.reminder.isRecurring // Use local state for standard reminders
+            ? GestureDetector(
+                onTap: _handleTap,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isDone
+                          ? AppTheme.successColor
+                          : AppTheme.borderColor,
+                      width: 2,
+                    ),
+                    color: isDone
+                        ? AppTheme.successColor
+                        : Colors.transparent,
+                  ),
+                  child: isDone
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: Colors.white,
+                          size: 14,
+                        )
+                      : null,
+                ),
+              )
+            // For recurring reminders, we might still need async check for specific occurrences if complex
+            // But for now, let's keep the FutureBuilder mainly for the 'check' status if strictly needed.
+            // Simplified for better perf:
+            : Consumer<ReminderProvider>(
               builder: (context, provider, child) {
-                // For one-time reminders, completion is based on enabled flag
-                // For recurring reminders, check if there are completed occurrences
-                final isCompleted = widget.reminder.isRecurring
-                    ? false // Will be determined by FutureBuilder below
-                    : !widget.reminder.enabled;
-                
-                if (widget.reminder.isRecurring) {
-                  // For recurring reminders, check if there are completed occurrences
                   return FutureBuilder<List<ReminderOccurrence>>(
                     future: FirestoreReminderRepository().getCompletedOccurrences(widget.reminder.id),
                     builder: (context, snapshot) {
                       final hasCompletedOccurrences = snapshot.hasData && snapshot.data!.isNotEmpty;
+                      // Update local if needed? No, separate logic for recurring.
+                      // ... (existing recurring logic block if we want to keep it totally separate)
+                      // Actually, let's unify.
+                      // If it IS recurring, we rely on the future builder for the checked state source of truth?
+                      // Or we can just use the toggle.
+                      
+                      // For now, return the widget as before for recurring special case
                       return GestureDetector(
                         onTap: () {
-                          HapticFeedback.mediumImpact();
-                          if (!hasCompletedOccurrences) {
-                            provider.completeReminder(widget.reminder.id);
-                          } else {
-                            provider.uncompleteReminder(widget.reminder.id);
-                          }
+                           HapticFeedback.mediumImpact();
+                           if (widget.onToggle != null) {
+                             widget.onToggle!(!widget.reminder.enabled);
+                             return;
+                           }
+                           if (!hasCompletedOccurrences) provider.completeReminder(widget.reminder.id);
+                           else provider.uncompleteReminder(widget.reminder.id);
                         },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: hasCompletedOccurrences
-                                  ? AppTheme.successColor
-                                  : AppTheme.borderColor,
-                              width: 2,
-                            ),
-                            color: hasCompletedOccurrences
-                                ? AppTheme.successColor
-                                : Colors.transparent,
-                          ),
-                          child: hasCompletedOccurrences
-                              ? const Icon(
-                                  Icons.check_rounded,
-                                  color: Colors.white,
-                                  size: 14,
-                                )
-                              : null,
+                           width: 20, height: 20,
+                           decoration: BoxDecoration(
+                             shape: BoxShape.circle,
+                             border: Border.all(color: hasCompletedOccurrences ? AppTheme.successColor : AppTheme.borderColor, width: 2),
+                             color: hasCompletedOccurrences ? AppTheme.successColor : Colors.transparent,
+                           ),
+                           child: hasCompletedOccurrences ? const Icon(Icons.check_rounded, color: Colors.white, size: 14) : null,
                         ),
                       );
                     },
                   );
-                }
-                
-                // For one-time reminders
-                return GestureDetector(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    if (!isCompleted) {
-                      provider.completeReminder(widget.reminder.id);
-                    } else {
-                      provider.uncompleteReminder(widget.reminder.id);
-                    }
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 20, // Reduced from 24
-                    height: 20, // Reduced from 24
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isCompleted
-                            ? AppTheme.successColor
-                            : AppTheme.borderColor,
-                        width: 2,
-                      ),
-                      color: isCompleted
-                          ? AppTheme.successColor
-                          : Colors.transparent,
-                    ),
-                    child: isCompleted
-                        ? const Icon(
-                            Icons.check_rounded,
-                            color: Colors.white,
-                            size: 14, // Reduced from 16
-                          )
-                        : null,
-                  ),
-                );
               },
             ),
             
-            const SizedBox(width: 10), // Reduced from spacingMD
-            
-            // Reminder text - Center (expanded)
+            const SizedBox(width: 10),
+
+            // Reminder text
             Expanded(
               child: Text(
                 widget.reminder.text,
-                style: theme.textTheme.bodyMedium?.copyWith( // Changed from bodyLarge
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w500,
-                  height: 1.3, // Reduced from 1.4
-                  fontSize: 14, // Explicit smaller font
-                  decoration: !widget.reminder.enabled
+                  height: 1.3,
+                  fontSize: 14,
+                  decoration: isDone
                       ? TextDecoration.lineThrough
                       : TextDecoration.none,
-                  color: !widget.reminder.enabled
+                  color: isDone
                       ? (theme.brightness == Brightness.dark
                           ? AppTheme.darkTextTertiary
                           : AppTheme.textTertiary)
@@ -191,9 +224,9 @@ class _ReminderCardState extends State<ReminderCard>
               ),
             ),
             
-            const SizedBox(width: 10), // Reduced from spacingMD
+            const SizedBox(width: 10),
             
-            // Date and time - Rightmost
+            // Date and time
             _buildDateTime(context, widget.reminder),
           ],
         ),

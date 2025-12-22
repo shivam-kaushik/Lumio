@@ -1290,22 +1290,7 @@ class _MapViewScreenState extends State<MapViewScreen> {
     ReminderProvider provider,
   ) {
     if (_locationReminders.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(AppTheme.spacingMD),
-        margin: const EdgeInsets.all(AppTheme.spacingMD),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(AppTheme.radiusLG),
-          boxShadow: AppTheme.getElevationShadow(2),
-        ),
-        child: Text(
-          'No location-based reminders',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: AppTheme.textSecondary,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     return Container(

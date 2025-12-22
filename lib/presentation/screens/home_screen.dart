@@ -109,8 +109,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (activeTask != null) break;
                       }
 
-                      // Group tasks by goals
-                      final groups = _groupTasksByGoals(
+                      // Group tasks? No, user wants a flat list.
+                      final allReminders = _getAllReminders(
                         visibleReminders,
                         growthProvider,
                       );
@@ -187,12 +187,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               },
                             ),
 
-                            if (groups.isEmpty)
+                            if (allReminders.isEmpty)
                                SliverFillRemaining(child: _buildEmptyState(context)),
 
-                            // Task groups by goals
-                            ...groups.entries.map((entry) {
-                              return SliverPadding(
+                            // Unified Task List
+                            if (allReminders.isNotEmpty)
+                              SliverPadding(
                                 padding: const EdgeInsets.fromLTRB(
                                   AppTheme.spacingMD,
                                   0,
@@ -201,11 +201,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 sliver: SliverToBoxAdapter(
                                   child: ContextGroupCard(
-                                    contextTitle: entry.key,
-                                    reminders: entry.value,
-                                    contextIcon: entry.key == 'General Tasks' ? null : '🎯',
+                                    contextTitle: 'All Tasks', // Flattened title
+                                    reminders: allReminders, // Flattened list
+                                    contextIcon: '📝',
                                     currentPosition: _currentPosition,
                                     onReminderTap: (reminder) async {
+                                      if (reminder.id.startsWith('task_')) {
+                                          // TODO: Navigate to Task Edit
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text("Editing tasks from Home is coming soon!"))
+                                          );
+                                          return;
+                                      }
+
                                       final result = await showDialog<Reminder>(
                                         context: context,
                                         builder: (context) => SmartReminderDialog(
@@ -217,16 +225,36 @@ class _HomeScreenState extends State<HomeScreen> {
                                       }
                                     },
                                     onToggle: (id, enabled) {
-                                      reminderProvider.toggleReminder(id, enabled);
+                                      if (id.startsWith('task_')) {
+                                          final taskId = int.tryParse(id.substring(5)); // Remove 'task_' check
+                                          if (taskId != null) {
+                                              if (enabled) {
+                                                  // Enabled = Active = Uncompleted
+                                                  growthProvider.uncompleteTask(taskId);
+                                              } else {
+                                                  // Disabled = Inactive = Completed
+                                                  growthProvider.completeTask(taskId);
+                                              }
+                                          }
+                                      } else {
+                                          reminderProvider.toggleReminder(id, enabled);
+                                      }
                                     },
                                     onDelete: (id) {
-                                      reminderProvider.deleteReminder(id);
+                                      if (id.startsWith('task_')) {
+                                          final taskId = int.tryParse(id.substring(5));
+                                          if (taskId != null) {
+                                              growthProvider.deleteTask(taskId);
+                                          }
+                                      } else {
+                                          reminderProvider.deleteReminder(id);
+                                      }
                                     },
                                   ),
                                 ),
-                              );
-                            }),
-                        
+                              ),
+
+
                             // Bottom padding above bottom navigation bar
                             const SliverPadding(
                               padding: EdgeInsets.only(bottom: 120),
@@ -244,41 +272,67 @@ class _HomeScreenState extends State<HomeScreen> {
       );
   }
 
-  /// Group tasks by goals (using linkedGoalId)
-  Map<String, List<Reminder>> _groupTasksByGoals(
+  /// Get ALL tasks flattened into one list, filtered for Inbox/Daily Plan
+  List<Reminder> _getAllReminders(
     List<Reminder> reminders,
     GrowthProvider growthProvider,
   ) {
-    final groups = <String, List<Reminder>>{};
-    final goalMap = {
-      for (var goal in growthProvider.goals) goal.id: goal.name,
-    };
+    final allReminders = [...reminders];
 
-    for (var reminder in reminders) {
-      String groupName = 'General Tasks';
-
-      if (reminder.linkedGoalId != null) {
-        final linkedGoalName = goalMap[reminder.linkedGoalId!];
-        if (linkedGoalName != null) {
-          groupName = linkedGoalName;
-        }
+    // Identify allowed Goal IDs (Inbox and Daily Plans)
+    final allowedGoalIds = <int>{};
+    for (var goal in growthProvider.goals) {
+      if (goal.name == 'Inbox' || goal.name.startsWith('Daily Plan')) {
+        allowedGoalIds.add(goal.id);
       }
-
-      groups.putIfAbsent(groupName, () => []).add(reminder);
     }
 
-    // Sort groups: Goals first (alphabetically), then "General Tasks"
-    final sortedGroups = <String, List<Reminder>>{};
-    final goalNames = groups.keys.where((k) => k != 'General Tasks').toList()
-      ..sort();
-    for (var goalName in goalNames) {
-      sortedGroups[goalName] = groups[goalName]!;
-    }
-    if (groups.containsKey('General Tasks')) {
-      sortedGroups['General Tasks'] = groups['General Tasks']!;
-    }
+    // Inject GoalTasks from allowed goals only
+    if (growthProvider.tasksByGoal.isNotEmpty) {
+      final allTasks = growthProvider.tasksByGoal.values.expand((list) => list).toList();
 
-    return sortedGroups;
+       for (var task in allTasks) {
+          // Filter: Must be in an allowed goal (Main Screen tasks)
+          if (!allowedGoalIds.contains(task.goalId)) {
+            continue; 
+          }
+          
+          allReminders.add(Reminder(
+              id: "task_${task.id}", // Prefix to avoid collisions
+              text: task.title,
+              timeAt: task.scheduledDate ?? task.createdAt, // Fallback to created
+              priority: _mapPriority(task.priority),
+              category: ReminderCategory.work, // Default or parse tags
+              linkedGoalId: task.goalId,
+              enabled: !task.isCompleted, // Map completion status to enabled status
+          ));
+       }
+    }
+    
+    // Sort logic
+    allReminders.sort((a, b) {
+        // 1. Incomplete before Complete
+        if (a.enabled != b.enabled) {
+            return a.enabled ? -1 : 1;
+        }
+        // 2. Scheduled Time (if available)
+        if (a.timeAt != null && b.timeAt != null) {
+            return a.timeAt!.compareTo(b.timeAt!);
+        }
+        return 0;
+    });
+
+    return allReminders;
+  }
+
+  ReminderPriority _mapPriority(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high': return ReminderPriority.high;
+      case 'low': return ReminderPriority.low;
+      case 'critical': return ReminderPriority.critical;
+      case 'medium': 
+      default: return ReminderPriority.medium;
+    }
   }
 
   Widget _buildPremiumHeader(BuildContext context, bool isDark) {

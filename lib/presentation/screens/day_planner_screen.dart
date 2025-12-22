@@ -161,19 +161,30 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
         final dateStr = "${today.year}-${today.month}-${today.day}";
         final goalName = "Daily Plan - $dateStr";
         
-        // Find goal
+        // Find goals
         int? dayGoalId;
+        int? inboxGoalId;
         try {
-          final goal = provider.goals.firstWhere((g) => g.name == goalName);
-          dayGoalId = goal.id;
+          dayGoalId = provider.goals.firstWhere((g) => g.name == goalName).id;
+        } catch (_) {}
+        try {
+          inboxGoalId = provider.goals.firstWhere((g) => g.name == 'Inbox').id;
         } catch (_) {}
         
+        // Collect ALL tasks
+        List<GoalTask> tasks = [];
+        if (dayGoalId != null) {
+            tasks.addAll(provider.getTasksForGoal(dayGoalId));
+        }
+        if (inboxGoalId != null) {
+            tasks.addAll(provider.getTasksForGoal(inboxGoalId));
+        }
+        
         // Check tasks
-        final hasPlan = dayGoalId != null && provider.getTasksForGoal(dayGoalId).isNotEmpty;
+        final hasPlan = tasks.isNotEmpty;
         
         if (hasPlan && _generatedPlan == null) {
           // MODE B: DASHBOARD (Plan Exists)
-          final tasks = provider.getTasksForGoal(dayGoalId!);
           return Scaffold(
             backgroundColor: theme.scaffoldBackgroundColor,
             appBar: AppBar(
