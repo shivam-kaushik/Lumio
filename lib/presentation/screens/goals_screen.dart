@@ -25,513 +25,12 @@ class GoalsScreen extends StatefulWidget {
 }
 
 class _GoalsScreenState extends State<GoalsScreen> {
-  final stt.SpeechToText _speech = stt.SpeechToText();
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GrowthProvider>().loadGrowthData();
     });
-  }
-
-  Future<void> _transcribeVoiceInput(
-    TextEditingController controller,
-    StateSetter setDialogState,
-    VoidCallback onStopListening,
-  ) async {
-    final permissionService = PermissionService();
-    final hasPermission = await permissionService.requestMicrophonePermission();
-    
-    if (!hasPermission) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Microphone permission is required')),
-        );
-      }
-      onStopListening();
-      return;
-    }
-
-    final available = await _speech.initialize();
-    if (!available) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Speech recognition not available')),
-        );
-      }
-      onStopListening();
-      return;
-    }
-
-    bool isFinal = false;
-    await _speech.listen(
-      onResult: (result) {
-        setDialogState(() {
-          controller.text = result.recognizedWords;
-          if (result.finalResult) {
-            isFinal = true;
-            _speech.stop();
-            onStopListening();
-          }
-        });
-      },
-      localeId: 'en_US',
-      listenOptions: stt.SpeechListenOptions(
-        listenMode: stt.ListenMode.confirmation,
-        cancelOnError: true,
-        partialResults: true,
-      ),
-    );
-
-    // Auto-stop after 5 seconds if no final result
-    await Future.delayed(const Duration(seconds: 5));
-    if (!isFinal) {
-      await _speech.stop();
-      onStopListening();
-    }
-  }
-
-  Future<void> _createGoal() async {
-    final controller = TextEditingController();
-    
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          bool isListening = false;
-          
-          return AlertDialog(
-            title: const Text('Create Goal'),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Describe your goal (e.g., Launch my SaaS product)',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                    color: isListening ? AppTheme.errorColor : null,
-                  ),
-                  onPressed: () async {
-                    setDialogState(() => isListening = true);
-                    await _transcribeVoiceInput(controller, setDialogState, () {
-                      setDialogState(() => isListening = false);
-                    });
-                  },
-                  tooltip: 'Voice input',
-                ),
-              ),
-              maxLines: 3,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, controller.text),
-                child: const Text('Next'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    if (result != null && result.isNotEmpty && mounted) {
-      // Show creation method selection
-      final creationMethod = await _showCreationMethodDialog(context);
-      
-      if (creationMethod == null) return;
-      
-      if (creationMethod == 'manual') {
-        // Manual creation - go directly to planning screen
-        await _createManualGoal(result);
-      } else if (creationMethod == 'ai') {
-        // AI creation - check premium status
-        final premiumService = PremiumService();
-        final isPremium = await premiumService.isPremium();
-        
-        if (!isPremium) {
-          // Show premium upgrade dialog
-          final upgrade = await _showPremiumUpgradeDialog(context);
-          if (upgrade != true) return;
-        }
-        
-        // Proceed with AI creation
-        await _createAIGoal(result);
-      }
-    }
-  }
-
-  Future<String?> _showCreationMethodDialog(BuildContext context) async {
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('How would you like to create your goal?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit, color: AppTheme.primaryColor),
-              title: const Text('Create Manually'),
-              subtitle: const Text('Add tasks yourself'),
-              onTap: () => Navigator.pop(context, 'manual'),
-            ),
-            const Divider(),
-            ListTile(
-              leading: Icon(Icons.auto_awesome, color: AppTheme.warningColor),
-              title: const Text('AI-Powered (Premium)'),
-              subtitle: const Text('Let AI create tasks and roadmap'),
-              trailing: Icon(Icons.star, color: AppTheme.warningColor, size: 20),
-              onTap: () => Navigator.pop(context, 'ai'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<bool?> _showPremiumUpgradeDialog(BuildContext context) async {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.star, color: AppTheme.warningColor),
-            const SizedBox(width: 8),
-            const Text('Premium Feature'),
-          ],
-        ),
-        content: const Text(
-          'AI-powered goal planning is a premium feature. Upgrade to unlock intelligent task generation and roadmaps.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Premium upgrade coming soon! For now, you can create goals manually.'),
-                ),
-              );
-              Navigator.pop(context, false);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.warningColor,
-            ),
-            child: const Text('Upgrade'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _createManualGoal(String goalName) async {
-    try {
-      // Ask for timeline
-      final timeline = await _showTimelineDialog(context);
-      
-      if (timeline == null) return;
-      
-      final deadline = timeline['deadline'] as DateTime;
-      final hoursPerDay = (timeline['hoursPerDay'] as num?)?.toDouble() ?? 2.0;
-      
-      // Create goal
-      final goalId = await context.read<GrowthProvider>().createGoal(
-        goalName,
-        targetDeadline: deadline,
-        hoursPerDay: hoursPerDay,
-      );
-      
-      if (mounted) {
-        // Navigate to Unified Editor
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => UnifiedGoalEditorScreen(
-              isNew: false, // Created but now editing/filling
-              existingGoal: Goal(
-                  id: goalId, 
-                  name: goalName, 
-                  createdAt: DateTime.now(), 
-                  targetDeadline: deadline, 
-                  hoursPerDay: hoursPerDay,
-                  totalEstimatedHours: 0
-              ),
-              initialTasks: [],
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _createAIGoal(String goalName) async {
-    try {
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
-
-      // Generate roadmap using GPT (includes tasks)
-      final gptService = PrivacyGptService();
-      
-      // Ask for timeline first (needed for generateDetailedRoadmap)
-      final timeline = await _showTimelineDialog(context);
-      
-      if (timeline == null) {
-        if (mounted) {
-          Navigator.pop(context); // Close loading dialog
-        }
-        return;
-      }
-      
-      final deadline = timeline['deadline'] as DateTime;
-      final hoursPerDay = (timeline['hoursPerDay'] as num?)?.toDouble() ?? 2.0;
-      
-      // Generate detailed roadmap with tasks
-      final roadmap = await gptService.generateDetailedRoadmap(
-        goalName,
-        targetDeadline: deadline,
-        hoursPerDay: hoursPerDay,
-      );
-      
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        
-        if (roadmap != null && roadmap['tasks'] != null) {
-          // Create goal with deadline and capacity
-          final goalId = await context.read<GrowthProvider>().createGoal(
-            goalName,
-            targetDeadline: deadline,
-            hoursPerDay: hoursPerDay,
-            totalEstimatedHours: roadmap['totalEstimatedHours'] as int?,
-          );
-          
-          // Navigate to Unified Editor with AI results
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => UnifiedGoalEditorScreen(
-                isNew: false, 
-                existingGoal: Goal(
-                  id: goalId,
-                  name: goalName,
-                  createdAt: DateTime.now(),
-                  targetDeadline: deadline,
-                  hoursPerDay: hoursPerDay,
-                  totalEstimatedHours: roadmap['totalEstimatedHours'] as int?,
-                ),
-                initialTasks: () {
-                    final rawTasks = roadmap['tasks'] as List;
-                    final totalDays = deadline.difference(DateTime.now()).inDays;
-                    final daysPerTask = (totalDays / (rawTasks.isEmpty ? 1 : rawTasks.length)).floor();
-                    final now = DateTime.now();
-
-                    return rawTasks.asMap().entries.map<GoalTask>((entry) {
-                      final i = entry.key;
-                      final s = entry.value as Map<String, dynamic>;
-                      final t = Task.fromMap(s);
-                      
-                      // Calculate distributed date
-                      final taskDeadline = now.add(Duration(days: (i + 1) * daysPerTask));
-
-                      return GoalTask(
-                        id: 0, // Temporary ID for new tasks
-                        goalId: goalId,
-                        title: t.title,
-                        description: t.description,
-                        estimatedHours: t.estimatedHours,
-                        priority: t.priority,
-                        frequency: t.frequency, 
-                        suggestedTime: t.suggestedTime,
-                        suggestedLocation: t.suggestedLocation,
-                        isMilestone: t.isMilestone,
-                        motivationAnchor: t.motivationAnchor,
-                        scheduledDate: taskDeadline, // Assign calculated date
-                        createdAt: DateTime.now(),
-                      );
-                    }).toList();
-                }(),
-              ),
-            ),
-          );
-        } else {
-          // Fallback: create goal without roadmap
-          final goalId = await context.read<GrowthProvider>().createGoal(goalName);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Goal created! You can add tasks manually.')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog if open
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
-  }
-
-  Future<Map<String, dynamic>?> _showTimelineDialog(BuildContext context) async {
-    return showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (dialogContext) {
-        double hoursPerDay = 2.0;
-        
-        return StatefulBuilder(
-          builder: (context, setState) => AlertDialog(
-            title: const Text('Goal Timeline'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                   Text(
-                    'When do you want to complete this goal?',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                  ),
-                  const SizedBox(height: AppTheme.spacingMD),
-                  _buildTimelineOption(dialogContext, setState, '1 day', 1, 'days', () => hoursPerDay),
-                  _buildTimelineOption(dialogContext, setState, '1 week', 1, 'weeks', () => hoursPerDay),
-                  _buildTimelineOption(dialogContext, setState, '2 weeks', 2, 'weeks', () => hoursPerDay),
-                  _buildTimelineOption(dialogContext, setState, '1 month', 1, 'months', () => hoursPerDay),
-                  _buildTimelineOption(dialogContext, setState, '2 months', 2, 'months', () => hoursPerDay),
-                  _buildTimelineOption(dialogContext, setState, '3 months', 3, 'months', () => hoursPerDay),
-                  _buildTimelineOption(dialogContext, setState, '6 months', 6, 'months', () => hoursPerDay),
-                  _buildTimelineOption(dialogContext, setState, '1 year', 12, 'months', () => hoursPerDay),
-                  const Divider(),
-                  _buildCustomTimelineOption(dialogContext, setState, () => hoursPerDay),
-                  const Divider(),
-                  const SizedBox(height: AppTheme.spacingSM),
-                   Text(
-                    'How many hours per day can you dedicate?',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                  ),
-                  const SizedBox(height: AppTheme.spacingSM),
-                  Slider(
-                    value: hoursPerDay,
-                    min: 0.5,
-                    max: 8.0,
-                    divisions: 15,
-                    label: '${hoursPerDay.toStringAsFixed(1)} hours/day',
-                    activeColor: AppTheme.primaryColor,
-                    onChanged: (value) {
-                      setState(() {
-                        hoursPerDay = value;
-                      });
-                    },
-                  ),
-                  Text(
-                    '${hoursPerDay.toStringAsFixed(1)} hours per day',
-                    style: TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCustomTimelineOption(
-    BuildContext dialogContext,
-    StateSetter setState,
-    double Function() getHoursPerDay,
-  ) {
-    return ListTile(
-      leading: const Icon(Icons.calendar_today_rounded),
-      title: const Text('Custom Date'),
-      subtitle: const Text('Select your own deadline'),
-      onTap: () async {
-        final selectedDate = await showDatePicker(
-          context: dialogContext,
-          initialDate: DateTime.now().add(const Duration(days: 30)),
-          firstDate: DateTime.now(),
-          lastDate: DateTime.now().add(const Duration(days: 365 * 5)), // 5 years max
-          builder: (context, child) {
-            return Theme(
-              data: Theme.of(context).copyWith(
-                colorScheme: ColorScheme.light(
-                  primary: AppTheme.primaryColor,
-                  onPrimary: Colors.white,
-                  surface: AppTheme.surfaceColor,
-                  onSurface: AppTheme.textPrimary,
-                ),
-              ),
-              child: child!,
-            );
-          },
-        );
-        
-        if (selectedDate != null) {
-          // Close the timeline dialog and return the result
-          Navigator.pop(dialogContext, {
-            'deadline': selectedDate,
-            'label': DateFormat('MMM d, y').format(selectedDate),
-            'hoursPerDay': getHoursPerDay(),
-          });
-        }
-      },
-    );
-  }
-
-  Widget _buildTimelineOption(
-    BuildContext context,
-    StateSetter setState,
-    String label,
-    int amount,
-    String unit,
-    double Function() getHoursPerDay,
-  ) {
-    return ListTile(
-      title: Text(label),
-      onTap: () {
-        final now = DateTime.now();
-        DateTime deadline;
-        if (unit == 'days') {
-          deadline = now.add(Duration(days: amount));
-        } else if (unit == 'weeks') {
-          deadline = now.add(Duration(days: amount * 7));
-        } else {
-          deadline = DateTime(now.year, now.month + amount, now.day);
-        }
-        Navigator.pop(context, {
-          'deadline': deadline,
-          'label': label,
-          'hoursPerDay': getHoursPerDay(),
-        });
-      },
-    );
   }
 
   String _getGoalStatus(Goal goal, int totalTasks, int completedTasks) {
@@ -615,7 +114,13 @@ class _GoalsScreenState extends State<GoalsScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
-                    onPressed: _createGoal,
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const UnifiedGoalEditorScreen(isNew: true),
+                        ),
+                      );
+                    },
                     icon: const Icon(Icons.add_rounded, color: AppTheme.primaryColor),
                     tooltip: 'Add Goal',
                   ),
@@ -752,7 +257,13 @@ class _GoalsScreenState extends State<GoalsScreen> {
             ),
             const SizedBox(height: AppTheme.spacingXL),
             ElevatedButton.icon(
-              onPressed: _createGoal,
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const UnifiedGoalEditorScreen(isNew: true),
+                  ),
+                );
+              },
               icon: const Icon(Icons.add_rounded),
               label: const Text('Start New Goal'),
               style: ElevatedButton.styleFrom(
@@ -809,10 +320,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
     final statusColor = _getStatusColor(status);
     final daysRemaining = _getDaysRemaining(goal.targetDeadline);
     
-    // Get preview tasks (fill space - top 4)
-    final previewTasks = tasks.where((t) => !t.isCompleted).take(4).toList();
+    // Get preview tasks (fill space - top 3)
+    final previewTasks = tasks.where((t) => !t.isCompleted).take(3).toList();
     if (previewTasks.isEmpty && tasks.isNotEmpty) {
-      previewTasks.addAll(tasks.take(4));
+      previewTasks.addAll(tasks.take(3));
     }
 
     return ModernSmartCard(
@@ -912,9 +423,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                 ],
                               ),
                             )),
-                            if (tasks.length > 4)
+                            if (tasks.length > 3)
                               Text(
-                                "+ ${tasks.length - 4} more",
+                                "+ ${tasks.length - 3} more",
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: isDark ? Colors.white38 : Colors.black38,

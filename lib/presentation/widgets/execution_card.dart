@@ -129,7 +129,9 @@ class _ExecutionCardState extends State<ExecutionCard> {
                  // Stop timer first
                  context.read<GrowthProvider>().toggleTaskTimer(widget.task.id).then((_) {
                    // Then complete
-                   context.read<GrowthProvider>().completeTask(widget.task.id);
+                   if (context.mounted) {
+                     context.read<GrowthProvider>().completeTask(widget.task.id);
+                   }
                  });
               },
               icon: const Icon(Icons.check_circle, color: Colors.greenAccent, size: 32),

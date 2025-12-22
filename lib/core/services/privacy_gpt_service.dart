@@ -11,6 +11,7 @@ import 'premium_service.dart';
 class PrivacyGptService {
   static const String _baseUrl = 'https://api.openai.com/v1/chat/completions';
   static const String _model = 'gpt-3.5-turbo'; // Fast and cost-effective
+  final PremiumService _premiumService = PremiumService();
 
   /// Ask clarifying question using GPT with privacy protection
   /// Returns fallback response if user is not premium
@@ -699,6 +700,51 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
         taskDescription: taskDescription,
         motivationAnchor: motivationAnchor,
       );
+    }
+  }
+
+  /// Generate generic context-aware message (Flexible endpoint for MotivationalEngine)
+  /// Returns null if API call fails or user not premium
+  Future<String?> generateContextAwareMessage({
+    required String systemInstruction,
+    required String userPrompt,
+    int maxTokens = 60,
+  }) async {
+    try {
+      // Check premium status
+      if (!await _premiumService.isPremium()) return null;
+
+      final apiKey = dotenv.env['OPENAI_API_KEY'];
+      if (apiKey == null || apiKey.isEmpty || apiKey == 'your_openai_api_key_here') {
+        return null;
+      }
+
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': [
+            {'role': 'system', 'content': systemInstruction},
+            {'role': 'user', 'content': userPrompt}
+          ],
+          'temperature': 0.8,
+          'max_tokens': maxTokens,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['choices'][0]['message']['content'] as String;
+        return content.trim().replaceAll('"', '').replaceAll('\n', ' ');
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error generating context-aware message: $e');
+      return null;
     }
   }
 

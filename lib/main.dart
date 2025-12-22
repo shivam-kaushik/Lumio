@@ -15,7 +15,6 @@ import 'core/services/smart_nudge_service.dart';
 import 'core/services/firestore_service.dart';
 import 'data/repositories/firestore_reminder_repository.dart';
 import 'data/repositories/firestore_growth_repository.dart';
-import 'core/services/firestore_service.dart';
 import 'presentation/providers/reminder_provider.dart';
 import 'presentation/providers/growth_provider.dart';
 import 'presentation/providers/theme_provider.dart';
@@ -23,6 +22,7 @@ import 'presentation/providers/auth_provider.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/screens/splash_screen.dart';
 import 'presentation/navigation/main_navigator.dart';
+import 'core/services/motivational_engine.dart'; // Add import
 
 /// Background task callback for Workmanager
 /// Executes context monitoring and reminder triggering in background
@@ -50,8 +50,12 @@ void callbackDispatcher() {
       final smartNudgeService = SmartNudgeService();
       await smartNudgeService.checkAndSendStreakProtectionNudges();
 
-      // Check context and trigger reminders
-      // This will be implemented by the TriggerEngine
+      // NEW: Motivational Engine Check (Kickstart, Deadline, Consistency)
+      final motivationalEngine = MotivationalEngine(
+        notifications: notificationService,
+      );
+      await motivationalEngine.checkAndSchedule();
+
       debugPrint('Background task executed: $task');
 
       return Future.value(true);

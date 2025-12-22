@@ -35,26 +35,26 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
   bool _isSaving = false;
   bool _isGeneratingSubtasks = false; 
   Timer? _debounce; // For auto-save
+  DateTime? _goalDeadline; // NEW: Local deadline state
 
   @override
   void initState() {
     super.initState();
     if (widget.existingGoal != null) {
       _titleController.text = widget.existingGoal!.name;
+      _goalDeadline = widget.existingGoal!.targetDeadline; // Load existing
       _loadExistingGoal();
     } else if (widget.aiResult != null) {
       _parseAiResult();
     } else {
-      _titleController.text = "New Goal";
+      _titleController.text = ""; // Empty for new
+      _goalDeadline = DateTime.now().add(const Duration(days: 30)); // Default 30 days
     }
   }
 
   void _loadExistingGoal() {
     final g = widget.existingGoal!;
-    if (g.targetDeadline != null) {
-       _blocks.add(PlanBlock.text("📅 Target: ${g.targetDeadline!.toIso8601String().split('T')[0]}"));
-    }
-    
+    // Note: Removed redundant text block for deadline since we have UI for it now
     if (widget.initialTasks != null && widget.initialTasks!.isNotEmpty) {
         _flattenTasks(widget.initialTasks!, 0);
     } else {
@@ -210,11 +210,14 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
          if (silent) return; 
          goalId = await growthProvider.createGoal(
             goalName,
-            targetDeadline: DateTime.now().add(const Duration(days: 30)), 
+            targetDeadline: _goalDeadline ?? DateTime.now().add(const Duration(days: 30)), 
          );
       } else {
          goalId = widget.existingGoal!.id;
-         await growthProvider.updateGoal(widget.existingGoal!.copyWith(name: goalName));
+         await growthProvider.updateGoal(widget.existingGoal!.copyWith(
+            name: goalName,
+            targetDeadline: _goalDeadline,
+         ));
       }
 
       // 2. Build Tree and Replace Tasks
@@ -262,24 +265,7 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
       ),
       body: Consumer<GrowthProvider>(
         builder: (context, growthProvider, child) {
-          // SYNC: Ensure local blocks match latest provider state (for completion status)
-          if (widget.existingGoal != null) {
-              final tasks = growthProvider.getTasksForGoal(widget.existingGoal!.id);
-              final taskMap = {for (var t in tasks) t.id: t};
-              
-              for (var block in _blocks) {
-                  if (block.type == BlockType.task && block.metadata != null) {
-                      final taskId = block.metadata!['id'] as int?;
-                      if (taskId != null && taskMap.containsKey(taskId)) {
-                          // Only sync completion status to avoid overwriting text edits
-                          final task = taskMap[taskId]!;
-                          if (block.isChecked != task.isCompleted) {
-                             block.isChecked = task.isCompleted;
-                          }
-                      }
-                  }
-              }
-          }
+
 
           return Stack(
             children: [
@@ -302,6 +288,25 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
                               onChanged: (v) => _triggerAutoSave(),
                               maxLines: null,
                             ),
+                          ),
+                          // Goal-level Deadline Picker
+                          IconButton(
+                            icon: Icon(Icons.calendar_month, color: isDark ? Colors.white70 : AppTheme.primaryColor, size: 24),
+                            tooltip: _goalDeadline != null 
+                                ? "Deadline: ${_goalDeadline!.month}/${_goalDeadline!.day}/${_goalDeadline!.year}" 
+                                : "Set Deadline",
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _goalDeadline ?? DateTime.now().add(const Duration(days: 30)),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                              );
+                              if (picked != null) {
+                                setState(() => _goalDeadline = picked);
+                                _triggerAutoSave();
+                              }
+                            },
                           ),
                           // Goal-level AI Action
                           PopupMenuButton<String>(
@@ -391,7 +396,10 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
                 if (block.type == BlockType.task) ...[
                      // Checkbox
                      InkWell(
-                         onTap: () => setState(() => block.isChecked = !block.isChecked),
+                         onTap: () {
+                             setState(() => block.isChecked = !block.isChecked);
+                             _triggerAutoSave();
+                         },
                          child: Padding(
                              padding: const EdgeInsets.only(top: 10, right: 8),
                              child: Icon(
