@@ -144,7 +144,12 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 );
               }
 
-              final goals = growthProvider.goals;
+              final allGoals = growthProvider.goals;
+              // Filter out system goals (Inbox, Daily Plans)
+              final goals = allGoals.where((g) => 
+                  g.name != 'Inbox' && 
+                  !g.name.startsWith('Daily Plan')
+              ).toList();
 
               if (goals.isEmpty) {
                 return SliverFillRemaining(
@@ -159,7 +164,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                     crossAxisCount: 2,
                     crossAxisSpacing: AppTheme.spacingMD,
                     mainAxisSpacing: AppTheme.spacingMD,
-                    childAspectRatio: 0.75, // Reduce height to minimize blank space
+                    childAspectRatio: 0.65, // Taller cards to fit 5 tasks
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -399,7 +404,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ...previewTasks.map((t) => Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
+                              padding: const EdgeInsets.only(bottom: 2),
                               child: Row(
                                 children: [
                                   Icon(

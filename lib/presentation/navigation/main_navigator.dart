@@ -348,13 +348,13 @@ class _MainNavigatorState extends State<MainNavigator>
     );
   }
 
-  /// Build center + button with animations
+  /// Build center "Plan Day" button with animations
   Widget _buildCenterRecordButton(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXS),
       child: Material(
         elevation: 8,
-        shadowColor: AppTheme.primaryColor.withOpacity(0.4),
+        shadowColor: Colors.amber.withOpacity(0.4),
         shape: const CircleBorder(),
         child: Container(
           width: 56,
@@ -365,20 +365,27 @@ class _MainNavigatorState extends State<MainNavigator>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppTheme.primaryColor,
-                AppTheme.primaryLight,
+                Colors.amber, // Sunny color for Day Planning
+                Colors.orangeAccent,
               ],
             ),
           ),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: _onRecordButtonPressed,
+              onTap: () {
+                 HapticFeedback.mediumImpact();
+                 Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const DayPlannerScreen(),
+                    ),
+                 );
+              },
               customBorder: const CircleBorder(),
               child: const Icon(
-                Icons.add_rounded,
+                Icons.wb_sunny_rounded,
                 color: Colors.white,
-                size: 32,
+                size: 28, // Slightly smaller icon inside circle
               ),
             ),
           ),

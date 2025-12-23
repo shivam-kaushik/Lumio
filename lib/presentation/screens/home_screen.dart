@@ -18,6 +18,7 @@ import '../../core/services/home_detection_service.dart';
 
 // Day Architect Imports
 import 'day_planner_screen.dart';
+import 'chat_screen.dart';
 import '../widgets/execution_card.dart';
 import '../widgets/day_planner_widgets.dart';
 import '../../data/models/goal_task.dart';
@@ -408,6 +409,36 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
+          
+          // Hands-free / Chatbot Action
+          Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isDark ? AppTheme.darkBorder : AppTheme.borderColor,
+                width: 1,
+              ),
+              boxShadow: AppTheme.getElevationShadow(1, isDark: isDark),
+            ),
+            child: IconButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ChatScreen(),
+                  ),
+                );
+              },
+              icon: Icon(
+                Icons.smart_toy_outlined,
+                color: isDark ? AppTheme.primaryLight : AppTheme.primaryColor,
+                size: 24,
+              ),
+              tooltip: 'AI Assistant',
+            ),
+          )
+            .animate()
+            .scale(delay: 400.ms, duration: 500.ms, curve: Curves.elasticOut),
         ],
       ),
     );

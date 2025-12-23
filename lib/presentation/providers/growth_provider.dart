@@ -49,14 +49,19 @@ class GrowthProvider with ChangeNotifier {
     try {
       _goals = await _repository.getGoals();
 
-      // Load tasks and phases for all goals
+      // Load tasks and phases for all goals in parallel
       _tasksByGoal.clear();
       _phasesByGoal.clear();
-      for (var goal in _goals) {
-        _tasksByGoal[goal.id] = await _repository.getTasksForGoal(goal.id);
-        _phasesByGoal[goal.id] = await _repository.getPhasesForGoal(goal.id);
-        _phasesByGoal[goal.id] = await _repository.getPhasesForGoal(goal.id);
-      }
+      
+      await Future.wait(_goals.map((goal) async {
+        final tasks = await _repository.getTasksForGoal(goal.id);
+        final phases = await _repository.getPhasesForGoal(goal.id);
+        
+        // Use lock or synchronized access if needed, but Dart is single-threaded event loop, 
+        // so map assignment is atomic enough if not awaited locally.
+        _tasksByGoal[goal.id] = tasks;
+        _phasesByGoal[goal.id] = phases;
+      }));
 
       // Load Saved Locations
       await _loadSavedLocations();
@@ -118,17 +123,34 @@ class GrowthProvider with ChangeNotifier {
     }
   }
 
-  /// Create a task
+  /// Create a task with Optimistic Update
   Future<int> createTask(GoalTask task) async {
     debugPrint('🌱 GrowthProvider: createTask called for "${task.title}" (GoalID: ${task.goalId})');
+    
+    // 1. Optimistic Update: Add to UI immediately
+    final tempId = -DateTime.now().millisecondsSinceEpoch; // Temporary ID
+    final tempTask = task.copyWith(id: tempId);
+    
+    if (!_tasksByGoal.containsKey(task.goalId)) {
+      _tasksByGoal[task.goalId] = [];
+    }
+    _tasksByGoal[task.goalId]!.add(tempTask);
+    notifyListeners(); // Instant UI update
+    
     try {
+      // 2. Perform actual creation
       final id = await _repository.createTask(task);
-      debugPrint('🌱 GrowthProvider: Task created in repo (ID: $id). Reloading data...');
-      await loadGrowthData();
+      debugPrint('🌱 GrowthProvider: Task created in repo (ID: $id). Syncing...');
+      
+      // 3. Sync with source of truth
+      // Ideally we just replace the temp task, but full reload ensures consistency
+      await loadGrowthData(); 
       debugPrint('🌱 GrowthProvider: Data reloaded successfully.');
       return id;
     } catch (e) {
       debugPrint('🛑 GrowthProvider Error: $e');
+      // Revert optimistic update
+      _tasksByGoal[task.goalId]?.removeWhere((t) => t.id == tempId);
       _error = e.toString();
       notifyListeners();
       rethrow;
