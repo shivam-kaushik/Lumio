@@ -26,8 +26,8 @@ class MotivationalEngine {
         _gptService = gptService ?? PrivacyGptService(),
         _premiumService = premiumService ?? PremiumService();
 
-  Future<void> checkAndSchedule({bool debug = false}) async {
-    debugPrint('🚀 MotivationalEngine: Starting check... (Debug: $debug)');
+  Future<void> checkAndSchedule({bool debug = false, bool force = false}) async {
+    debugPrint('🚀 MotivationalEngine: Starting check... (Debug: $debug, Force: $force)');
     
     try {
       // 1. Load User Context
@@ -42,39 +42,46 @@ class MotivationalEngine {
       final sleepTime = prefs.getInt('setting_sleep_time') ?? 22; // 10 PM
       final quietMode = prefs.getBool('setting_quiet_mode') ?? false;
 
-      if (!debug && quietMode && (hour < wakeTime || hour >= sleepTime)) {
+      // Skip if quiet hours (unless forced or debug)
+      if (!force && !debug && quietMode && (hour < wakeTime || hour >= sleepTime)) {
         debugPrint('🌙 MotivationalEngine: Quiet hours. Skipping.');
         return;
       }
 
-      // 2. Filter Active Goals (since Goal model doesn't have isCompleted/status)
-      // We'll consider a goal "active" if it has tasks and not all are completed.
-      // This is expensive (N+1 queries), but okay for background task with few goals.
+      // 2. Filter Active Goals
       List<Goal> activeGoals = [];
       for (var g in goals) {
+         // Filter out system goals
+         if (g.name == 'Inbox' || g.name.startsWith('Daily Plan')) continue;
+         
          final tasks = await _repository.getTasksForGoal(g.id);
          final isCompleted = tasks.isNotEmpty && tasks.every((t) => t.isCompleted);
-         // Also filter out if no tasks (nothing to motivate) ? Or motivate to add tasks?
-         // Let's keep goals that are NOT completed.
-         if (!isCompleted) {
+         
+         if (!isCompleted && tasks.isNotEmpty) {
            activeGoals.add(g);
          }
       }
 
-      // A. Morning Kickstart
-      if (debug || hour == wakeTime) {
+      if (activeGoals.isEmpty) {
+        debugPrint('⚠️ MotivationalEngine: No active goals to motivate.');
+        return;
+      }
+
+      // A. Morning Kickstart (Wake Time +/- 1 hour, or Force)
+      if (force || debug || hour == wakeTime) {
         debugPrint('☀️ Checking Morning Kickstart...');
         await _checkMorningKickstart(activeGoals);
+        if (force) return; // If forced, just do one
       }
       
       // B. Deadline Nudges
-      if (debug || (hour > wakeTime && hour < sleepTime)) {
+      if (!force && (hour > wakeTime && hour < sleepTime)) {
         debugPrint('⏳ Checking Deadline Nudges...');
         await _checkDeadlineNudges(activeGoals);
       }
 
       // C. Consistency Check
-      if (debug || hour == (sleepTime - 2)) {
+      if (!force && hour == (sleepTime - 2)) {
         debugPrint('🌙 Checking Consistency...');
         await _checkConsistency(activeGoals);
       }
@@ -89,24 +96,30 @@ class MotivationalEngine {
 
     // Pick a goal to focus on
     final focusGoal = goals[Random().nextInt(goals.length)];
-    int streak = 0; // Placeholder for streak logic
+    // Verify streak (mock for now, or fetch from goal metadata if available)
+    int streak = 0; 
     
     // Generate Content
     String title = "Good Morning! ☀️";
     String body = "Ready to crush '${focusGoal.name}'? Let's make today count.";
 
-    if (await _premiumService.isPremium()) {
-       // AI Generation (Premium)
-       final prompt = "Generate a short morning motivation (MAX 15 words) for a user working on goal '${focusGoal.name}'. Streak: $streak days.";
-       final aiResponse = await _gptService.generateContextAwareMessage(
-          systemInstruction: 'You are a motivational coach. Keep messages under 15 words.',
-          userPrompt: prompt, 
-          maxTokens: 30, // Reduced tokens
-       );
-       if (aiResponse != null) body = aiResponse;
-    } else {
-       // Template (Free)
-       body = _TemplateEngine.getKickstart(focusGoal.name, streak);
+    try {
+      if (await _premiumService.isPremium()) {
+         // AI Generation (Premium)
+         final prompt = "Generate a short morning motivation (MAX 15 words) for a user working on goal '${focusGoal.name}'. Streak: $streak days.";
+         final aiResponse = await _gptService.generateContextAwareMessage(
+            systemInstruction: 'You are a motivational coach. Keep messages under 15 words.',
+            userPrompt: prompt, 
+            maxTokens: 30, // Reduced tokens
+         );
+         if (aiResponse != null) body = aiResponse;
+      } else {
+         // Template (Free)
+         body = _TemplateEngine.getKickstart(focusGoal.name, streak);
+      }
+    } catch (e) {
+      // Fallback to template if AI/Premium fails
+      body = _TemplateEngine.getKickstart(focusGoal.name, streak);
     }
 
     _schedule(1001, title, body);
