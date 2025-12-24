@@ -65,7 +65,23 @@ class QuickTaskInputSheet extends StatefulWidget {
     String? location,   // e.g. "Work", "Home"
   ) onSubmit;
 
-  const QuickTaskInputSheet({super.key, required this.onSubmit});
+  final String? initialTitle;
+  final String? initialPriority;
+  final List<String>? initialTags;
+  final String? initialRepeat;
+  final String? initialLocation;
+  final bool isEditing;
+
+  const QuickTaskInputSheet({
+    super.key, 
+    required this.onSubmit,
+    this.initialTitle,
+    this.initialPriority,
+    this.initialTags,
+    this.initialRepeat,
+    this.initialLocation,
+    this.isEditing = false,
+  });
 
   @override
   State<QuickTaskInputSheet> createState() => _QuickTaskInputSheetState();
@@ -100,6 +116,23 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
         _tagPattern: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
       },
     );
+    // Initialize state from props if editing
+    if (widget.initialTitle != null) {
+        _controller.text = widget.initialTitle!;
+    }
+    if (widget.initialPriority != null) {
+        _parsedPriority = widget.initialPriority!;
+    }
+    if (widget.initialTags != null) {
+        _parsedTags.addAll(widget.initialTags!);
+    }
+    if (widget.initialRepeat != null) {
+        _parsedRepeat = widget.initialRepeat;
+    }
+    if (widget.initialLocation != null) {
+        _parsedLocation = widget.initialLocation;
+    }
+
     _controller.addListener(_parseText);
   }
 
@@ -262,7 +295,7 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
                    Icon(Icons.edit_note_rounded, size: 20, color: AppTheme.primaryColor).animate().fadeIn(),
                    const SizedBox(width: 8),
                    Text(
-                       "What's on your mind?", 
+                       widget.isEditing ? "Edit Task" : "What's on your mind?", 
                        style: theme.textTheme.titleMedium?.copyWith(
                            color: isDark ? Colors.grey[400] : Colors.grey[600],
                            fontWeight: FontWeight.w600
@@ -429,7 +462,10 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
                            ]
                        ),
                        child: IconButton(
-                           icon: const Icon(Icons.arrow_upward_rounded, color: Colors.white),
+                           icon: Icon(
+                               widget.isEditing ? Icons.check_rounded : Icons.arrow_upward_rounded, 
+                               color: Colors.white
+                           ),
                            onPressed: _submit,
                        ),
                    ).animate().scale(duration: 400.ms, curve: Curves.elasticOut),

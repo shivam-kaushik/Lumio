@@ -21,6 +21,7 @@ import 'day_planner_screen.dart';
 import 'chat_screen.dart';
 import '../widgets/execution_card.dart';
 import '../widgets/day_planner_widgets.dart';
+import '../widgets/quick_task_input_sheet.dart';
 import '../../data/models/goal_task.dart';
 
 /// Premium home screen with minimal, elegant design
@@ -208,10 +209,47 @@ class _HomeScreenState extends State<HomeScreen> {
                                     currentPosition: _currentPosition,
                                     onReminderTap: (reminder) async {
                                       if (reminder.id.startsWith('task_')) {
-                                          // TODO: Navigate to Task Edit
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text("Editing tasks from Home is coming soon!"))
-                                          );
+                                          final taskId = int.tryParse(reminder.id.substring(5));
+                                          if (taskId != null) {
+                                              // Find the original task object
+                                              GoalTask? originalTask;
+                                              for (var tasks in growthProvider.tasksByGoal.values) {
+                                                  try {
+                                                      originalTask = tasks.firstWhere((t) => t.id == taskId);
+                                                      break;
+                                                  } catch (_) {}
+                                              }
+
+                                              if (originalTask != null) {
+                                                  // Show Edit Sheet
+                                                  await showModalBottomSheet(
+                                                      context: context,
+                                                      isScrollControlled: true,
+                                                      backgroundColor: Colors.transparent,
+                                                      builder: (context) => QuickTaskInputSheet(
+                                                          isEditing: true,
+                                                          initialTitle: originalTask!.title,
+                                                          initialPriority: originalTask!.priority,
+                                                          initialTags: [], // TODO: extract tags from title if needed
+                                                          initialRepeat: originalTask!.frequency != 'one-time' ? originalTask!.frequency : null,
+                                                          initialLocation: originalTask!.suggestedLocation != 'any' ? originalTask!.suggestedLocation : null,
+                                                          onSubmit: (title, date, priority, tags, repeat, location) {
+                                                              // Update Task
+                                                              final updatedTask = originalTask!.copyWith(
+                                                                  title: title,
+                                                                  priority: priority,
+                                                                  frequency: repeat ?? 'one-time',
+                                                                  suggestedLocation: location ?? 'any',
+                                                                  // If date changed, we might need a new scheduledDate
+                                                                  scheduledDate: date ?? originalTask!.scheduledDate,
+                                                              );
+                                                              growthProvider.updateTask(updatedTask);
+                                                              Navigator.pop(context); // Close sheet
+                                                          },
+                                                      ),
+                                                  );
+                                              }
+                                          }
                                           return;
                                       }
 
