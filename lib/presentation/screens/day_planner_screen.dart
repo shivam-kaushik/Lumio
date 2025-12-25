@@ -8,7 +8,10 @@ import '../../core/services/sound_service.dart';
 import '../providers/growth_provider.dart';
 import '../../data/models/goal_task.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_theme.dart';
 import 'daily_report_screen.dart';
+import '../widgets/active_task_timer.dart';
+import '../widgets/quick_task_input_sheet.dart';
 
 class DayPlannerScreen extends StatefulWidget {
   const DayPlannerScreen({super.key});
@@ -147,6 +150,33 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
     }
   }
 
+  void _showQuickAdd(BuildContext context, GrowthProvider provider) {
+      showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => QuickTaskInputSheet(
+              onSubmit: (title, date, priority, tags, repeat, location) async {
+                  // Add directly to today's plan
+                  final goalId = await provider.ensureDailyGoal(DateTime.now());
+                  final task = GoalTask(
+                      id: 0,
+                      goalId: goalId,
+                      title: title,
+                      description: '',
+                      priority: priority,
+                      createdAt: DateTime.now(),
+                      scheduledDate: DateTime.now(),
+                      frequency: repeat ?? 'one-time',
+                      suggestedLocation: location ?? 'any',
+                  );
+                  await provider.createTask(task);
+                  if (mounted) Navigator.pop(context);
+              },
+          ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -185,11 +215,19 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
         
         if (hasPlan && _generatedPlan == null) {
           // MODE B: DASHBOARD (Plan Exists)
+          
+          // Find active task for Timer
+          GoalTask? activeTask;
+          try {
+             activeTask = tasks.firstWhere((t) => t.startedAt != null);
+          } catch (_) {}
+
           return Scaffold(
             backgroundColor: theme.scaffoldBackgroundColor,
             appBar: AppBar(
               title: Text('Today\'s Plan', style: TextStyle(color: textColor)),
               backgroundColor: Colors.transparent,
+              elevation: 0,
               iconTheme: IconThemeData(color: textColor),
               actions: [
                  IconButton(
@@ -200,19 +238,44 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                  )
               ],
             ),
+            floatingActionButton: FloatingActionButton.extended(
+                onPressed: () => _showQuickAdd(context, provider),
+                backgroundColor: AppTheme.primaryColor,
+                icon: const Icon(Icons.add, color: Colors.white),
+                label: const Text("Add Task", style: TextStyle(color: Colors.white)),
+            ),
             body: SafeArea(
               child: Column(
                 children: [
+                  
+                  // Active Timer Section
+                  if (activeTask != null)
+                      Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: ActiveTaskTimer(task: activeTask),
+                      ),
+
                   Expanded(
                     child: ListView.builder(
                       itemCount: tasks.length,
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80), // Bottom padding for FAB
                       itemBuilder: (context, index) {
                         final task = tasks[index];
+                        // Don't show active task in list if it's shown in Timer (optional, but cleaner redundancy)
+                        // But user might want to check it off from list too. Let's keep it but maybe highlight it?
+                        // For now keep it simple.
+                        
+                        final isRunning = task.startedAt != null;
+
                         return Card(
-                          color: isDark ? const Color(0xFF1E1E20) : Colors.white,
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          color: isRunning 
+                             ? (isDark ? const Color(0xFF2C2C30) : Colors.blue.shade50) 
+                             : (isDark ? const Color(0xFF1E1E20) : Colors.white),
+                          elevation: isRunning ? 4 : 2,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: isRunning ? BorderSide(color: AppTheme.primaryColor, width: 2) : BorderSide.none
+                          ),
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
                             leading: Checkbox(
@@ -235,14 +298,16 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                                 fontWeight: FontWeight.w500,
                               )
                             ),
-                            subtitle: Text(
-                              "${task.estimatedMinutes ?? 0}m est • ${task.actualMinutes ?? 0}m act",
-                              style: TextStyle(color: subtleColor),
-                            ),
+                            // Subtitle removed as per user request
+                            // subtitle: Text(
+                            //   "${task.estimatedMinutes ?? 0}m est • ${task.actualMinutes ?? 0}m act",
+                            //   style: TextStyle(color: subtleColor),
+                            // ),
                             trailing: IconButton(
                               icon: Icon(
-                                task.startedAt != null ? Icons.stop_circle : Icons.play_circle_fill,
-                                color: task.startedAt != null ? AppTheme.errorColor : AppTheme.primaryColor,
+                                isRunning ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                                color: isRunning ? Colors.amber : AppTheme.primaryColor,
+                                size: 32,
                               ),
                               onPressed: () {
                                 provider.toggleTaskTimer(task.id);
@@ -251,26 +316,6 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                           ),
                         );
                       },
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                           Navigator.push(context, MaterialPageRoute(builder: (_) => DailyReportScreen()));
-                        },
-                        icon: const Icon(Icons.summarize),
-                        label: const Text("View Daily Retro"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isDark ? AppTheme.darkSurfaceElevated : AppTheme.surfaceColor,
-                          foregroundColor: textColor,
-                          elevation: 0,
-                          side: BorderSide(color: isDark ? AppTheme.darkBorder : AppTheme.borderColor),
-                        ),
-                      ),
                     ),
                   ),
                 ],

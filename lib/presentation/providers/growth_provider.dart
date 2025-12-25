@@ -314,6 +314,24 @@ class GrowthProvider with ChangeNotifier {
     }
   }
 
+  /// Reset task progress
+  Future<void> restartTask(int taskId) async {
+    try {
+      final taskList = _tasksByGoal.values.expand((l) => l);
+      final task = taskList.firstWhere((t) => t.id == taskId);
+      
+      // Reset actual minutes and clear start time
+      final updated = task.copyWith(
+        clearStartedAt: true,
+        actualMinutes: 0,
+      );
+      
+      await updateTask(updated);
+    } catch (e) {
+      debugPrint("Error restarting task: $e");
+    }
+  }
+
   /// Complete a task and return motivational message
   Future<String?> completeTask(int taskId) async {
     try {

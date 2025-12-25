@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:percent_indicator/percent_indicator.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'dart:math' as math;
 
 import '../providers/growth_provider.dart';
 import '../../data/models/goal_task.dart';
@@ -12,116 +15,131 @@ class DailyReportScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<GrowthProvider>(
       builder: (context, provider, _) {
-        // Fetch Today's Tasks
-        // Logic: Find "Daily Plan - Today" goal or just filter all tasks by scheduledDate = today
-        // For robustness, let's filter all tasks where scheduledDate is today (+/- logic)
-        // Actually, we created them under "Daily Plan - yyyy-MM-dd".
-        
         final today = DateTime.now();
         final dateStr = "${today.year}-${today.month}-${today.day}";
         final goalName = "Daily Plan - $dateStr";
         
-        final dailyGoals = provider.goals.where((g) => g.name == goalName);
+        // Fetch tasks from "Daily Plan" goal + Tasks from "Inbox" that were worked on today (startedAt or completedAt roughly)
+        // For simplicity, we stick to the Plan.
+        
+        // Fetch tasks from "Daily Plan" goal + "Inbox" to match DayPlannerScreen
+        final dailyGoal = provider.goals.where((g) => g.name == goalName).firstOrNull;
+        final inboxGoal = provider.goals.where((g) => g.name == 'Inbox').firstOrNull;
+        
         final List<GoalTask> tasks = [];
         
-        if (dailyGoals.isNotEmpty) {
-           final goalId = dailyGoals.first.id;
-           tasks.addAll(provider.getTasksForGoal(goalId));
+        if (dailyGoal != null) {
+           tasks.addAll(provider.getTasksForGoal(dailyGoal.id));
+        }
+        if (inboxGoal != null) {
+           tasks.addAll(provider.getTasksForGoal(inboxGoal.id));
         }
         
-        // Also include any other task scheduled for today? 
-        // For "Day Architect", we stick to the plan.
-        
-        if (tasks.isEmpty) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Daily Retro')),
-            body: const Center(child: Text("No plan found for today.")),
-          );
-        }
-
-        // Analytics
-        int totalEstimated = 0;
-        int totalActual = 0;
+        // Calculate Metrics
+        int totalEstMinutes = 0;
+        int totalActMinutes = 0;
         int completedCount = 0;
         
         for (var t in tasks) {
-          totalEstimated += t.estimatedMinutes ?? (t.estimatedHours != null ? (t.estimatedHours! * 60).round() : 0);
-          totalActual += t.actualMinutes ?? 0;
-          if (t.isCompleted) completedCount++;
+            totalEstMinutes += t.estimatedMinutes ?? 0;
+            totalActMinutes += t.actualMinutes ?? 0;
+            if (t.isCompleted) completedCount++;
         }
+
+        // Efficiency Score: (Planned / Actual) * CompletionRate
+        // If Actual < Planned (Speedy), cap at 100% or allow bonus? Let's cap at 100 for now.
+        // Actually, let's use a simpler metric: "Focus Score".
+        // Base score = (Completed / Total) * 100.
+        // Penalty for heavily exceeding time?
+        // Let's stick to standard Efficiency: Start with 100. Deduct for missed tasks.
         
-        double efficiency = totalActual > 0 ? (totalEstimated / totalActual) * 100 : 0;
-        if (efficiency > 100) efficiency = 100; // Cap at 100 for simplicity or allow >100 for "Speedy"
+        // Efficiency Score: Just Completion Rate for now since we don't have estimates
+        double completionRate = tasks.isEmpty ? 0 : completedCount / tasks.length;
+        int focusScore = (completionRate * 100).toInt();
+
+        // Theme
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final bg = isDark ? const Color(0xFF121212) : Colors.white;
+        final text = isDark ? Colors.white : Colors.black;
+
+        if (tasks.isEmpty) {
+             return Scaffold(
+                 appBar: AppBar(title: const Text('Daily Analytics')),
+                 body: const Center(child: Text("No data for today yet.")),
+             );
+        }
 
         return Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: bg,
           appBar: AppBar(
-            title: const Text('Daily Retro'),
+            title: Text('Daily Analytics', style: TextStyle(color: text)),
             backgroundColor: Colors.transparent,
+            elevation: 0,
+            iconTheme: IconThemeData(color: text),
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Day Summary",
-                  style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "${today.day}/${today.month}/${today.year}",
-                  style: const TextStyle(color: Colors.white54, fontSize: 18),
-                ),
+                // 1. Focus Score Gauge
+                Center(
+                    child: CircularPercentIndicator(
+                        radius: 80.0,
+                        lineWidth: 12.0,
+                        animation: true,
+                        percent: focusScore / 100,
+                        center: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                                Text(
+                                    "$focusScore",
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 40.0, color: text),
+                                ),
+                                Text("Completion", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            ],
+                        ),
+                        circularStrokeCap: CircularStrokeCap.round,
+                        progressColor: AppTheme.primaryColor,
+                        backgroundColor: isDark ? Colors.white10 : Colors.grey[200]!,
+                    ),
+                ).animate().scale(),
+
                 const SizedBox(height: 32),
-                
-                // Score Cards
+
+                // 2. Overview Cards (Total Time & Tasks)
                 Row(
-                  children: [
-                    Expanded(
-                      child: _buildScoreCard("Tasks", "$completedCount/${tasks.length}", Colors.blue),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildScoreCard("Efficiency", "${efficiency.toInt()}%", efficiency > 80 ? Colors.green : Colors.orange),
-                    ),
-                  ],
+                   children: [
+                       Expanded(
+                           child: _buildStatCard(
+                               "Total Focus", 
+                               "${(totalActMinutes / 60).toStringAsFixed(1)}h", 
+                               Icons.timer, 
+                               Colors.blueAccent, 
+                               isDark
+                           ),
+                       ),
+                       const SizedBox(width: 16),
+                       Expanded(
+                           child: _buildStatCard(
+                               "Tasks Done", 
+                               "$completedCount/${tasks.length}", 
+                               Icons.check_circle_outline, 
+                               Colors.greenAccent, 
+                               isDark
+                           ),
+                       ),
+                   ],
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildScoreCard("Planned", "${totalEstimated}m", Colors.white54),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildScoreCard("Actual", "${totalActual}m", Colors.white),
-                    ),
-                  ],
-                ),
-                
+
                 const SizedBox(height: 32),
-                const Text(
-                  "Breakdown",
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                ),
+                Text("Task Deep Dive", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: text)),
                 const SizedBox(height: 16),
-                
-                ...tasks.map((t) => _buildTaskRow(t)).toList(),
+
+                // 4. Task List
+                ...tasks.map((t) => _buildTaskAnalysisRow(t, isDark)).toList().animate(interval: 50.ms).slideX(),
                 
                 const SizedBox(height: 48),
-                
-                Center(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    ),
-                    child: const Text("Close Day"),
-                  ),
-                ),
               ],
             ),
           ),
@@ -130,76 +148,88 @@ class DailyReportScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildScoreCard(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white10,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(value, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold)),
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 14)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTaskRow(GoalTask t) {
-    final est = t.estimatedMinutes ?? 0;
-    final act = t.actualMinutes ?? 0;
-    final diff = act - est;
-    Color diffColor = Colors.grey;
-    if (diff > 0) diffColor = Colors.redAccent; // Took longer
-    if (diff < 0) diffColor = Colors.greenAccent; // Faster
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-         color: Colors.white.withOpacity(0.05),
-         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
+  Widget _buildStatCard(String label, String value, IconData icon, Color color, bool isDark) {
+      return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: color.withOpacity(0.3)),
+          ),
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  t.title,
-                  style: TextStyle(
-                    color: Colors.white,
-                    decoration: t.isCompleted ? TextDecoration.lineThrough : null,
-                    decorationColor: Colors.white54,
-                  ),
-                ),
-                if (t.isCompleted)
-                  Text("Completed", style: TextStyle(color: AppTheme.primaryColor, fontSize: 10)),
+                  Icon(icon, color: color),
+                  const SizedBox(height: 8),
+                  Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                  Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ],
-            ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text("Plan: ${est}m", style: const TextStyle(color: Colors.white54, fontSize: 12)),
-              Text(
-                "Act: ${act}m", 
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-              if (act > 0)
-                Text(
-                  "${diff > 0 ? '+' : ''}${diff}m",
-                  style: TextStyle(color: diffColor, fontSize: 10),
-                )
-            ],
-          )
-        ],
-      ),
-    );
+      );
+  }
+
+
+
+  Widget _buildTaskAnalysisRow(GoalTask t, bool isDark) {
+      final act = t.actualMinutes ?? 0;
+      
+      // Calculate variance color
+      Color varColor = AppTheme.primaryColor;
+      if (t.isCompleted) varColor = Colors.green;
+      
+      // Just show a small progress bar representing "effort" relative to something?
+      // Or just remove the bar entirely since we have no scale?
+      // Let's keep a full width bar if it has any time, or empty if 0
+      double pct = act > 0 ? 1.0 : 0.0;
+
+      return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E20) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: isDark ? [] : [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0,2))],
+              border: Border.all(color: isDark ? Colors.white10 : Colors.transparent)
+          ),
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                  Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                          Expanded(
+                              child: Text(t.title, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                          ),
+                          if (t.isCompleted)
+                              const Icon(Icons.check_circle, color: Colors.green, size: 16)
+                      ],
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Progress Bar (Visual only)
+                  LinearPercentIndicator(
+                      lineHeight: 6.0,
+                      percent: pct,
+                      progressColor: varColor,
+                      backgroundColor: isDark ? Colors.white10 : Colors.grey[100],
+                      barRadius: const Radius.circular(3),
+                      padding: EdgeInsets.zero,
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                          Text("Time Spent", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text(
+                              "${act}m",
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
+                          )
+                      ],
+                  )
+              ],
+          ),
+      );
   }
 }

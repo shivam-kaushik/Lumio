@@ -99,23 +99,49 @@ class _HomeScreenState extends State<HomeScreen> {
                   
                   return Consumer<GrowthProvider>(
                     builder: (context, growthProvider, _) {
-                      // Find active task (Day Architect)
-                      GoalTask? activeTask;
-                      for (var list in growthProvider.tasksByGoal.values) {
-                        for (var t in list) {
-                          if (t.startedAt != null) {
-                            activeTask = t;
-                            break;
-                          }
-                        }
-                        if (activeTask != null) break;
-                      }
-
-                      // Group tasks? No, user wants a flat list.
+                      // 1. Get Unified List of Tasks (Daily Plan + Inbox)
                       final allReminders = _getAllReminders(
                         visibleReminders,
                         growthProvider,
                       );
+                      
+                      final taskReminders = allReminders.where((r) => r.id.startsWith('task_')).toList();
+                      
+
+                      
+                      // Filter for "Today's Plan" Summary Card
+                      // Logic MUST match DayPlannerScreen: (Daily Plan - Today) + (Inbox)
+                      final today = DateTime.now();
+                      final dateStr = "${today.year}-${today.month}-${today.day}";
+                      final todayGoalName = "Daily Plan - $dateStr";
+                      
+                      final todayGoal = growthProvider.goals.where((g) => g.name == todayGoalName).firstOrNull;
+                      final inboxGoal = growthProvider.goals.where((g) => g.name == 'Inbox').firstOrNull;
+                      
+                      final todaysTasks = taskReminders.where((r) {
+                          // Allow if it belongs to Today's Plan Goal
+                          if (todayGoal != null && r.linkedGoalId == todayGoal.id) return true;
+                          // Allow if it belongs to Inbox Goal
+                          if (inboxGoal != null && r.linkedGoalId == inboxGoal.id) return true;
+                          
+                          return false;
+                      }).toList();
+
+                      final completedTaskCount = todaysTasks.where((r) => !r.enabled).length; 
+                      final totalTaskCount = todaysTasks.length;
+                      
+                      // For the LIST below, we might still want to show everything (Overdue + Today).
+                      // But for the "Hero" card, the user explicitly wants "Today's Plan".
+
+                      // 2. Find active task (Day Architect)
+                      GoalTask? activeTask;
+                      final allGoalTasks = growthProvider.tasksByGoal.values.expand((l) => l);
+                      for (var t in allGoalTasks) {
+                        if (t.startedAt != null) {
+                          activeTask = t;
+                          break;
+                        }
+                      }
 
                       return RefreshIndicator(
                         onRefresh: () async {
@@ -133,18 +159,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             // Day Architect: Dynamic Hero Section
                             Builder(
                               builder: (context) {
-                                // 1. Check for Active Plan
-                                final today = DateTime.now();
-                                final dateStr = "${today.year}-${today.month}-${today.day}";
-                                final goalName = "Daily Plan - $dateStr";
-                                int? dayGoalId;
-                                try {
-                                  final goal = growthProvider.goals.firstWhere((g) => g.name == goalName);
-                                  dayGoalId = goal.id;
-                                } catch (_) {}
-                                
-                                final hasPlan = dayGoalId != null && growthProvider.getTasksForGoal(dayGoalId).isNotEmpty;
-                                
                                 // State 2: Active Execution (Priority)
                                 if (activeTask != null) {
                                   return SliverPadding(
@@ -155,17 +169,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   );
                                 }
 
-                                // State 3: Plan Exists, Idle -> Daily Summary
-                                if (hasPlan) {
-                                  final tasks = growthProvider.getTasksForGoal(dayGoalId!);
-                                  final completed = tasks.where((t) => t.isCompleted).length;
-                                  
+                                // State 3: Tasks Exist -> Daily Summary
+                                if (totalTaskCount > 0) {
                                   return SliverPadding(
                                     padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD, vertical: 8),
                                     sliver: SliverToBoxAdapter(
                                       child: DailySummaryCard(
-                                        completedTasks: completed,
-                                        totalTasks: tasks.length,
+                                        completedTasks: completedTaskCount,
+                                        totalTasks: totalTaskCount,
                                         onTap: () {
                                           Navigator.push(context, MaterialPageRoute(builder: (_) => const DayPlannerScreen()));
                                         },

@@ -149,23 +149,33 @@ class DailySummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = totalTasks > 0 ? completedTasks / totalTasks : 0.0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD, vertical: 8),
       decoration: BoxDecoration(
-         // Logic to handle dark/light mode for gradient if needed, keeping static for now as requested
         gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark 
+          ? [
             const Color(0xFF1A1A1A),
             const Color(0xFF2C2C2C),
+          ]
+          : [
+             Colors.white,
+             const Color(0xFFFFF3E0), // Very pale orange
           ],
         ),
         borderRadius: BorderRadius.circular(20),
+        border: isDark ? null : Border.all(color: AppTheme.primaryColor.withOpacity(0.3), width: 1),
         boxShadow: [
-           BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))
+           BoxShadow(
+             color: (isDark ? Colors.black : AppTheme.primaryColor).withOpacity(0.15), 
+             blurRadius: 15, 
+             offset: const Offset(0, 8)
+           )
         ],
       ),
       child: Material(
@@ -174,7 +184,7 @@ class DailySummaryCard extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.all(16.0), // Reduced from 20
+            padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
                 SizedBox(
@@ -182,9 +192,11 @@ class DailySummaryCard extends StatelessWidget {
                   height: 36,
                   child: CircularProgressIndicator(
                     value: progress,
-                    backgroundColor: Colors.white24,
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.greenAccent),
-                    strokeWidth: 3,
+                    backgroundColor: isDark ? Colors.white24 : AppTheme.primaryColor.withOpacity(0.1),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      isDark ? Colors.white : AppTheme.primaryColor
+                    ),
+                    strokeWidth: 4,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -193,22 +205,29 @@ class DailySummaryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        totalTasks == completedTasks ? "All Done! 🎉" : "Your Plan",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16, // Reduced size
+                        totalTasks == completedTasks ? "All Done! 🎉" : "Todays Plan",
+                        style: TextStyle(
+                          color: isDark ? Colors.white : AppTheme.textPrimary,
+                          fontSize: 16, 
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         "$completedTasks of $totalTasks tasks completed",
-                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : AppTheme.textSecondary, 
+                          fontSize: 12
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.white54, size: 20),
+                Icon(
+                  Icons.arrow_forward_rounded, 
+                  color: isDark ? Colors.white70 : AppTheme.primaryColor, 
+                  size: 20
+                ),
               ],
             ),
           ),
