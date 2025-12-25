@@ -36,6 +36,7 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
   bool _isGeneratingSubtasks = false; 
   Timer? _debounce; // For auto-save
   DateTime? _goalDeadline; // NEW: Local deadline state
+  int? _localGoalId; // NEW: Track ID of locally created goal (for "new" goals that become "existing" mid-session)
 
   @override
   void initState() {
@@ -119,8 +120,8 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
 
   void _triggerAutoSave() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(seconds: 2), () {
-        if (mounted && !widget.isNew && widget.existingGoal != null) {
+    _debounce = Timer(const Duration(milliseconds: 1000), () {
+        if (mounted && _titleController.text.isNotEmpty) {
             _savePlan(silent: true);
         }
     });
@@ -196,25 +197,37 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
   }
 
   Future<void> _savePlan({bool silent = false}) async {
+    // Prevent duplicate saves or empty titles
+    if (_titleController.text.isEmpty) return; 
+
     if (!silent) setState(() => _isSaving = true);
     
     try {
       final growthProvider = context.read<GrowthProvider>();
       
       String goalName = _titleController.text;
-      if (goalName.isEmpty) goalName = "Untitled Goal";
+
+      // Determine effective ID: Use local ID if we created one, otherwise use existing
+      final effectiveGoalId = _localGoalId ?? widget.existingGoal?.id;
 
       // 1. Create OR Update Goal
       int goalId;
-      if (widget.isNew && widget.existingGoal == null) {
-         if (silent) return; 
+      if (effectiveGoalId == null) {
+         // Create New Goal (Auto-create)
          goalId = await growthProvider.createGoal(
             goalName,
             targetDeadline: _goalDeadline ?? DateTime.now().add(const Duration(days: 30)), 
          );
+         _localGoalId = goalId; // Store for future updates
       } else {
-         goalId = widget.existingGoal!.id;
-         await growthProvider.updateGoal(widget.existingGoal!.copyWith(
+         // Update Existing Goal
+         goalId = effectiveGoalId;
+         // We need the original goal object to update safely
+         // If we have widget.existingGoal, use it. If not (it was local), fetch or construct minimal.
+         final baseGoal = widget.existingGoal ?? 
+             Goal(id: goalId, name: goalName, createdAt: DateTime.now()); // Minimal fallback
+
+         await growthProvider.updateGoal(baseGoal.copyWith(
             name: goalName,
             targetDeadline: _goalDeadline,
          ));
@@ -227,6 +240,7 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
       await growthProvider.replaceTasksForGoal(goalId, rootTasks);
       
       if (!silent && mounted) {
+        // Only show if explicit manual save (which we are removing, but good for safety)
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saved!")));
         if (widget.isNew) Navigator.of(context).pop(); 
       }
@@ -248,22 +262,37 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
 
     return Scaffold(
       backgroundColor: backgroundColor, 
+
       appBar: AppBar(
         title: Text(widget.isNew ? "Create Goal" : "Edit Goal", style: TextStyle(color: textColor)),
         backgroundColor: backgroundColor,
         iconTheme: IconThemeData(color: textColor),
         elevation: 0,
         actions: [
-          TextButton(
-            onPressed: _isSaving ? null : _savePlan,
-            child: _isSaving 
-               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-               : const Text("Done", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
-          ),
-          const SizedBox(width: 16),
+            // Status Indicator (Optional)
+            if (_isSaving) 
+                const Padding(
+                    padding: EdgeInsets.only(right: 16.0),
+                    child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+            if (!_isSaving && (_localGoalId != null || widget.existingGoal != null))
+                const Padding(
+                    padding: EdgeInsets.only(right: 16.0),
+                    child: Icon(Icons.cloud_done, color: Colors.green, size: 20), // "Saved" icon
+                ),
         ],
       ),
-      body: Consumer<GrowthProvider>(
+      body: PopScope(
+        canPop: true,
+        onPopInvoked: (didPop) async {
+             if (didPop) {
+                 // Trigger final save if we have pending changes or just to be safe
+                 if (_titleController.text.isNotEmpty) {
+                    await _savePlan(silent: true);
+                 }
+             }
+        },
+        child: Consumer<GrowthProvider>(
         builder: (context, growthProvider, child) {
 
 
@@ -374,6 +403,7 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
         ],
       );
     },
+  ),
   ),
     );
   }
