@@ -164,7 +164,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                     crossAxisCount: 2,
                     crossAxisSpacing: AppTheme.spacingMD,
                     mainAxisSpacing: AppTheme.spacingMD,
-                    childAspectRatio: 0.75, // Shorter cards to reduce empty space
+                    childAspectRatio: 0.70, // Shorter cards to reduce empty space
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {

@@ -70,6 +70,7 @@ class QuickTaskInputSheet extends StatefulWidget {
   final List<String>? initialTags;
   final String? initialRepeat;
   final String? initialLocation;
+  final DateTime? initialDate; // NEW
   final bool isEditing;
 
   const QuickTaskInputSheet({
@@ -80,6 +81,7 @@ class QuickTaskInputSheet extends StatefulWidget {
     this.initialTags,
     this.initialRepeat,
     this.initialLocation,
+    this.initialDate,
     this.isEditing = false,
   });
 
@@ -131,6 +133,9 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
     }
     if (widget.initialLocation != null) {
         _parsedLocation = widget.initialLocation;
+    }
+    if (widget.initialDate != null) {
+        _parsedDate = widget.initialDate;
     }
 
     _controller.addListener(_parseText);

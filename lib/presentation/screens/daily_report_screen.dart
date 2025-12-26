@@ -2,87 +2,92 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'dart:math' as math;
+import 'package:intl/intl.dart';
 
 import '../providers/growth_provider.dart';
 import '../../data/models/goal_task.dart';
 import '../theme/app_theme.dart';
+import '../utils/analytics_helper.dart';
 
-class DailyReportScreen extends StatelessWidget {
+enum TimeRange { day, week, month, all }
+
+class DailyReportScreen extends StatefulWidget {
   const DailyReportScreen({super.key});
 
   @override
+  State<DailyReportScreen> createState() => _DailyReportScreenState();
+}
+
+class _DailyReportScreenState extends State<DailyReportScreen> {
+  TimeRange _range = TimeRange.day;
+  DateTime _referenceDate = DateTime.now(); // The "anchor" for the range (e.g. "this week containing X")
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF121212) : Colors.white;
+    final text = isDark ? Colors.white : Colors.black;
+
     return Consumer<GrowthProvider>(
       builder: (context, provider, _) {
-        final today = DateTime.now();
-        final dateStr = "${today.year}-${today.month}-${today.day}";
-        final goalName = "Daily Plan - $dateStr";
+        // 1. Filter Tasks based on Range
+        final allTasks = provider.allTasks; // Helper to get flat list
+        final goals = provider.goals;
+        final tasks = _getTasksForRange(allTasks, goals, _range, _referenceDate);
         
-        // Fetch tasks from "Daily Plan" goal + Tasks from "Inbox" that were worked on today (startedAt or completedAt roughly)
-        // For simplicity, we stick to the Plan.
-        
-        // Fetch tasks from "Daily Plan" goal + "Inbox" to match DayPlannerScreen
-        final dailyGoal = provider.goals.where((g) => g.name == goalName).firstOrNull;
-        final inboxGoal = provider.goals.where((g) => g.name == 'Inbox').firstOrNull;
-        
-        final List<GoalTask> tasks = [];
-        
-        if (dailyGoal != null) {
-           tasks.addAll(provider.getTasksForGoal(dailyGoal.id));
-        }
-        if (inboxGoal != null) {
-           tasks.addAll(provider.getTasksForGoal(inboxGoal.id));
-        }
-        
-        // Calculate Metrics
-        int totalEstMinutes = 0;
-        int totalActMinutes = 0;
-        int completedCount = 0;
-        
+        // 2. Metrics
+        final focusScore = AnalyticsHelper.calculateFocusScore(tasks);
+        final completed = tasks.where((t) => t.isCompleted).length;
+        final total = tasks.length;
+        int totalMinutes = 0;
+        int totalEst = 0;
         for (var t in tasks) {
-            totalEstMinutes += t.estimatedMinutes ?? 0;
-            totalActMinutes += t.actualMinutes ?? 0;
-            if (t.isCompleted) completedCount++;
+           totalMinutes += t.actualMinutes ?? 0;
+           totalEst += t.estimatedMinutes ?? 0;
         }
 
-        // Efficiency Score: (Planned / Actual) * CompletionRate
-        // If Actual < Planned (Speedy), cap at 100% or allow bonus? Let's cap at 100 for now.
-        // Actually, let's use a simpler metric: "Focus Score".
-        // Base score = (Completed / Total) * 100.
-        // Penalty for heavily exceeding time?
-        // Let's stick to standard Efficiency: Start with 100. Deduct for missed tasks.
-        
-        // Efficiency Score: Just Completion Rate for now since we don't have estimates
-        double completionRate = tasks.isEmpty ? 0 : completedCount / tasks.length;
-        int focusScore = (completionRate * 100).toInt();
-
-        // Theme
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final bg = isDark ? const Color(0xFF121212) : Colors.white;
-        final text = isDark ? Colors.white : Colors.black;
-
-        if (tasks.isEmpty) {
-             return Scaffold(
-                 appBar: AppBar(title: const Text('Daily Analytics')),
-                 body: const Center(child: Text("No data for today yet.")),
-             );
+        // 3. Consistency (Simple: Days with > 0 focus / Total Days in range)
+        int activeDays = 0;
+        if (_range != TimeRange.day) {
+           final grouped = AnalyticsHelper.groupTasksByDate(tasks);
+            // Count days with > 10 mins focus
+           activeDays = grouped.values.where((list) {
+               final dayMins = list.fold(0, (sum, t) => sum + (t.actualMinutes ?? 0));
+               return dayMins > 10;
+           }).length;
         }
 
         return Scaffold(
           backgroundColor: bg,
           appBar: AppBar(
-            title: Text('Daily Analytics', style: TextStyle(color: text)),
+            title: Text('Analytics', style: TextStyle(color: text)),
             backgroundColor: Colors.transparent,
             elevation: 0,
             iconTheme: IconThemeData(color: text),
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Focus Score Gauge
+                // Range Selector
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                        _buildRangeChip("Today", TimeRange.day),
+                        const SizedBox(width: 8),
+                        _buildRangeChip("This Week", TimeRange.week),
+                        const SizedBox(width: 8),
+                        _buildRangeChip("This Month", TimeRange.month),
+                        const SizedBox(width: 8),
+                        _buildRangeChip("All Time", TimeRange.all),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Main Focus Gauge (Day Mode) or Summary (Week Mode)
                 Center(
                     child: CircularPercentIndicator(
                         radius: 80.0,
@@ -96,50 +101,47 @@ class DailyReportScreen extends StatelessWidget {
                                     "$focusScore",
                                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 40.0, color: text),
                                 ),
-                                Text("Completion", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                Text(_range == TimeRange.day ? "Focus Score" : "Avg Score", style: TextStyle(fontSize: 12, color: Colors.grey)),
                             ],
                         ),
                         circularStrokeCap: CircularStrokeCap.round,
-                        progressColor: AppTheme.primaryColor,
+                        progressColor: _getScoreColor(focusScore),
                         backgroundColor: isDark ? Colors.white10 : Colors.grey[200]!,
                     ),
                 ).animate().scale(),
 
                 const SizedBox(height: 32),
 
-                // 2. Overview Cards (Total Time & Tasks)
-                Row(
-                   children: [
-                       Expanded(
-                           child: _buildStatCard(
-                               "Total Focus", 
-                               "${(totalActMinutes / 60).toStringAsFixed(1)}h", 
-                               Icons.timer, 
-                               Colors.blueAccent, 
-                               isDark
-                           ),
-                       ),
-                       const SizedBox(width: 16),
-                       Expanded(
-                           child: _buildStatCard(
-                               "Tasks Done", 
-                               "$completedCount/${tasks.length}", 
-                               Icons.check_circle_outline, 
-                               Colors.greenAccent, 
-                               isDark
-                           ),
-                       ),
-                   ],
+                // Grid stats
+                GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 1.5,
+                    children: [
+                        _buildStatCard("Total Focus", "${(totalMinutes/60).toStringAsFixed(1)}h", Icons.timer, Colors.blue, isDark),
+                        if (_range == TimeRange.day)
+                            _buildStatCard("Tasks Done", "$completed/$total", Icons.check_circle, Colors.green, isDark)
+                        else
+                            _buildStatCard("Active Days", "$activeDays", Icons.calendar_today, Colors.orange, isDark),
+                            
+                        _buildStatCard("Completion", "${total == 0 ? 0 : ((completed/total)*100).toInt()}%", Icons.done_all, Colors.purple, isDark),
+                        _buildStatCard("Est. vs Act.", "${(totalEst/60).toStringAsFixed(1)}h", Icons.balance, Colors.teal, isDark),
+                    ],
                 ),
 
                 const SizedBox(height: 32),
-                Text("Task Deep Dive", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: text)),
-                const SizedBox(height: 16),
-
-                // 4. Task List
-                ...tasks.map((t) => _buildTaskAnalysisRow(t, isDark)).toList().animate(interval: 50.ms).slideX(),
                 
-                const SizedBox(height: 48),
+                // Detailed List (Only if Day mode, or summarize if Week?)
+                // For MVP, just list tasks for Day, or Grouped Breakdown for Week
+                Text(_range == TimeRange.day ? "Today's Breakdown" :"Recent Activity", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: text)),
+                const SizedBox(height: 16),
+                
+                ...tasks.take(50).map((t) => _buildTaskRow(t, isDark)).toList(),
+                
+                const SizedBox(height: 40),
               ],
             ),
           ),
@@ -147,7 +149,70 @@ class DailyReportScreen extends StatelessWidget {
       },
     );
   }
+  
+  // Helpers
+  List<GoalTask> _getTasksForRange(List<GoalTask> all, List<dynamic> goals, TimeRange range, DateTime ref) {
+      return all.where((t) {
+          // 1. First, check if it belongs to a "Daily Plan" goal and extract Date
+          DateTime taskDate;
+          try {
+             final goal = goals.firstWhere((g) => g.id == t.goalId);
+             if (!goal.name.startsWith("Daily Plan")) {
+                return false;
+             }
+             
+             // Extract date from "Daily Plan - YYYY-M-D"
+             // Format from GrowthProvider.ensureDailyGoal: "${date.year}-${date.month}-${date.day}"
+             final parts = goal.name.split(' - ');
+             if (parts.length < 2) return false;
+             
+             final dateParts = parts[1].split('-');
+             if (dateParts.length != 3) {
+                 // Fallback if format is weird
+                 taskDate = t.scheduledDate ?? t.createdAt;
+             } else {
+                 final y = int.parse(dateParts[0]);
+                 final m = int.parse(dateParts[1]);
+                 final d = int.parse(dateParts[2]);
+                 taskDate = DateTime(y, m, d);
+             }
+          } catch (e) {
+             return false;
+          }
 
+          // 2. Then check Date Range using the Goal's Date
+          if (range == TimeRange.day) {
+             return AnalyticsHelper.isSameDay(taskDate, ref);
+          } else if (range == TimeRange.week) {
+             final startOfWeek = ref.subtract(Duration(days: ref.weekday - 1));
+             final endOfWeek = startOfWeek.add(const Duration(days: 6));
+             // Normalize to YMD for comparison
+             final check = DateTime(taskDate.year, taskDate.month, taskDate.day);
+             final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+             final end = DateTime(endOfWeek.year, endOfWeek.month, endOfWeek.day).add(const Duration(days: 1)); // End is exclusive boundary
+             
+             return check.isAtSameMomentAs(start) || (check.isAfter(start) && check.isBefore(end));
+          } else if (range == TimeRange.month) {
+             return taskDate.year == ref.year && taskDate.month == ref.month;
+          }
+          return true; // All
+      }).toList();
+  }
+  
+  Widget _buildRangeChip(String label, TimeRange r) {
+      final selected = _range == r;
+      return ChoiceChip(
+        label: Text(label), 
+        selected: selected,
+        onSelected: (val) {
+           if (val) setState(() => _range = r); 
+        },
+        selectedColor: AppTheme.primaryColor,
+        labelStyle: TextStyle(color: selected ? Colors.white : Colors.grey),
+        backgroundColor: Colors.transparent,
+      );
+  }
+  
   Widget _buildStatCard(String label, String value, IconData icon, Color color, bool isDark) {
       return Container(
           padding: const EdgeInsets.all(16),
@@ -158,78 +223,34 @@ class DailyReportScreen extends StatelessWidget {
           ),
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                  Icon(icon, color: color),
+                  Icon(icon, color: color, size: 20),
                   const SizedBox(height: 8),
-                  Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                  Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                   Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ],
           ),
       );
   }
-
-
-
-  Widget _buildTaskAnalysisRow(GoalTask t, bool isDark) {
-      final act = t.actualMinutes ?? 0;
-      
-      // Calculate variance color
-      Color varColor = AppTheme.primaryColor;
-      if (t.isCompleted) varColor = Colors.green;
-      
-      // Just show a small progress bar representing "effort" relative to something?
-      // Or just remove the bar entirely since we have no scale?
-      // Let's keep a full width bar if it has any time, or empty if 0
-      double pct = act > 0 ? 1.0 : 0.0;
-
+  
+  Widget _buildTaskRow(GoalTask t, bool isDark) {
       return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E20) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: isDark ? [] : [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0,2))],
-              border: Border.all(color: isDark ? Colors.white10 : Colors.transparent)
-          ),
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                  Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                          Expanded(
-                              child: Text(t.title, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                          ),
-                          if (t.isCompleted)
-                              const Icon(Icons.check_circle, color: Colors.green, size: 16)
-                      ],
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Progress Bar (Visual only)
-                  LinearPercentIndicator(
-                      lineHeight: 6.0,
-                      percent: pct,
-                      progressColor: varColor,
-                      backgroundColor: isDark ? Colors.white10 : Colors.grey[100],
-                      barRadius: const Radius.circular(3),
-                      padding: EdgeInsets.zero,
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                          Text("Time Spent", style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                          Text(
-                              "${act}m",
-                              style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
-                          )
-                      ],
-                  )
-              ],
-          ),
+         margin: const EdgeInsets.only(bottom: 8),
+         child: Row(
+             children: [
+                 Icon(t.isCompleted ? Icons.check_circle : Icons.circle_outlined, size: 16, color: t.isCompleted ? Colors.green : Colors.grey),
+                 const SizedBox(width: 8),
+                 Expanded(child: Text(t.title, style: TextStyle(color: isDark ? Colors.white70 : Colors.black87))),
+                 Text("${t.actualMinutes ?? 0}m", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+             ],
+         ),
       );
+  }
+
+  Color _getScoreColor(int score) {
+      if (score >= 80) return Colors.green;
+      if (score >= 50) return Colors.orange;
+      return Colors.red;
   }
 }

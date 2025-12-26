@@ -31,6 +31,10 @@ class GrowthProvider with ChangeNotifier {
   List<UserLocation> get savedLocations => _savedLocations; // NEW
   bool get isLoading => _isLoading;
   String? get error => _error;
+  
+  // Helper to get all tasks flat
+  List<GoalTask> get allTasks => _tasksByGoal.values.expand((l) => l).toList();
+  List<GoalTask> getAllTasksFlat() => allTasks; // Alias for compatibility
 
   List<GoalTask> getTasksForGoal(int goalId) {
     return _tasksByGoal[goalId] ?? [];

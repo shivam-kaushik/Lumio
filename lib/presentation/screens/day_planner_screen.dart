@@ -8,10 +8,11 @@ import '../../core/services/sound_service.dart';
 import '../providers/growth_provider.dart';
 import '../../data/models/goal_task.dart';
 import '../theme/app_theme.dart';
-import '../theme/app_theme.dart';
 import 'daily_report_screen.dart';
+import 'day_planner_history_screen.dart'; // NEW
 import '../widgets/active_task_timer.dart';
 import '../widgets/quick_task_input_sheet.dart';
+import '../utils/analytics_helper.dart'; // NEW
 
 class DayPlannerScreen extends StatefulWidget {
   const DayPlannerScreen({super.key});
@@ -28,6 +29,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
   bool _isListening = false;
   bool _speechAvailable = false;
   List<Map<String, dynamic>>? _generatedPlan;
+  DateTime _selectedDate = DateTime.now(); // NEW: Date Navigation
 
   @override
   void initState() {
@@ -109,8 +111,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
     try {
       final provider = context.read<GrowthProvider>();
       
-      // 1. Ensure Daily Goal Exists
-      final goalId = await provider.ensureDailyGoal(DateTime.now());
+      // 1. Ensure Daily Goal Exists for SELECTED DATE
+      final goalId = await provider.ensureDailyGoal(_selectedDate);
       
       // 2. Create Tasks
       // Note: We create them sequentially to preserve order
@@ -126,8 +128,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
           createdAt: DateTime.now(),
           isCompleted: false,
           subtasks: [],
-          // Set scheduledDate to today
-          scheduledDate: DateTime.now(),
+          // Set scheduledDate to today/selected date
+          scheduledDate: _selectedDate,
         );
         
         await provider.createTask(task);
@@ -157,8 +159,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
           backgroundColor: Colors.transparent,
           builder: (context) => QuickTaskInputSheet(
               onSubmit: (title, date, priority, tags, repeat, location) async {
-                  // Add directly to today's plan
-                  final goalId = await provider.ensureDailyGoal(DateTime.now());
+                  // Add directly to day's plan
+                  final goalId = await provider.ensureDailyGoal(_selectedDate);
                   final task = GoalTask(
                       id: 0,
                       goalId: goalId,
@@ -166,15 +168,28 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                       description: '',
                       priority: priority,
                       createdAt: DateTime.now(),
-                      scheduledDate: DateTime.now(),
+                      scheduledDate: _selectedDate, // Use selected date
                       frequency: repeat ?? 'one-time',
                       suggestedLocation: location ?? 'any',
                   );
                   await provider.createTask(task);
                   if (mounted) Navigator.pop(context);
               },
+              initialDate: _selectedDate, // Pass selected date to quick add
           ),
       );
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
   }
 
   @override
@@ -187,8 +202,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
     return Consumer<GrowthProvider>(
       builder: (context, provider, _) {
         // Check for existing plan
-        final today = DateTime.now();
-        final dateStr = "${today.year}-${today.month}-${today.day}";
+        final isToday = AnalyticsHelper.isSameDay(_selectedDate, DateTime.now());
+        final dateStr = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
         final goalName = "Daily Plan - $dateStr";
         
         // Find goals
@@ -206,7 +221,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
         if (dayGoalId != null) {
             tasks.addAll(provider.getTasksForGoal(dayGoalId));
         }
-        if (inboxGoalId != null) {
+        // ONLY show inbox if viewing TODAY. Past days should only show what was planned/done.
+        if (isToday && inboxGoalId != null) {
             tasks.addAll(provider.getTasksForGoal(inboxGoalId));
         }
         
@@ -225,18 +241,37 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
           return Scaffold(
             backgroundColor: theme.scaffoldBackgroundColor,
             appBar: AppBar(
-              title: Text('Today\'s Plan', style: TextStyle(color: textColor)),
+              title: InkWell(
+                  onTap: _pickDate,
+                  child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                          Text(
+                              isToday ? "Today's Plan" : AnalyticsHelper.formatDate(_selectedDate), 
+                              style: TextStyle(color: textColor)
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(Icons.arrow_drop_down, color: textColor),
+                      ],
+                  ),
+              ),
               backgroundColor: Colors.transparent,
               elevation: 0,
               iconTheme: IconThemeData(color: textColor),
               actions: [
+                 IconButton(
+                   icon: const Icon(Icons.history, color: Colors.grey),
+                   onPressed: () {
+                     Navigator.push(context, MaterialPageRoute(builder: (_) => const DayPlannerHistoryScreen()));
+                   },
+                 ),
                  IconButton(
                    icon: Icon(Icons.analytics_outlined, color: textColor),
                    onPressed: () {
                      Navigator.push(context, MaterialPageRoute(builder: (_) => DailyReportScreen()));
                    },
                  )
-              ],
+               ],
             ),
             floatingActionButton: FloatingActionButton.extended(
                 onPressed: () => _showQuickAdd(context, provider),
@@ -261,10 +296,6 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 80), // Bottom padding for FAB
                       itemBuilder: (context, index) {
                         final task = tasks[index];
-                        // Don't show active task in list if it's shown in Timer (optional, but cleaner redundancy)
-                        // But user might want to check it off from list too. Let's keep it but maybe highlight it?
-                        // For now keep it simple.
-                        
                         final isRunning = task.startedAt != null;
 
                         return Card(
@@ -298,11 +329,6 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                                 fontWeight: FontWeight.w500,
                               )
                             ),
-                            // Subtitle removed as per user request
-                            // subtitle: Text(
-                            //   "${task.estimatedMinutes ?? 0}m est • ${task.actualMinutes ?? 0}m act",
-                            //   style: TextStyle(color: subtleColor),
-                            // ),
                             trailing: IconButton(
                               icon: Icon(
                                 isRunning ? Icons.pause_circle_filled : Icons.play_circle_fill,
