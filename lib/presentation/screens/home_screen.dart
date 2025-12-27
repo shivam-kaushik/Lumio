@@ -118,23 +118,27 @@ class _HomeScreenState extends State<HomeScreen> {
                       final todayGoal = growthProvider.goals.where((g) => g.name == todayGoalName).firstOrNull;
                       final inboxGoal = growthProvider.goals.where((g) => g.name == 'Inbox').firstOrNull;
                       
-                      final todaysTasks = taskReminders.where((r) {
-                          // 1. Strictly belong to Today's Daily Plan
-                          if (todayGoal != null && r.linkedGoalId == todayGoal.id) return true;
-                          
-                          // 2. Belong to Inbox AND scheduled for Today
-                          if (inboxGoal != null && r.linkedGoalId == inboxGoal.id) {
-                              if (r.timeAt == null) return false;
-                              return r.timeAt!.year == today.year && 
-                                     r.timeAt!.month == today.month && 
-                                     r.timeAt!.day == today.day;
-                          }
-                          
-                          return false;
-                      }).toList();
+                      List<GoalTask> calculatedTasks = [];
+                      
+                      // 1. Add Daily Plan Tasks (Strictly for today goal)
+                      if (todayGoal != null) {
+                          calculatedTasks.addAll(growthProvider.getTasksForGoal(todayGoal.id));
+                      }
+                      
+                      // 2. Add Inbox Tasks (Scheduled/Created Today)
+                      if (inboxGoal != null) {
+                          final inboxTasks = growthProvider.getTasksForGoal(inboxGoal.id);
+                          final relevantInbox = inboxTasks.where((t) {
+                               final date = t.scheduledDate ?? t.createdAt;
+                               return date.year == today.year && 
+                                      date.month == today.month && 
+                                      date.day == today.day;
+                          });
+                          calculatedTasks.addAll(relevantInbox);
+                      }
 
-                      final completedTaskCount = todaysTasks.where((r) => !r.enabled).length; 
-                      final totalTaskCount = todaysTasks.length;
+                      final completedTaskCount = calculatedTasks.where((t) => t.isCompleted).length; 
+                      final totalTaskCount = calculatedTasks.length;
                       
                       // For the LIST below, we might still want to show everything (Overdue + Today).
                       // But for the "Hero" card, the user explicitly wants "Today's Plan".
