@@ -1,3 +1,4 @@
+import 'dart:async'; 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -9,10 +10,10 @@ import '../providers/growth_provider.dart';
 import '../../data/models/goal_task.dart';
 import '../theme/app_theme.dart';
 import 'daily_report_screen.dart';
-import 'day_planner_history_screen.dart'; // NEW
+import 'day_planner_history_screen.dart'; 
 import '../widgets/active_task_timer.dart';
 import '../widgets/quick_task_input_sheet.dart';
-import '../utils/analytics_helper.dart'; // NEW
+import '../utils/analytics_helper.dart'; 
 
 class DayPlannerScreen extends StatefulWidget {
   const DayPlannerScreen({super.key});
@@ -21,7 +22,7 @@ class DayPlannerScreen extends StatefulWidget {
   State<DayPlannerScreen> createState() => _DayPlannerScreenState();
 }
 
-class _DayPlannerScreenState extends State<DayPlannerScreen> {
+class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBindingObserver {
   final _inputController = TextEditingController();
   final stt.SpeechToText _speech = stt.SpeechToText();
   
@@ -29,12 +30,49 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
   bool _isListening = false;
   bool _speechAvailable = false;
   List<Map<String, dynamic>>? _generatedPlan;
-  DateTime _selectedDate = DateTime.now(); // NEW: Date Navigation
+  Timer? _rolloverTimer;
+  bool _isViewingToday = true;
+  DateTime _selectedDate = DateTime.now(); 
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); 
     _initSpeech();
+    _startRolloverCheck();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _rolloverTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startRolloverCheck() {
+    // Check every minute for day change
+    _rolloverTimer = Timer.periodic(const Duration(minutes: 1), (_) => _checkRollover());
+  }
+
+  void _checkRollover() {
+    if (!mounted) return;
+    
+    final now = DateTime.now();
+    
+    // If we are supposed to be viewing "Today", but the date has drifted, update it.
+    if (_isViewingToday && !AnalyticsHelper.isSameDay(_selectedDate, now)) {
+       debugPrint("📅 Day Rollover Detected! Updating to $now");
+       setState(() {
+         _selectedDate = now;
+       });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkRollover(); // Force check immediately on resume
+    }
   }
 
   Future<void> _initSpeech() async {
@@ -47,7 +85,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
         onError: (e) => setState(() => _isListening = false),
         onStatus: (s) => setState(() => _isListening = s == 'listening'),
       );
-      setState(() {});
+      if (mounted) setState(() {});
     } catch (e) {
       debugPrint("Speech init error: $e");
     }
@@ -136,7 +174,10 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
       }
 
       if (mounted) {
-        Navigator.pop(context);
+        // Clear state to switch to Dashboard Mode
+        _inputController.clear();
+        setState(() => _generatedPlan = null);
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Day Plan Created Successfully!')),
         );
@@ -188,7 +229,13 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
       lastDate: DateTime(2030),
     );
     if (picked != null) {
-      setState(() => _selectedDate = picked);
+      setState(() {
+        _selectedDate = picked;
+        // If user manually picks a date, we respect their choice.
+        // If they pick "Today", we resume auto-rollover.
+        // If they pick "Yesterday", auto-rollover stops (so it doesn't jump back to Today).
+        _isViewingToday = AnalyticsHelper.isSameDay(picked, DateTime.now());
+      });
     }
   }
 
@@ -208,22 +255,36 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
         
         // Find goals
         int? dayGoalId;
-        int? inboxGoalId;
         try {
           dayGoalId = provider.goals.firstWhere((g) => g.name == goalName).id;
         } catch (_) {}
-        try {
-          inboxGoalId = provider.goals.firstWhere((g) => g.name == 'Inbox').id;
-        } catch (_) {}
         
-        // Collect ALL tasks
+        // Collect tasks (Strictly Daily Plan only + Date Check)
+        // Collect tasks (Daily Plan + Inbox for this date)
         List<GoalTask> tasks = [];
+        
+        // 1. Daily Plan Goal Tasks
         if (dayGoalId != null) {
-            tasks.addAll(provider.getTasksForGoal(dayGoalId));
+            final goalTasks = provider.getTasksForGoal(dayGoalId);
+            tasks.addAll(goalTasks.where((t) {
+                final dateToCheck = t.scheduledDate ?? t.createdAt;
+                return AnalyticsHelper.isSameDay(dateToCheck, _selectedDate);
+            }));
         }
-        // ONLY show inbox if viewing TODAY. Past days should only show what was planned/done.
-        if (isToday && inboxGoalId != null) {
-            tasks.addAll(provider.getTasksForGoal(inboxGoalId));
+
+        // 2. Inbox Tasks (Scheduled for this date)
+        try {
+           final inboxGoal = provider.goals.firstWhere((g) => g.name == 'Inbox');
+           final inboxTasks = provider.getTasksForGoal(inboxGoal.id);
+           final inboxForDay = inboxTasks.where((t) {
+               // Check Scheduled OR Created date for Inbox
+               // This allows "Quick Capture" tasks (no date) to appear on the day they were created.
+               final dateToCheck = t.scheduledDate ?? t.createdAt; 
+               return AnalyticsHelper.isSameDay(dateToCheck, _selectedDate);
+           });
+           tasks.addAll(inboxForDay);
+        } catch (_) {
+           // No Inbox or errors
         }
         
         // Check tasks

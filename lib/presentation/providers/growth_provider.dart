@@ -5,9 +5,10 @@ import '../../data/models/goal_phase.dart';
 import '../../data/repositories/firestore_growth_repository.dart';
 import '../../core/services/privacy_gpt_service.dart';
 import '../../core/services/sound_service.dart';
-import '../../data/models/user_location.dart'; // NEW
-import 'package:shared_preferences/shared_preferences.dart'; // NEW
-import 'dart:convert'; // NEW
+import '../../core/services/notification_service.dart'; // NEW
+import '../../data/models/user_location.dart'; 
+import 'package:shared_preferences/shared_preferences.dart'; 
+import 'dart:convert';
 
 /// Growth state management provider for goals and tasks
 class GrowthProvider with ChangeNotifier {
@@ -127,33 +128,86 @@ class GrowthProvider with ChangeNotifier {
     }
   }
 
-  /// Create a task with Optimistic Update
+  Future<void> _persistSavedLocations() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String jsonStr = jsonEncode(_savedLocations.map((e) => e.toMap()).toList());
+    await prefs.setString('saved_locations', jsonStr);
+  }
+
+  // ==================== Notifications ====================
+  
+  Future<void> _scheduleTaskNotification(GoalTask task) async {
+    final notificationService = NotificationService();
+    
+    // 1. If completed or no date, cancel any existing
+    if (task.isCompleted || task.scheduledDate == null) {
+      await notificationService.cancelNotification(task.id % 2147483647);
+      return;
+    }
+
+    // 2. Determine Trigger Time
+    DateTime triggerTime = task.scheduledDate!;
+    
+    // If time is midnight (00:00), it implies "Any time this day"
+    // So we apply the Suggested Time preference
+    if (triggerTime.hour == 0 && triggerTime.minute == 0) {
+       int hour = 9; // Default 'any' or 'morning'
+       if (task.suggestedTime == 'afternoon') hour = 14;
+       else if (task.suggestedTime == 'evening') hour = 18;
+       else if (task.suggestedTime == 'morning') hour = 9;
+       
+       triggerTime = DateTime(
+         triggerTime.year, 
+         triggerTime.month, 
+         triggerTime.day, 
+         hour, 
+         0
+       );
+    }
+    
+    // 3. Schedule if in future
+    if (triggerTime.isAfter(DateTime.now())) {
+      // Notification ID must be 32-bit int
+      final notificationId = task.id % 2147483647;
+      
+      await notificationService.scheduleNotification(
+        id: notificationId,
+        title: "Time for: ${task.title}",
+        body: task.priority == 'high' ? "🔥 High priority task pending!" : "Let's make progress on your goals.",
+        scheduledTime: triggerTime,
+        payload: jsonEncode({
+             'action': 'open_task',
+             'task_id': task.id,
+             'goal_id': task.goalId,
+        }),
+      );
+    }
+  }
+
+  @override
   Future<int> createTask(GoalTask task) async {
     debugPrint('🌱 GrowthProvider: createTask called for "${task.title}" (GoalID: ${task.goalId})');
     
-    // 1. Optimistic Update: Add to UI immediately
-    final tempId = -DateTime.now().millisecondsSinceEpoch; // Temporary ID
+    // 1. Optimistic Update
+    final tempId = -DateTime.now().millisecondsSinceEpoch; 
     final tempTask = task.copyWith(id: tempId);
     
     if (!_tasksByGoal.containsKey(task.goalId)) {
       _tasksByGoal[task.goalId] = [];
     }
     _tasksByGoal[task.goalId]!.add(tempTask);
-    notifyListeners(); // Instant UI update
+    notifyListeners(); 
     
     try {
       // 2. Perform actual creation
       final id = await _repository.createTask(task);
-      debugPrint('🌱 GrowthProvider: Task created in repo (ID: $id). Syncing...');
       
-      // 3. Sync with source of truth
-      // Ideally we just replace the temp task, but full reload ensures consistency
+      // 3. Schedule Notification
+      await _scheduleTaskNotification(task.copyWith(id: id));
+
       await loadGrowthData(); 
-      debugPrint('🌱 GrowthProvider: Data reloaded successfully.');
       return id;
     } catch (e) {
-      debugPrint('🛑 GrowthProvider Error: $e');
-      // Revert optimistic update
       _tasksByGoal[task.goalId]?.removeWhere((t) => t.id == tempId);
       _error = e.toString();
       notifyListeners();
@@ -161,10 +215,14 @@ class GrowthProvider with ChangeNotifier {
     }
   }
 
-  /// Update a task
+  @override
   Future<void> updateTask(GoalTask task) async {
     try {
       await _repository.updateTask(task);
+      
+      // Update Notification
+      await _scheduleTaskNotification(task);
+      
       await loadGrowthData();
     } catch (e) {
       _error = e.toString();
@@ -173,22 +231,14 @@ class GrowthProvider with ChangeNotifier {
     }
   }
 
-  /// Replace all tasks for a goal
-  Future<void> replaceTasksForGoal(int goalId, List<GoalTask> rootTasks) async {
-    try {
-      await _repository.replaceTasksForGoal(goalId, rootTasks);
-      await loadGrowthData();
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-      rethrow;
-    }
-  }
-
-  /// Delete a task
+  @override
   Future<void> deleteTask(int taskId) async {
     try {
       await _repository.deleteTask(taskId);
+      
+      // Cancel Notification
+      await NotificationService().cancelNotification(taskId % 2147483647);
+      
       await loadGrowthData();
     } catch (e) {
       _error = e.toString();
@@ -197,15 +247,72 @@ class GrowthProvider with ChangeNotifier {
     }
   }
 
+  @override
+  Future<String?> completeTask(int taskId) async {
+    try {
+      // Get task details before completing to pass to message gen
+      final allTasks = _tasksByGoal.values.expand((list) => list).toList();
+      final task = allTasks.firstWhere(
+          (t) => t.id == taskId, 
+          orElse: () => throw Exception("Task with ID $taskId not found in provider")
+      );
+      
+      final goal = _goals.firstWhere(
+          (g) => g.id == task.goalId, 
+          orElse: () => Goal(id: task.goalId, name: 'Unknown Goal', createdAt: DateTime.now())
+      );
+      
+      // Optimistic Update
+      final updatedTask = task.copyWith(
+        isCompleted: true, 
+        completedAt: DateTime.now()
+      );
+      
+      // Update local state
+      if (_tasksByGoal.containsKey(task.goalId)) {
+        final list = _tasksByGoal[task.goalId]!;
+        final index = list.indexWhere((t) => t.id == taskId);
+        if (index != -1) {
+          list[index] = updatedTask;
+          notifyListeners(); 
+        }
+      }
 
+      SoundService().playSuccess();
 
-  /// Uncomplete a task (mark as not completed)
+      await _repository.completeTask(taskId);
+      
+      // Cancel Notification
+      await NotificationService().cancelNotification(taskId % 2147483647);
+      
+      loadGrowthData(); 
+      
+      final privacyGpt = PrivacyGptService();
+      final message = await privacyGpt.generateMotivationalMessage(
+        goalName: goal.name,
+        taskDescription: task.description,
+        skillName: null, 
+        streakCount: 0, 
+        totalReps: 0, 
+        motivationAnchor: task.motivationAnchor,
+      );
+      
+      return message;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  @override
   Future<void> uncompleteTask(int taskId) async {
     try {
-      // Uncomplete the task
       await _repository.uncompleteTask(taskId);
       
-      // Reload data to sync across screens
+      final task = allTasks.firstWhere((t) => t.id == taskId);
+      await _scheduleTaskNotification(task.copyWith(isCompleted: false)); // Re-arm
+
       await loadGrowthData();
     } catch (e) {
       _error = e.toString();
@@ -223,6 +330,18 @@ class GrowthProvider with ChangeNotifier {
       _error = e.toString();
       debugPrint('Error loading tasks: $e');
       notifyListeners();
+    }
+  }
+  
+  /// Replace all tasks for a goal
+  Future<void> replaceTasksForGoal(int goalId, List<GoalTask> rootTasks) async {
+    try {
+      await _repository.replaceTasksForGoal(goalId, rootTasks);
+      await loadGrowthData();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
     }
   }
 
@@ -335,69 +454,7 @@ class GrowthProvider with ChangeNotifier {
       debugPrint("Error restarting task: $e");
     }
   }
-
-  /// Complete a task and return motivational message
-  Future<String?> completeTask(int taskId) async {
-    try {
-      // Get task details before completing
-      final allTasks = _tasksByGoal.values.expand((list) => list).toList();
-      final task = allTasks.firstWhere(
-          (t) => t.id == taskId, 
-          orElse: () => throw Exception("Task with ID $taskId not found in provider")
-      );
-      
-      final goal = _goals.firstWhere(
-          (g) => g.id == task.goalId, 
-          orElse: () => Goal(id: task.goalId, name: 'Unknown Goal', createdAt: DateTime.now())
-      );
-      
-      // OPTIMISTIC UPDATE: Update local state immediately for UI responsiveness
-      final updatedTask = task.copyWith(
-        isCompleted: true, 
-        completedAt: DateTime.now()
-      );
-      
-      // Update the subtask in the list (this handles top-level tasks)
-      // Note: If it's a subtask, deep update recursive logic would be needed.
-      // Assuming flat list for now or top-level. 
-      // Actually, _tasksByGoal contains lists of tasks. If 'task' is from there, we can replace it.
-      if (_tasksByGoal.containsKey(task.goalId)) {
-        final list = _tasksByGoal[task.goalId]!;
-        final index = list.indexWhere((t) => t.id == taskId);
-        if (index != -1) {
-          list[index] = updatedTask;
-          notifyListeners(); // Trigger UI update instantly
-        }
-      }
-
-      // Play Sound
-      SoundService().playSuccess();
-
-      // Complete the task in backend
-      await _repository.completeTask(taskId);
-      
-      // Reload data to ensure consistency (background)
-      loadGrowthData(); 
-      
-      // Generate motivational message
-      final privacyGpt = PrivacyGptService();
-      final message = await privacyGpt.generateMotivationalMessage(
-        goalName: goal.name,
-        taskDescription: task.description,
-        skillName: null, // No skills anymore
-        streakCount: 0, // No streaks anymore
-        totalReps: 0, // No reps anymore
-        motivationAnchor: task.motivationAnchor,
-      );
-      
-      return message;
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-      rethrow;
-    }
-  }
-
+  
   void clearError() {
     _error = null;
     notifyListeners();
@@ -430,11 +487,5 @@ class GrowthProvider with ChangeNotifier {
     _savedLocations.removeWhere((l) => l.id == id);
     notifyListeners();
     await _persistSavedLocations();
-  }
-
-  Future<void> _persistSavedLocations() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String jsonStr = jsonEncode(_savedLocations.map((e) => e.toMap()).toList());
-    await prefs.setString('saved_locations', jsonStr);
   }
 }

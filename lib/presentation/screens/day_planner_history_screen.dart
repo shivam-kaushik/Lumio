@@ -22,15 +22,13 @@ class DayPlannerHistoryScreen extends StatelessWidget {
       ),
       body: Consumer<GrowthProvider>(
         builder: (context, provider, _) {
-          // 1. Fetch relevant tasks (Only "Daily Plan" goals)
-          // We filter out Business Goals to keep history focused on daily planning.
+          // 1. Fetch relevant tasks (Daily Plan + Inbox)
           final relevantTasks = provider.allTasks.where((t) {
-             if (t.scheduledDate == null) return false;
-             
              // Find parent goal to check name
              try {
                final goal = provider.goals.firstWhere((g) => g.id == t.goalId);
-               return goal.name.startsWith("Daily Plan");
+               final name = goal.name;
+               return name.startsWith("Daily Plan") || name == "Inbox";
              } catch (e) {
                return false;
              }

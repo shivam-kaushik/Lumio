@@ -119,10 +119,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       final inboxGoal = growthProvider.goals.where((g) => g.name == 'Inbox').firstOrNull;
                       
                       final todaysTasks = taskReminders.where((r) {
-                          // Allow if it belongs to Today's Plan Goal
+                          // 1. Strictly belong to Today's Daily Plan
                           if (todayGoal != null && r.linkedGoalId == todayGoal.id) return true;
-                          // Allow if it belongs to Inbox Goal
-                          if (inboxGoal != null && r.linkedGoalId == inboxGoal.id) return true;
+                          
+                          // 2. Belong to Inbox AND scheduled for Today
+                          if (inboxGoal != null && r.linkedGoalId == inboxGoal.id) {
+                              if (r.timeAt == null) return false;
+                              return r.timeAt!.year == today.year && 
+                                     r.timeAt!.month == today.month && 
+                                     r.timeAt!.day == today.day;
+                          }
                           
                           return false;
                       }).toList();
@@ -322,41 +328,43 @@ class _HomeScreenState extends State<HomeScreen> {
       );
   }
 
-  /// Get ALL tasks flattened into one list, filtered for Inbox/Daily Plan
+  /// Get tasks flattened, strictly from "Inbox" (Home Screen created)
   List<Reminder> _getAllReminders(
     List<Reminder> reminders,
     GrowthProvider growthProvider,
   ) {
+    // 1. Start with simple Reminders (created from Home)
     final allReminders = [...reminders];
 
-    // Identify allowed Goal IDs (Inbox and Daily Plans)
-    final allowedGoalIds = <int>{};
-    for (var goal in growthProvider.goals) {
-      if (goal.name == 'Inbox' || goal.name.startsWith('Daily Plan')) {
-        allowedGoalIds.add(goal.id);
-      }
-    }
-
-    // Inject GoalTasks from allowed goals only
+    // 2. Inject GoalTasks ONLY if they belong to "Inbox"
     if (growthProvider.tasksByGoal.isNotEmpty) {
       final allTasks = growthProvider.tasksByGoal.values.expand((list) => list).toList();
+      
+      // Find Inbox Goal ID
+      int? inboxGoalId;
+      try {
+        final inboxGoal = growthProvider.goals.firstWhere((g) => g.name == 'Inbox');
+        inboxGoalId = inboxGoal.id;
+      } catch (_) {
+        // No Inbox found, so no tasks to add
+      }
 
-       for (var task in allTasks) {
-          // Filter: Must be in an allowed goal (Main Screen tasks)
-          if (!allowedGoalIds.contains(task.goalId)) {
-            continue; 
-          }
-          
-          allReminders.add(Reminder(
-              id: "task_${task.id}", // Prefix to avoid collisions
-              text: task.title,
-              timeAt: task.scheduledDate ?? task.createdAt, // Fallback to created
-              priority: _mapPriority(task.priority),
-              category: ReminderCategory.work, // Default or parse tags
-              linkedGoalId: task.goalId,
-              enabled: !task.isCompleted, // Map completion status to enabled status
-          ));
-       }
+      if (inboxGoalId != null) {
+         for (var task in allTasks) {
+            // STRICT FILTER: Only Inbox tasks
+            if (task.goalId != inboxGoalId) continue;
+            
+            allReminders.add(Reminder(
+                id: "task_${task.id}", 
+                text: task.title,
+                timeAt: task.scheduledDate ?? task.createdAt, 
+                priority: _mapPriority(task.priority),
+                category: ReminderCategory.work, 
+                linkedGoalId: task.goalId,
+                enabled: !task.isCompleted, 
+            ));
+         }
+      }
     }
     
     // Sort logic
