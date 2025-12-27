@@ -30,6 +30,11 @@ import 'core/services/motivational_engine.dart'; // Add import
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     try {
+      // 0. Initialize Firebase (Critical for Background Firestore Access)
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+
       // Initialize services for background context
       final notificationService = NotificationService();
       await notificationService.initialize();
