@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/reminder_provider.dart';
 import '../providers/growth_provider.dart';
 import '../widgets/reminder_card.dart';
-import '../widgets/smart_reminder_dialog.dart';
+import '../widgets/quick_task_input_sheet.dart';
 import '../theme/app_theme.dart';
 import '../../data/models/reminder.dart';
 import '../../data/models/goal_task.dart';
@@ -732,15 +732,46 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ...reminders.map((reminder) => ReminderCard(
             reminder: reminder,
             onTap: () async {
-              final result = await showDialog<Reminder>(
-                context: context,
-                builder: (context) => SmartReminderDialog(
-                  reminder: reminder,
-                ),
+              // Show Edit Sheet
+              await showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => QuickTaskInputSheet(
+                      isEditing: true,
+                      initialTitle: reminder.text,
+                      initialPriority: reminder.priority.name,
+                      initialDate: reminder.timeAt,
+                      initialTags: [reminder.category.name], 
+                      onSubmit: (title, date, priority, tags, repeat, location) {
+                          // Map tags to Category
+                          ReminderCategory newCat = ReminderCategory.other;
+                          for (var tag in tags) {
+                              try {
+                                  newCat = ReminderCategory.values.firstWhere((e) => e.name.toLowerCase() == tag.toLowerCase());
+                                  break; // Take first valid category
+                              } catch (_) {}
+                          }
+                          
+                          // Map Priority
+                          ReminderPriority newPrio = ReminderPriority.medium;
+                          switch (priority.toLowerCase()) {
+                              case 'high': newPrio = ReminderPriority.high; break;
+                              case 'low': newPrio = ReminderPriority.low; break;
+                              case 'critical': newPrio = ReminderPriority.critical; break;
+                          }
+
+                          final updated = reminder.copyWith(
+                              text: title,
+                              timeAt: date ?? reminder.timeAt,
+                              priority: newPrio,
+                              category: newCat,
+                          );
+                          context.read<ReminderProvider>().updateReminder(updated);
+                          Navigator.pop(context);
+                      },
+                  ),
               );
-              if (result != null && mounted) {
-                context.read<ReminderProvider>().updateReminder(result);
-              }
             },
             onToggle: (enabled) {
               context.read<ReminderProvider>().toggleReminder(

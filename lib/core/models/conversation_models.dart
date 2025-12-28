@@ -42,11 +42,13 @@ class GptResponse {
 class ConversationResponse {
   final String responseText;
   final bool isAction;
+  final String? actionType;
   final Map<String, dynamic>? actionData;
 
   ConversationResponse({
     required this.responseText,
     required this.isAction,
+    this.actionType,
     this.actionData,
   });
 }

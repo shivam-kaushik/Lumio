@@ -893,44 +893,60 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
 
   String _buildConversationalSystemPrompt() {
     return '''
-You are Lumio, a hands-free execution assistant. Your goal is to help the user define a clear goal and create a plan.
+You are Lumio, a proactive execution assistant. Your goal is to Identify User Intent and Help them Execute.
 
-STATE MACHINE:
-1. GATHER_INFO: Ask questions to clarify the user's goal.
-2. CREATE_PLAN: Once you have enough info (What, When, How much effort) OR IF THE USER SAYS THEY ARE DONE, generate a plan.
+INTENTS:
+1. **CREATE_RELINDER/TASK**: User wants to do something simple (e.g., "Call Mom", "Buy milk").
+   - Action: Create a task immediately.
+   - Required: Title. (Date/Time defaults to Today/Now if missing).
+   
+2. **CREATE_GOAL**: User has a big objective (e.g., "Run a marathon", "Start a business", "I want to create a goal").
+   - Action: Create a detailed plan.
+   - Required: Goal Name, Deadline, Effort (Hours/Week).
+   - **CRITICAL**: If User says "I want to create a goal" but doesn't say WHAT, ASK: "What is the goal you want to achieve?"
+   - If User provides Goal Name but no Deadline, ASK: "When do you want to achieve [Goal Name] by?"
 
-REQUIRED INFO:
-- Goal Description (What)
-- Deadline (When)
-- Effort/Capacity (e.g., hours per week)
+3. **PLAN_DAY**: User wants to organize their schedule (e.g., "Plan my day", "Here is my dump...").
+   - Action: Generate a Daily Schedule.
+   - Required: List of tasks (user input).
 
-CRITICAL INSTRUCTION:
-If the user says "that's it", "nothing else", "I'm done", or similar, YOU MUST PROCEED TO CREATE_PLAN immediately, even if some info is missing (use defaults: 30 days, 2 hours/day).
+STATE MACHINE RULES:
+- **NEVER** reply with generic phrases like "Okay, I've noted that down. Anything else?" for Goal/Task completion.
+- If info is missing (e.g. Goal Title), response type MUST be "question".
+- If info is sufficient, response type MUST be "action".
 
-OUTPUT FORMAT:
-Return JSON ONLY.
+OUTPUT FORMAT (JSON ONLY):
 
-If you need more info (and user hasn't said they are done):
+Type 1: QUESTION (Need more info)
 {
   "type": "question",
-  "text": "Your question here?"
+  "text": "What is the specific goal you want to work on?",
+  "intent": "CREATE_GOAL" // Optional context
 }
 
-If you have enough info to create a plan OR user is done:
+Type 2: ACTION (Ready to execute)
 {
   "type": "action",
-  "text": "Great! I've created your roadmap to [Goal Name]. It starts with [First Task].",
+  "text": "I've created your goal 'Run Marathon'. Let's do this!",
+  "action_type": "CREATE_GOAL", 
   "action_data": {
-     "goal": "...",
-     "deadline": "...",
-     "tasks": [
-        {"title": "Task 1", "description": "...", "estimatedHours": 1.0, "priority": "high"},
-        {"title": "Task 2", "description": "...", "estimatedHours": 2.0, "priority": "medium"}
-     ]
+     "goal": "Run Marathon",
+     "deadline": "2025-06-01...",
+     "tasks": [...]
   }
 }
 
-Keep questions SHORT and conversational (spoken by TTS).
+Type 3: TASK_ACTION (Simple Task)
+{
+  "type": "action",
+  "text": "Added 'Buy Milk' to your list.",
+  "action_type": "CREATE_TASK",
+  "action_data": {
+     "title": "Buy Milk"
+  }
+}
+
+Keep questions SHORT, DIRECT, and CONVERSATIONAL (spoken by TTS).
 ''';
   }
 
@@ -947,6 +963,7 @@ Keep questions SHORT and conversational (spoken by TTS).
       return ConversationResponse(
         responseText: data['text'],
         isAction: data['type'] == 'action',
+        actionType: data['action_type'],
         actionData: data['action_data'],
       );
     } catch (e) {
@@ -1019,45 +1036,110 @@ Keep questions SHORT and conversational (spoken by TTS).
       lastUserMsg = history.last['content']?.toLowerCase().trim() ?? '';
     }
     
-    // Check for stop signals in fallback mode too
+    // Check for stop signals
     final stopPhrases = ['no', 'nope', 'nothing else', 'that\'s it', 'done', 'nothing', 'stop', 'finished', 'no more'];
     final isStop = stopPhrases.any((phrase) => lastUserMsg.contains(phrase));
 
     if (isStop) {
-       // Try to find the goal in history (usually the first user message)
+       // ... (Keep existing Logic for "Creating Plan" if stop is said) ...
        String goalName = "New Goal";
        if (history.isNotEmpty) {
            final firstUserMsg = history.firstWhere((m) => m['role'] == 'user', orElse: () => {'content': 'New Goal'});
            goalName = firstUserMsg['content'] ?? "New Goal";
-           // Truncate if too long for a title
-           if (goalName.length > 50) {
-               goalName = goalName.substring(0, 47) + "...";
-           }
+           if (goalName.length > 50) goalName = goalName.substring(0, 47) + "...";
        }
 
        return ConversationResponse(
         responseText: "Understood. Creating your plan now.",
         isAction: true,
+        actionType: 'CREATE_GOAL',
         actionData: {
           'goal': goalName,
           'deadline': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
           'tasks': [
-             {'title': 'Review Goal', 'description': 'Review and clear up the details of this goal', 'priority': 'high'},
+             {'title': 'Review Goal', 'description': 'Review $goalName details', 'priority': 'high'},
              {'title': 'First Step', 'description': 'Identify the immediate next step', 'priority': 'medium'},
           ]
         },
       );
     }
     
-    // Very basic heuristic
+    // 1. Intelligent Fallback: Goal Creation Intent
+    // If user says "create a goal" or "new goal" but hasn't given details
+    if (lastUserMsg.contains('goal') && (lastUserMsg.contains('create') || lastUserMsg.contains('new') || lastUserMsg.contains('want to'))) {
+        return ConversationResponse(
+            responseText: "What is the specific goal you want to achieve?",
+            isAction: false,
+        );
+    }
+
+    // 2. Intelligent Fallback: Task Creation Intent (Simple Regex)
+    // Matches "Remind me to [X]", "Buy [X]", "Call [X]"
+    final taskRegex = RegExp(r'^(remind me to|buy|call|email|text|check) (.+)', caseSensitive: false);
+    final match = taskRegex.firstMatch(lastUserMsg);
+    if (match != null) {
+        final taskTitle = match.group(2)?.trim() ?? lastUserMsg; // content after verb
+        // Capitalize
+        final formattedTitle = taskTitle.length > 0 
+            ? '${taskTitle[0].toUpperCase()}${taskTitle.substring(1)}'
+            : taskTitle;
+
+        final verb = match.group(1)?.toLowerCase();
+
+        return ConversationResponse(
+            responseText: "I've added '$formattedTitle' to your tasks.",
+            isAction: true,
+            actionType: 'CREATE_TASK',
+            actionData: {
+                'title': '$verb $formattedTitle', // e.g. "call Mom"
+            }
+        );
+    }
+    
+    // 4. Context-Aware Fallback (Answering a Question)
+    // Check if the PREVIOUS message (Assistant) was asking for a goal
+    if (history.length >= 2) {
+        final lastAssistantMsg = history[history.length - 2]['content']?.toLowerCase() ?? '';
+        if (history[history.length - 2]['role'] == 'assistant') {
+             if (lastAssistantMsg.contains('specific goal') || lastAssistantMsg.contains('what is the goal')) {
+                  // User is answering the goal question!
+                  // Treat current message as the Goal Title
+                  final goalName = lastUserMsg.length > 50 
+                      ? lastUserMsg.substring(0, 47) + "..." 
+                      : lastUserMsg;
+                  
+                  // Capitalize
+                  final formattedGoal = goalName.length > 0 
+                      ? '${goalName[0].toUpperCase()}${goalName.substring(1)}'
+                      : goalName;
+
+                  return ConversationResponse(
+                      responseText: "I've drafted a plan for '$formattedGoal'. Check it out!",
+                      isAction: true,
+                      actionType: 'CREATE_GOAL',
+                      actionData: {
+                          'goal': formattedGoal,
+                          'deadline': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+                          'tasks': [
+                              {'title': 'Research $formattedGoal', 'description': 'Initial research phase', 'priority': 'high'},
+                              {'title': 'Draft Plan', 'description': 'Outline key milestones', 'priority': 'medium'},
+                              {'title': 'Execute First Step', 'description': 'Start working on the first task', 'priority': 'medium'},
+                          ]
+                      }
+                  );
+             }
+        }
+    }
+
+    // 5. Generic Fallback
     if (history.length < 2) {
       return ConversationResponse(
-        responseText: "Got it. And when do you want to finish this by?",
+        responseText: "Got it. When would you like to finish this by?",
         isAction: false,
       );
     } else {
       return ConversationResponse(
-        responseText: "Okay, I've noted that down. Anything else?",
+        responseText: "I've noted that. Anything else?",
         isAction: false,
       );
     }

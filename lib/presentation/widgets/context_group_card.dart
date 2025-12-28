@@ -61,7 +61,7 @@ class ContextGroupCard extends StatelessWidget {
                 final index = entry.key;
                 final reminder = entry.value;
                 return Dismissible(
-                  key: Key('reminder_${reminder.id}_$index'),
+                  key: Key('reminder_${reminder.id}'),
                   direction: DismissDirection.endToStart,
                   background: Container(
                     alignment: Alignment.centerRight,
@@ -242,7 +242,7 @@ class ContextGroupCard extends StatelessWidget {
                 ),
               );
               return Dismissible(
-                key: Key('reminder_${reminder.id}_$index'),
+                key: Key('reminder_${reminder.id}'),
                 direction: DismissDirection.endToStart,
                 background: Container(
                   alignment: Alignment.centerRight,

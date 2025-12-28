@@ -15,10 +15,22 @@ enum ChatState {
 }
 
 class ChatController extends ChangeNotifier {
-  final stt.SpeechToText _speech = stt.SpeechToText();
-  final TextToSpeechService _tts = TextToSpeechService();
-  final PrivacyGptService _gpt = PrivacyGptService();
-  final PermissionService _permissions = PermissionService();
+  late final stt.SpeechToText _speech;
+  late final TextToSpeechService _tts;
+  late final PrivacyGptService _gpt;
+  late final PermissionService _permissions;
+
+  ChatController({
+    stt.SpeechToText? speech,
+    TextToSpeechService? tts,
+    PrivacyGptService? gpt,
+    PermissionService? permissions,
+  }) {
+    _speech = speech ?? stt.SpeechToText();
+    _tts = tts ?? TextToSpeechService();
+    _gpt = gpt ?? PrivacyGptService();
+    _permissions = permissions ?? PermissionService();
+  }
 
   ChatState _state = ChatState.idle;
   String _currentTranscript = '';
@@ -115,7 +127,11 @@ class ChatController extends ChangeNotifier {
           
           if (response != null) {
               if (response.isAction) {
-                  _addMessage(ChatMessage.action(response.responseText, response.actionData ?? {}));
+                  _addMessage(ChatMessage.action(
+                    response.responseText, 
+                    response.actionData ?? {},
+                    type: response.actionType
+                  ));
                   // Optional: Speak the completion message
                    _tts.speak(response.responseText);
               } else {

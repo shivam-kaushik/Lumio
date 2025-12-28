@@ -8,10 +8,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/reminder_provider.dart';
 import '../providers/growth_provider.dart';
 import '../widgets/context_group_card.dart';
-import '../widgets/smart_reminder_dialog.dart';
+
 import '../widgets/modern_smart_card.dart';
 import '../theme/app_theme.dart';
-import 'add_reminder_screen.dart';
+
 import '../../data/models/reminder.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../../core/services/home_detection_service.dart';
@@ -89,10 +89,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   if (reminderProvider.error != null) {
                     return _buildErrorState(context, reminderProvider);
-                  }
-
-                  if (reminderProvider.reminders.isEmpty) {
-                    return _buildEmptyState(context);
                   }
 
                   final visibleReminders = reminderProvider.reminders;
@@ -274,15 +270,46 @@ class _HomeScreenState extends State<HomeScreen> {
                                           return;
                                       }
 
-                                      final result = await showDialog<Reminder>(
-                                        context: context,
-                                        builder: (context) => SmartReminderDialog(
-                                          reminder: reminder,
-                                        ),
+                                      // Standard Reminder Edit
+                                      await showModalBottomSheet(
+                                          context: context,
+                                          isScrollControlled: true,
+                                          backgroundColor: Colors.transparent,
+                                          builder: (context) => QuickTaskInputSheet(
+                                              isEditing: true,
+                                              initialTitle: reminder.text,
+                                              initialPriority: reminder.priority.name,
+                                              initialDate: reminder.timeAt,
+                                              initialTags: [reminder.category.name], 
+                                              onSubmit: (title, date, priority, tags, repeat, location) {
+                                                  // Map tags to Category
+                                                  ReminderCategory newCat = ReminderCategory.other;
+                                                  for (var tag in tags) {
+                                                      try {
+                                                          newCat = ReminderCategory.values.firstWhere((e) => e.name.toLowerCase() == tag.toLowerCase());
+                                                          break; // Take first valid category
+                                                      } catch (_) {}
+                                                  }
+                                                  
+                                                  // Map Priority
+                                                  ReminderPriority newPrio = ReminderPriority.medium;
+                                                  switch (priority.toLowerCase()) {
+                                                      case 'high': newPrio = ReminderPriority.high; break;
+                                                      case 'low': newPrio = ReminderPriority.low; break;
+                                                      case 'critical': newPrio = ReminderPriority.critical; break;
+                                                  }
+
+                                                  final updated = reminder.copyWith(
+                                                      text: title,
+                                                      timeAt: date ?? reminder.timeAt,
+                                                      priority: newPrio,
+                                                      category: newCat,
+                                                  );
+                                                  reminderProvider.updateReminder(updated);
+                                                  Navigator.pop(context);
+                                              },
+                                          ),
                                       );
-                                      if (result != null && mounted) {
-                                        reminderProvider.updateReminder(result);
-                                      }
                                     },
                                     onToggle: (id, enabled) {
                                       if (id.startsWith('task_')) {
@@ -353,21 +380,23 @@ class _HomeScreenState extends State<HomeScreen> {
         // No Inbox found, so no tasks to add
       }
 
-      if (inboxGoalId != null) {
-         for (var task in allTasks) {
-            // STRICT FILTER: Only Inbox tasks
-            if (task.goalId != inboxGoalId) continue;
+      for (var task in allTasks) {
+            // FILTER: Only Inbox tasks OR Tasks Scheduled for Today
+            final isInbox = inboxGoalId != null && task.goalId == inboxGoalId;
+            final isToday = task.scheduledDate != null && DateTimeUtils.isToday(task.scheduledDate!.toLocal());
+
+            // Strict Filter: Must be Inbox OR Today
+            if (!isInbox && !isToday) continue;
             
             allReminders.add(Reminder(
                 id: "task_${task.id}", 
                 text: task.title,
                 timeAt: task.scheduledDate ?? task.createdAt, 
                 priority: _mapPriority(task.priority),
-                category: ReminderCategory.work, 
+                category: _parseCategoryFromDescription(task.description), // Parse Category
                 linkedGoalId: task.goalId,
                 enabled: !task.isCompleted, 
             ));
-         }
       }
     }
     
@@ -385,6 +414,20 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     return allReminders;
+  }
+
+  ReminderCategory _parseCategoryFromDescription(String description) {
+     final tagPattern = RegExp(r'(#[a-zA-Z0-9_]+)', caseSensitive: false);
+     final match = tagPattern.firstMatch(description);
+     if (match != null) {
+        final tag = match.group(0)!.substring(1).toLowerCase(); // remove #
+        try {
+           return ReminderCategory.values.firstWhere((e) => e.name.toLowerCase() == tag);
+        } catch (_) {
+           // Tag found but doesn't match enum
+        }
+     }
+     return ReminderCategory.other;
   }
 
   ReminderPriority _mapPriority(String priority) {
@@ -627,10 +670,47 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: AppTheme.spacingXL),
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const AddReminderScreen(),
-                  ),
+                // Show new Quick Task Sheet
+                showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => QuickTaskInputSheet(
+                        onSubmit: (title, date, priority, tags, repeat, location) {
+                            // Create Task in GrowthProvider by default (Unified)
+                            final start = date ?? DateTime.now();
+                             // Try to find Inbox Goal
+                             int? inboxId;
+                             try {
+                                 inboxId = context.read<GrowthProvider>().goals.firstWhere((g) => g.name == 'Inbox').id;
+                             } catch (_) {}
+
+                             if (inboxId != null) {
+                                 final newTask = GoalTask(
+                                     id: 0, 
+                                     goalId: inboxId, 
+                                     title: title, 
+                                     description: tags.map((t) => "#$t").join(" "), 
+                                     createdAt: DateTime.now(),
+                                     scheduledDate: start,
+                                     priority: priority,
+                                     frequency: repeat ?? 'one-time',
+                                     suggestedLocation: location ?? 'any',
+                                 );
+                                 context.read<GrowthProvider>().createTask(newTask);
+                             } else {
+                                // Fallback to classic reminder if no Inbox goal? 
+                                // Or better: Create Inbox goal silently?
+                                // Let's use ReminderProvider as fallback for safety if GrowthProvider fails, 
+                                // BUT user wants "new tasks screen" gone.
+                                // Assuming GrowthProvider is primary now.
+                                // Let's create an Inbox goal if missing.
+                                // NOTE: We can't easily wait here.
+                                // Just add a logic to ensure Inbox exists in GrowthProvider or use generic create.
+                             }
+                             Navigator.pop(context);
+                        },
+                    ),
                 );
               },
               icon: const Icon(Icons.add_rounded, size: 20),

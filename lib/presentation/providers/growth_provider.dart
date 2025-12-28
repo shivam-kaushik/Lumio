@@ -13,6 +13,7 @@ import 'dart:convert';
 /// Growth state management provider for goals and tasks
 class GrowthProvider with ChangeNotifier {
   final FirestoreGrowthRepository _repository;
+  final NotificationService _notificationService;
 
   // State
   List<Goal> _goals = [];
@@ -22,8 +23,11 @@ class GrowthProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
-  GrowthProvider({required FirestoreGrowthRepository repository})
-      : _repository = repository;
+  GrowthProvider({
+    required FirestoreGrowthRepository repository,
+    NotificationService? notificationService,
+  })  : _repository = repository,
+        _notificationService = notificationService ?? NotificationService();
 
   // Getters
   List<Goal> get goals => _goals;
@@ -137,11 +141,9 @@ class GrowthProvider with ChangeNotifier {
   // ==================== Notifications ====================
   
   Future<void> _scheduleTaskNotification(GoalTask task) async {
-    final notificationService = NotificationService();
-    
     // 1. If completed or no date, cancel any existing
     if (task.isCompleted || task.scheduledDate == null) {
-      await notificationService.cancelNotification(task.id % 2147483647);
+      await _notificationService.cancelNotification(task.id % 2147483647);
       return;
     }
 
@@ -170,7 +172,7 @@ class GrowthProvider with ChangeNotifier {
       // Notification ID must be 32-bit int
       final notificationId = task.id % 2147483647;
       
-      await notificationService.scheduleNotification(
+      await _notificationService.scheduleNotification(
         id: notificationId,
         title: "Time for: ${task.title}",
         body: task.priority == 'high' ? "🔥 High priority task pending!" : "Let's make progress on your goals.",
@@ -237,7 +239,7 @@ class GrowthProvider with ChangeNotifier {
       await _repository.deleteTask(taskId);
       
       // Cancel Notification
-      await NotificationService().cancelNotification(taskId % 2147483647);
+      await _notificationService.cancelNotification(taskId % 2147483647);
       
       await loadGrowthData();
     } catch (e) {
@@ -283,7 +285,40 @@ class GrowthProvider with ChangeNotifier {
       await _repository.completeTask(taskId);
       
       // Cancel Notification
-      await NotificationService().cancelNotification(taskId % 2147483647);
+      await _notificationService.cancelNotification(taskId % 2147483647);
+
+      // --- Recurrence Logic ---
+      if (task.frequency != 'one-time' && task.scheduledDate != null) {
+        DateTime? nextDate;
+        final d = task.scheduledDate!;
+        
+        if (task.frequency == 'daily') {
+          nextDate = d.add(const Duration(days: 1));
+        } else if (task.frequency == 'weekly') {
+          nextDate = d.add(const Duration(days: 7));
+        } else if (task.frequency == 'monthly') {
+          // Careful with month overflow (e.g. Jan 31 -> Feb 28/29)
+          // DateTime handles overflow by moving to next valid date (March 3 usually)
+          // Simple addition is acceptable for MVP
+          nextDate = DateTime(d.year, d.month + 1, d.day, d.hour, d.minute);
+        }
+
+        if (nextDate != null) {
+          debugPrint('🔄 Creating recurring task for ${task.frequency}: $nextDate');
+          final newTask = task.copyWith(
+            id: 0, // Reset ID for creation
+            scheduledDate: nextDate,
+            isCompleted: false,
+            completedAt: null,
+            startedAt: null,
+            clearStartedAt: true,
+            actualMinutes: 0,
+            // Keep original frequency to continue chain
+          );
+          // Use provider's createTask to handle notifications and state
+          await createTask(newTask);
+        }
+      }
       
       loadGrowthData(); 
       

@@ -6,15 +6,18 @@ import '../screens/home_screen.dart';
 import '../screens/goals_screen.dart';
 import '../screens/subtasks_calendar_screen.dart';
 import '../screens/account_screen.dart';
-import '../screens/add_reminder_screen.dart';
+
 import '../screens/goal_planning_screen.dart';
 import '../providers/growth_provider.dart';
 import '../theme/app_theme.dart';
 import '../screens/chat_screen.dart';
+import '../providers/reminder_provider.dart';
 import '../screens/day_planner_screen.dart'; // Added
 import '../../data/models/goal.dart';
+import '../../core/utils/date_time_utils.dart';
 import '../../data/models/goal_task.dart';
 import '../widgets/quick_task_input_sheet.dart';
+import '../../data/models/reminder.dart';
 
 /// Main navigation wrapper with bottom tab bar
 /// Provides smooth transitions and consistent navigation structure
@@ -129,11 +132,8 @@ class _MainNavigatorState extends State<MainNavigator>
       builder: (context) => _CreateOptionsBottomSheet(
         onCreateTask: () {
           Navigator.pop(context);
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const AddReminderScreen(),
-            ),
-          );
+          // Show Quick Task Sheet
+          _showQuickTaskSheet(context);
         },
         onCreateGoal: () {
           Navigator.pop(context);
@@ -184,15 +184,59 @@ class _MainNavigatorState extends State<MainNavigator>
       extendBody: true,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: _currentIndex == 0 
-        ? Padding(
-            padding: const EdgeInsets.only(bottom: 50.0), // Adjust to be above navbar
-            child: FloatingActionButton(
-              onPressed: () => _showQuickTaskSheet(context),
-              backgroundColor: AppTheme.primaryColor,
-              elevation: 4,
-              shape: const CircleBorder(),
-              child: const Icon(Icons.add, color: Colors.white),
-            ),
+        ? Consumer<ReminderProvider>(
+            builder: (context, reminderProvider, _) {
+              return Consumer<GrowthProvider>(
+                builder: (context, growthProvider, _) {
+                  // Calculate visible tasks (logic must match HomeScreen)
+                  bool hasTasks = false;
+                  
+                  // 1. Classic Reminders (Enabled only)
+                  if (reminderProvider.reminders.where((r) => r.enabled).isNotEmpty) {
+                      hasTasks = true;
+                  }
+                  
+                  // 2. Growth Tasks (Inbox or Today)
+                  if (!hasTasks && growthProvider.tasksByGoal.isNotEmpty) {
+                      // Find Inbox
+                      int? inboxId;
+                      try {
+                          inboxId = growthProvider.goals.firstWhere((g) => g.name == 'Inbox').id;
+                      } catch (_) {}
+                      
+                      final allTasks = growthProvider.tasksByGoal.values.expand((l) => l);
+                      // debugPrint('Searching Tasks...'); 
+                      for (var t in allTasks) {
+                          if (t.isCompleted) continue; // Skip completed
+
+                          // Inbox Task?
+                          if (inboxId != null && t.goalId == inboxId) {
+                              hasTasks = true;
+                              break;
+                          }
+                          // Today Task?
+                          if (t.scheduledDate != null && DateTimeUtils.isToday(t.scheduledDate!.toLocal())) {
+                              hasTasks = true;
+                              break;
+                          }
+                      }
+                  }
+
+                  if (!hasTasks) return const SizedBox.shrink();
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 50.0), // Adjust to be above navbar
+                    child: FloatingActionButton(
+                      onPressed: () => _showQuickTaskSheet(context),
+                      backgroundColor: AppTheme.primaryColor,
+                      elevation: 4,
+                      shape: const CircleBorder(),
+                      child: const Icon(Icons.add, color: Colors.white),
+                    ),
+                  );
+                },
+              );
+            },
           )
         : null,
     );

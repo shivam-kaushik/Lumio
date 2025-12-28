@@ -7,6 +7,7 @@ class ChatMessage {
   final DateTime timestamp;
   final Map<String, dynamic>? actionData; // If this message triggers an action (e.g. Plan Created)
   final bool isAction;
+  final String? actionType;
 
   ChatMessage({
     required this.id,
@@ -15,6 +16,7 @@ class ChatMessage {
     required this.timestamp,
     this.actionData,
     this.isAction = false,
+    this.actionType,
   });
 
   factory ChatMessage.user(String text) {
@@ -35,7 +37,7 @@ class ChatMessage {
     );
   }
   
-  factory ChatMessage.action(String text, Map<String, dynamic> data) {
+  factory ChatMessage.action(String text, Map<String, dynamic> data, {String? type}) {
     return ChatMessage(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       text: text,
@@ -43,6 +45,7 @@ class ChatMessage {
       timestamp: DateTime.now(),
       isAction: true,
       actionData: data,
+      actionType: type,
     );
   }
 }

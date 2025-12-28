@@ -202,25 +202,59 @@ class _ReminderCardState extends State<ReminderCard>
 
             // Reminder text
             Expanded(
-              child: Text(
-                widget.reminder.text,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  height: 1.3,
-                  fontSize: 14,
-                  decoration: isDone
-                      ? TextDecoration.lineThrough
-                      : TextDecoration.none,
-                  color: isDone
-                      ? (theme.brightness == Brightness.dark
-                          ? AppTheme.darkTextTertiary
-                          : AppTheme.textTertiary)
-                      : (theme.brightness == Brightness.dark
-                          ? AppTheme.darkTextPrimary
-                          : AppTheme.textPrimary),
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.reminder.text,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      height: 1.3,
+                      fontSize: 14,
+                      decoration: isDone
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
+                      color: isDone
+                          ? (theme.brightness == Brightness.dark
+                              ? AppTheme.darkTextTertiary
+                              : AppTheme.textTertiary)
+                          : (theme.brightness == Brightness.dark
+                              ? AppTheme.darkTextPrimary
+                              : AppTheme.textPrimary),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  
+                  // Metadata Row (Priority, Category)
+                  if (!isDone && (widget.reminder.priority != ReminderPriority.medium || widget.reminder.category != ReminderCategory.other))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Row(
+                        children: [
+                          if (widget.reminder.priority != ReminderPriority.medium)
+                            _buildMetadataChip(
+                              context,
+                              label: widget.reminder.priority.displayName,
+                              color: _getPriorityColor(widget.reminder.priority),
+                              icon: Icons.flag_rounded,
+                            ),
+                          
+                          if (widget.reminder.priority != ReminderPriority.medium && widget.reminder.category != ReminderCategory.other)
+                             const SizedBox(width: 6),
+
+                          if (widget.reminder.category != ReminderCategory.other)
+                             _buildMetadataChip(
+                              context,
+                              label: widget.reminder.category.displayName,
+                              color: _getCategoryColor(widget.reminder.category),
+                              icon: _getCategoryIcon(widget.reminder.category),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
             
@@ -425,6 +459,68 @@ class _ReminderCardState extends State<ReminderCard>
     } catch (e) {
       debugPrint('Error getting next occurrence: $e');
       return null;
+    }
+  }
+
+  Widget _buildMetadataChip(BuildContext context, {required String label, required Color color, required IconData icon}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.2), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getPriorityColor(ReminderPriority priority) {
+    switch (priority) {
+      case ReminderPriority.high:
+      case ReminderPriority.critical:
+        return AppTheme.errorColor;
+      case ReminderPriority.low:
+        return Colors.blue; 
+      default:
+        return Colors.orange;
+    }
+  }
+
+  Color _getCategoryColor(ReminderCategory category) {
+    switch (category) {
+      case ReminderCategory.work: return Colors.blue;
+      case ReminderCategory.personal: return Colors.purple;
+      case ReminderCategory.shopping: return Colors.green;
+      case ReminderCategory.health: return Colors.redAccent;
+      case ReminderCategory.family: return Colors.orange;
+      case ReminderCategory.study: return Colors.indigo;
+      case ReminderCategory.other: return Colors.grey;
+    }
+  }
+
+  IconData _getCategoryIcon(ReminderCategory category) {
+     switch (category) {
+      case ReminderCategory.work: return Icons.work_outline_rounded;
+      case ReminderCategory.personal: return Icons.person_outline_rounded;
+      case ReminderCategory.shopping: return Icons.shopping_cart_outlined;
+      case ReminderCategory.health: return Icons.favorite_border_rounded;
+      case ReminderCategory.family: return Icons.family_restroom_rounded;
+      case ReminderCategory.study: return Icons.school_outlined;
+      case ReminderCategory.other: return Icons.turned_in_not_rounded;
     }
   }
 

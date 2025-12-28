@@ -227,9 +227,12 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
     // Clean text for final title
     String cleanTitle = _controller.text;
     String originalTitle = cleanTitle; // Backup
-    cleanTitle = cleanTitle.replaceAll(_datePattern, '')
-                           .replaceAll(_timePattern, '')
-                           .replaceAll(_priorityPattern, ''); 
+    
+    // User Update 2025: Keep date/time in text (so "at 5pm" remains), 
+    // but remove tags/priority markers so they become metadata.
+    cleanTitle = cleanTitle.replaceAll(_priorityPattern, '')
+                           .replaceAll(_tagPattern, ''); // Remove tags (#work)
+    
     cleanTitle = cleanTitle.replaceAll(RegExp(r'\s+'), ' ').trim();
     
     // If cleaning removed everything (e.g. user just typed "Tomorrow"), revert to original

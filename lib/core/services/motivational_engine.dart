@@ -152,7 +152,8 @@ class MotivationalEngine {
              body = _TemplateEngine.getDeadlineNudge(goal.name, daysLeft);
          }
 
-         _schedule(2000 + goal.id, title, body);
+         // Use modulo to prevent 32-bit integer overflow with timestamp-based Goal IDs
+         _schedule(2000 + (goal.id % 2000000000), title, body);
       }
     }
   }

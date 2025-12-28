@@ -169,6 +169,37 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   }
 
   Widget _buildActionCard(BuildContext context, ChatMessage msg) {
+      if (msg.actionType == 'CREATE_TASK') {
+         // Simple Task Confirmation Card
+         return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                   color: Colors.green.withOpacity(0.1),
+                   borderRadius: BorderRadius.circular(12),
+                   border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Row(
+                   children: [
+                       const Icon(Icons.check_circle, color: Colors.green),
+                       const SizedBox(width: 12),
+                       Expanded(
+                           child: Column(
+                               crossAxisAlignment: CrossAxisAlignment.start,
+                               children: [
+                                   Text("Task Created", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green[800])),
+                                   Text(msg.actionData?['title'] ?? 'New Task', style: const TextStyle(fontSize: 16)),
+                               ],
+                           ),
+                       )
+                   ],
+                ),
+            ).animate().fadeIn().slideX(),
+         );
+      }
+      
+      // Default / CREATE_GOAL
       return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: InkWell(
@@ -209,7 +240,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                                   borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Text("Tap to Review Plan", style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
-                          )
+                          ),
                       ],
                   ),
               ),
@@ -237,6 +268,11 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   }
 
   Widget _buildInputArea(BuildContext context, ChatController controller) {
+     // Live Transcription Overlay
+     if (controller.state == ChatState.listening) {
+         return _buildLiveOverlay(context, controller);
+     }
+
      return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -251,7 +287,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                         child: TextField(
                             controller: _textController,
                             decoration: InputDecoration(
-                                hintText: controller.state == ChatState.listening ? "Listening..." : "Type your goal...",
+                                hintText: "Type your goal...",
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                                 filled: true,
                                 fillColor: Colors.grey[100],
@@ -264,32 +300,77 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                         ),
                     ),
                     const SizedBox(width: 8),
-                    // Send/Mic Button
-                    GestureDetector( // Use GestureDetector to handle Hold-to-Talk if we wanted, but tap toggle is fine
+                    // Mic Button (Idle)
+                    GestureDetector( 
                         onTap: () {
                             if (_textController.text.isNotEmpty) {
                                 controller.sendTextMessage(_textController.text);
                                 _textController.clear();
                             } else {
-                                if (controller.state == ChatState.listening) {
-                                    controller.stopListening();
-                                } else {
-                                    controller.startListening();
-                                }
+                                controller.startListening();
                             }
                         },
                         child: CircleAvatar(
                             radius: 24,
-                            backgroundColor: controller.state == ChatState.listening ? Colors.redAccent : AppTheme.primaryColor,
+                            backgroundColor: AppTheme.primaryColor,
                             child: Icon(
-                                _textController.text.isNotEmpty ? Icons.send : (controller.state == ChatState.listening ? Icons.stop : Icons.mic),
+                                _textController.text.isNotEmpty ? Icons.send : Icons.mic,
                                 color: Colors.white,
                             ),
                         ),
-                    ).animate(target: controller.state == ChatState.listening ? 1 : 0).scale(begin: const Offset(1,1), end: const Offset(1.1, 1.1), duration: 200.ms),
+                    ),
                 ],
             ),
         ),
      );
+  }
+
+  Widget _buildLiveOverlay(BuildContext context, ChatController controller) {
+      return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.95),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 20, offset: const Offset(0, -5))]
+          ),
+          child: SafeArea(
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                    // Waveform Animation
+                    Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (index) => 
+                            Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                width: 6,
+                                height: 40,
+                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
+                            ).animate(onPlay: (c) => c.repeat(reverse: true))
+                             .scaleY(begin: 0.2, end: 1.0, duration: 300.ms + (index * 100).ms, curve: Curves.easeInOut)
+                        ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Live Text
+                    Text(
+                        controller.currentTranscript.isEmpty ? "Listening..." : controller.currentTranscript,
+                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    // Stop Button
+                    GestureDetector(
+                        onTap: () => controller.stopListening(),
+                        child: const CircleAvatar(
+                            radius: 30,
+                            backgroundColor: Colors.white,
+                            child: Icon(Icons.stop, color: AppTheme.primaryColor, size: 30),
+                        ),
+                    ),
+                ],
+            ),
+          ),
+      ).animate().slideY(begin: 1, end: 0, duration: 300.ms, curve: Curves.easeOut);
   }
 }
