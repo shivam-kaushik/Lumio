@@ -141,49 +141,58 @@ class GrowthProvider with ChangeNotifier {
   // ==================== Notifications ====================
   
   Future<void> _scheduleTaskNotification(GoalTask task) async {
-    // 1. If completed or no date, cancel any existing
-    if (task.isCompleted || task.scheduledDate == null) {
-      await _notificationService.cancelNotification(task.id % 2147483647);
-      return;
+    // 1. Recursive Helper
+    Future<void> scheduleRecursive(GoalTask currentTask) async {
+       // A. If completed or no date, cancel/skip
+       if (currentTask.isCompleted || currentTask.scheduledDate == null) {
+          // Try to cancel (id collision risk is low with modulo, but good hygiene)
+          await _notificationService.cancelNotification(currentTask.id % 2147483647);
+       } else {
+          // B. Determine Trigger Time
+          DateTime triggerTime = currentTask.scheduledDate!;
+          
+          // If time is midnight (00:00), it implies "Any time this day"
+          if (triggerTime.hour == 0 && triggerTime.minute == 0) {
+             int hour = 9; // Default 'any' or 'morning'
+             if (currentTask.suggestedTime == 'afternoon') hour = 14;
+             else if (currentTask.suggestedTime == 'evening') hour = 18;
+             else if (currentTask.suggestedTime == 'morning') hour = 9;
+             
+             triggerTime = DateTime(
+               triggerTime.year, 
+               triggerTime.month, 
+               triggerTime.day, 
+               hour, 
+               0
+             );
+          }
+           
+          // C. Schedule if in future
+          if (triggerTime.isAfter(DateTime.now())) {
+            final notificationId = currentTask.id % 2147483647;
+            
+            await _notificationService.scheduleNotification(
+              id: notificationId,
+              title: "Time for: ${currentTask.title}",
+              body: currentTask.priority == 'high' ? "🔥 High priority task pending!" : "Let's make progress on your goals.",
+              scheduledTime: triggerTime,
+              payload: jsonEncode({
+                   'action': 'open_task',
+                   'task_id': currentTask.id,
+                   'goal_id': currentTask.goalId,
+              }),
+            );
+          }
+       }
+       
+       // Recurse for subtasks
+       for (var sub in currentTask.subtasks) {
+         await scheduleRecursive(sub);
+       }
     }
 
-    // 2. Determine Trigger Time
-    DateTime triggerTime = task.scheduledDate!;
-    
-    // If time is midnight (00:00), it implies "Any time this day"
-    // So we apply the Suggested Time preference
-    if (triggerTime.hour == 0 && triggerTime.minute == 0) {
-       int hour = 9; // Default 'any' or 'morning'
-       if (task.suggestedTime == 'afternoon') hour = 14;
-       else if (task.suggestedTime == 'evening') hour = 18;
-       else if (task.suggestedTime == 'morning') hour = 9;
-       
-       triggerTime = DateTime(
-         triggerTime.year, 
-         triggerTime.month, 
-         triggerTime.day, 
-         hour, 
-         0
-       );
-    }
-    
-    // 3. Schedule if in future
-    if (triggerTime.isAfter(DateTime.now())) {
-      // Notification ID must be 32-bit int
-      final notificationId = task.id % 2147483647;
-      
-      await _notificationService.scheduleNotification(
-        id: notificationId,
-        title: "Time for: ${task.title}",
-        body: task.priority == 'high' ? "🔥 High priority task pending!" : "Let's make progress on your goals.",
-        scheduledTime: triggerTime,
-        payload: jsonEncode({
-             'action': 'open_task',
-             'task_id': task.id,
-             'goal_id': task.goalId,
-        }),
-      );
-    }
+    // 2. Start recursion
+    await scheduleRecursive(task);
   }
 
   @override

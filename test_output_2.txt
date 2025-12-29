@@ -1,0 +1,13 @@
+00:00 +0: loading C:/Users/Public/Documents/Learning/Awarely/test/unit/notification_enhanced_test.dart
+00:00 +0 -1: loading C:/Users/Public/Documents/Learning/Awarely/test/unit/notification_enhanced_test.dart [E]
+  Failed to load "C:/Users/Public/Documents/Learning/Awarely/test/unit/notification_enhanced_test.dart":
+  Compilation failed for testPath=C:/Users/Public/Documents/Learning/Awarely/test/unit/notification_enhanced_test.dart: test/unit/notification_enhanced_test.dart:45:16: Error: The return type of the method 'MockGrowthRepository.updateTask' is 'Future<void>', which does not match the return type, 'Future<int>', of the overridden method, 'FirestoreGrowthRepository.updateTask'.
+   - 'Future' is from 'dart:async'.
+  Change to a subtype of 'Future<int>'.
+    Future<void> updateTask(GoalTask task) async {}
+                 ^
+  lib/data/repositories/firestore_growth_repository.dart:263:15: Context: This is the overridden method ('updateTask').
+    Future<int> updateTask(GoalTask task) async {
+                ^
+  .
+00:00 +0 -1: Some tests failed.

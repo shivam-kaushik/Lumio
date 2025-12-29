@@ -115,11 +115,11 @@ class MotivationalEngine {
          if (aiResponse != null) body = aiResponse;
       } else {
          // Template (Free)
-         body = _TemplateEngine.getKickstart(focusGoal.name, streak);
+         body = TemplateEngine.getKickstart(focusGoal.name, streak);
       }
     } catch (e) {
       // Fallback to template if AI/Premium fails
-      body = _TemplateEngine.getKickstart(focusGoal.name, streak);
+      body = TemplateEngine.getKickstart(focusGoal.name, streak);
     }
 
     _schedule(1001, title, body);
@@ -149,7 +149,7 @@ class MotivationalEngine {
              );
              if (aiResponse != null) body = aiResponse;
          } else {
-             body = _TemplateEngine.getDeadlineNudge(goal.name, daysLeft);
+             body = TemplateEngine.getDeadlineNudge(goal.name, daysLeft);
          }
 
          // Use modulo to prevent 32-bit integer overflow with timestamp-based Goal IDs
@@ -175,7 +175,7 @@ class MotivationalEngine {
          );
          if (aiResponse != null) body = aiResponse;
     } else {
-         body = _TemplateEngine.getConsistency(goal.name);
+         body = TemplateEngine.getConsistency(goal.name);
     }
 
     _schedule(3001, title, body);
@@ -192,8 +192,66 @@ class MotivationalEngine {
 }
 
 /// Helper for Free Tier Templates
-class _TemplateEngine {
+class TemplateEngine {
+  static final List<String> _quotes = [
+    "The only way to do great work is to love what you do.",
+    "Believe you can and you're halfway there.",
+    "Your limitation—it's only your imagination.",
+    "Push yourself, because no one else is going to do it for you.",
+    "Great things never come from comfort zones.",
+    "Dream it. Wish it. Do it.",
+    "Success doesn’t just find you. You have to go out and get it.",
+    "The harder you work for something, the greater you’ll feel when you achieve it.",
+    "Dream bigger. Do bigger.",
+    "Don’t stop when you’re tired. Stop when you’re done.",
+    "Wake up with determination. Go to bed with satisfaction.",
+    "Do something today that your future self will thank you for.",
+    "Little things make big days.",
+    "It’s going to be hard, but hard does not mean impossible.",
+    "Don’t wait for opportunity. Create it.",
+    "Sometimes we’re tested not to show our weaknesses, but to discover our strengths.",
+    "The key to success is to focus on goals, not obstacles.",
+    "Dream it. Believe it. Build it.",
+    "Discipline is doing what needs to be done, even if you don't want to do it.",
+    "Success is the sum of small efforts, repeated day-in and day-out.",
+    "The future depends on what you do today.",
+    "You don’t have to be great to start, but you have to start to be great.",
+    "Action is the foundational key to all success.",
+    "Don’t watch the clock; do what it does. Keep going.",
+    "The secret of getting ahead is getting started.",
+    "It always seems impossible until it’s done.",
+    "Quality is not an act, it is a habit.",
+    "Start where you are. Use what you have. Do what you can.",
+    "If you can dream it, you can do it.",
+    "A year from now you may wish you had started today.",
+    "Everything you’ve ever wanted is on the other side of fear.",
+    "Your time is limited, don't waste it living someone else's life.",
+    "Pain is temporary. Quitting lasts forever.",
+    "The pain you feel today will be the strength you feel tomorrow.",
+    "Don't count the days, make the days count.",
+    "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+    "What you get by achieving your goals is not as important as what you become by achieving your goals.",
+    "Believe in yourself and all that you are.",
+    "If it doesn’t challenge you, it won’t change you.",
+    "Don't let yesterday take up too much of today.",
+    "You are never too old to set another goal or to dream a new dream.",
+    "Goals are dreams with deadlines.",
+    "A goal without a plan is just a wish.",
+    "Be stubborn about your goals and flexible about your methods.",
+    "The only limit to our realization of tomorrow will be our doubts of today.",
+    "Do what you can, with what you have, where you are.",
+    "Focus on being productive instead of busy.",
+    "You don't need to see the whole staircase, just take the first step.",
+    "Success is walking from failure to failure with no loss of enthusiasm.",
+    "The only place where success comes before work is in the dictionary."
+  ];
+
   static String getKickstart(String goalName, int streak) {
+    if (Random().nextBool()) {
+        // 50% chance for a quote
+        return _getRandomQuote();
+    }
+    
     final templates = [
       "Rise and shine! ⚡ Time to work on '$goalName'.",
       "New day, new progress on '$goalName'. Let's go!",
@@ -206,6 +264,10 @@ class _TemplateEngine {
   }
 
   static String getDeadlineNudge(String goalName, int daysLeft) {
+    if (Random().nextBool()) {
+        return _getRandomQuote();
+    }
+
     return [
       "Crunch time! '$goalName' is due in $daysLeft days.",
       "Just $daysLeft days left for '$goalName'. Finish strong!",
@@ -214,10 +276,18 @@ class _TemplateEngine {
   }
 
   static String getConsistency(String goalName) {
+     if (Random().nextBool()) {
+        return _getRandomQuote();
+    }
+
     return [
       "Still up? Review your progress on '$goalName'.",
       "Small steps matter. Do one thing for '$goalName' tonight.",
       "Set yourself up for success tomorrow by checking '$goalName' now.",
     ][Random().nextInt(3)];
+  }
+  
+  static String _getRandomQuote() {
+     return _quotes[Random().nextInt(_quotes.length)];
   }
 }
