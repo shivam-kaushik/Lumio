@@ -9,6 +9,7 @@ import '../widgets/modern_smart_card.dart';
 import '../../core/services/premium_service.dart';
 import 'settings_screen.dart';
 import 'login_screen.dart';
+import 'recent_notifications_screen.dart';
 
 /// Account screen showing user profile and settings access
 class AccountScreen extends StatelessWidget {
@@ -360,6 +361,52 @@ class AccountScreen extends StatelessWidget {
                       elevationLevel: 1,
                       child: Column(
                         children: [
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(
+                              Icons.notifications_active_rounded,
+                              color: isDark
+                                  ? AppTheme.darkTextPrimary
+                                  : AppTheme.textPrimary,
+                            ),
+                            title: Text(
+                              'Notification History',
+                              style: TextStyle(
+                                color: isDark
+                                    ? AppTheme.darkTextPrimary
+                                    : AppTheme.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'View past alerts and nudges',
+                              style: TextStyle(
+                                color: isDark
+                                    ? AppTheme.darkTextSecondary
+                                    : AppTheme.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: Icon(
+                              Icons.chevron_right_rounded,
+                              color: isDark
+                                  ? AppTheme.darkTextTertiary
+                                  : AppTheme.textTertiary,
+                            ),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const RecentNotificationsScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          Divider(
+                            height: 1,
+                            color: isDark
+                                ? AppTheme.darkDivider
+                                : AppTheme.dividerColor,
+                          ),
                           ListTile(
                             contentPadding: EdgeInsets.zero,
                             leading: Icon(

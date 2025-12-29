@@ -311,8 +311,12 @@ class NotificationService {
   }
 
   /// Record scheduled notification in database
-  static Future<void> _recordScheduledNotification(
-      String reminderId, DateTime scheduledTime,) async {
+  static Future<void> _recordScheduledNotification({
+    required String reminderId,
+    required DateTime scheduledTime,
+    required String title,
+    required String body,
+  }) async {
     try {
       final firestoreService = FirestoreService();
       final collection = firestoreService.contextEventsCollection;
@@ -328,6 +332,11 @@ class NotificationService {
         contextType: AppConstants.contextTypeTime,
         triggerTime: scheduledTime,
         outcome: AppConstants.outcomePending,
+        metadata: {
+          'title': title,
+          'body': body,
+          'type': 'scheduled_alarm',
+        },
       );
 
       await collection.doc(eventId).set(event.toFirestore());
@@ -424,6 +433,68 @@ class NotificationService {
     );
 
     await _notifications.show(id, title, body, details, payload: payload);
+
+    // Record interaction for history
+    if (payload != null) {
+      await _recordNotificationEvent(
+        payload: payload,
+        title: title,
+        body: body,
+        type: 'immediate',
+      );
+    }
+  }
+
+  /// Record notification event to Firestore
+  static Future<void> _recordNotificationEvent({
+    required String payload,
+    required String title,
+    required String body,
+    required String type,
+  }) async {
+    try {
+      String? reminderId;
+      Map<String, dynamic> metadata = {
+        'title': title,
+        'body': body,
+        'type': type,
+        'payload': payload,
+      };
+
+      try {
+        final data = jsonDecode(payload);
+        if (data is Map<String, dynamic>) {
+           if (data.containsKey('reminder_id')) reminderId = data['reminder_id'];
+           if (data.containsKey('task_id')) reminderId = "task_${data['task_id']}";
+           // Merge other data
+           metadata.addAll(data);
+        }
+      } catch (e) {
+        // Payload might be just ID string
+        reminderId = payload;
+      }
+
+      if (reminderId == null) return; // Can't link
+
+      final firestoreService = FirestoreService();
+      final collection = firestoreService.contextEventsCollection;
+      if (collection == null) return;
+
+      final eventId = 'notif_${DateTime.now().millisecondsSinceEpoch}';
+      final event = ContextEvent(
+        id: eventId,
+        reminderId: reminderId,
+        contextType: 'notification_sent',
+        triggerTime: DateTime.now(),
+        outcome: AppConstants.outcomePending,
+        metadata: metadata,
+      );
+
+      await collection.doc(eventId).set(event.toFirestore());
+      debugPrint('✅ Recorded notification history: $title');
+    } catch (e) {
+      debugPrint('❌ Failed to record notification history: $e');
+    }
   }
 
   /// Schedule notification for a specific time
@@ -546,8 +617,26 @@ class NotificationService {
 
     // Create context event for scheduled notification
     if (scheduled && payload != null) {
+      String recordId = payload;
+      try {
+        final data = jsonDecode(payload);
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('task_id')) {
+            recordId = 'task_${data['task_id']}';
+          } else if (data.containsKey('reminder_id')) {
+            recordId = data['reminder_id'].toString();
+          }
+        }
+      } catch (_) {
+        // Payload is not JSON, use as is
+      }
+
       await NotificationService._recordScheduledNotification(
-          payload, scheduledTime,);
+        reminderId: recordId,
+        scheduledTime: scheduledTime,
+        title: title,
+        body: body,
+      );
     }
   }
 

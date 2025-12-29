@@ -453,6 +453,7 @@ class TriggerEngine {
     // Generate motivational message if linked to goal
     if (goalName != null) {
       try {
+        // Ensure initialized or try-catch the entire block
         final motivationalMessage = await _privacyGpt.generateMotivationalMessage(
           goalName: goalName,
           taskDescription: reminder.text,
@@ -462,7 +463,7 @@ class TriggerEngine {
         title = '🚀 Task Time!';
         body = motivationalMessage ?? reminder.text;
       } catch (e) {
-        debugPrint('❌ Error generating motivational message: $e');
+        debugPrint('⚠️ Error generating motivational message (using fallback): $e');
         title = 'Task';
         body = reminder.text;
       }

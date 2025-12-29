@@ -209,6 +209,21 @@ class ReminderProvider with ChangeNotifier {
             );
 
             debugPrint('✅ Alarm scheduled');
+
+            // Record history
+            await _reminderRepository.createContextEvent(
+               ContextEvent(
+                 reminderId: reminder.id,
+                 contextType: 'notification_scheduled',
+                 triggerTime: scheduleTime,
+                 outcome: AppConstants.outcomePending,
+                 metadata: {
+                   'title': reminder.text, 
+                   'body': 'Reminder: ${reminder.text}',
+                   'type': 'reminder_alarm'
+                 },
+               )
+            );
       } else {
         debugPrint('⚠️⚠️⚠️ WARNING: SCHEDULED TIME IS IN THE PAST! ⚠️⚠️⚠️');
         debugPrint('   Scheduled: $scheduleTime');

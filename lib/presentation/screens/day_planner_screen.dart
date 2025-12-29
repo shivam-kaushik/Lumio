@@ -16,7 +16,9 @@ import '../widgets/quick_task_input_sheet.dart';
 import '../utils/analytics_helper.dart'; 
 
 class DayPlannerScreen extends StatefulWidget {
-  const DayPlannerScreen({super.key});
+  final DateTime? initialDate;
+
+  const DayPlannerScreen({super.key, this.initialDate});
 
   @override
   State<DayPlannerScreen> createState() => _DayPlannerScreenState();
@@ -32,12 +34,17 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
   List<Map<String, dynamic>>? _generatedPlan;
   Timer? _rolloverTimer;
   bool _isViewingToday = true;
-  DateTime _selectedDate = DateTime.now(); 
+  late DateTime _selectedDate; 
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this); 
+    
+    // Initialize date from constructor or default to now
+    _selectedDate = widget.initialDate ?? DateTime.now();
+    _isViewingToday = AnalyticsHelper.isSameDay(_selectedDate, DateTime.now());
+    
     _initSpeech();
     _startRolloverCheck();
   }
