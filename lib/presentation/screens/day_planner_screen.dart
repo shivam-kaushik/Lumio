@@ -366,7 +366,63 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                         final task = tasks[index];
                         final isRunning = task.startedAt != null;
 
-                        return Card(
+                        return Dismissible(
+                          key: Key('task_${task.id}'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            decoration: BoxDecoration(
+                              color: AppTheme.errorColor,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: const [
+                                Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Icon(
+                                  Icons.delete_rounded,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                              ],
+                            ),
+                          ),
+                          confirmDismiss: (direction) async {
+                             return await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                    title: const Text('Delete Task'),
+                                    content: Text('Are you sure you want to delete "${task.title}"?'),
+                                    actions: [
+                                        TextButton(
+                                            onPressed: () => Navigator.pop(context, false),
+                                            child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                            onPressed: () => Navigator.pop(context, true),
+                                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+                                            child: const Text('Delete'),
+                                        ),
+                                    ],
+                                ),
+                             ) ?? false;
+                          },
+                          onDismissed: (direction) {
+                             provider.deleteTask(task.id);
+                             ScaffoldMessenger.of(context).showSnackBar(
+                                 const SnackBar(content: Text('Task deleted')),
+                             );
+                          },
+                          child: Card(
                           color: isRunning 
                              ? (isDark ? const Color(0xFF2C2C30) : Colors.blue.shade50) 
                              : (isDark ? const Color(0xFF1E1E20) : Colors.white),
@@ -377,6 +433,34 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                           ),
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
+                            onTap: () async {
+                                // EDIT TASK
+                                await showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (context) => QuickTaskInputSheet(
+                                        isEditing: true,
+                                        initialTitle: task.title,
+                                        initialPriority: task.priority,
+                                        initialTags: [], // Extract from description if needed, or pass empty
+                                        initialRepeat: task.frequency != 'one-time' ? task.frequency : null,
+                                        initialLocation: task.suggestedLocation != 'any' ? task.suggestedLocation : null,
+                                        onSubmit: (title, date, priority, tags, repeat, location) {
+                                            final updatedTask = task.copyWith(
+                                                title: title,
+                                                priority: priority,
+                                                frequency: repeat ?? 'one-time',
+                                                suggestedLocation: location ?? 'any',
+                                                scheduledDate: date ?? task.scheduledDate,
+                                            );
+                                            provider.updateTask(updatedTask);
+                                            Navigator.pop(context);
+                                        },
+                                        initialDate: task.scheduledDate,
+                                    ),
+                                );
+                            },
                             leading: Checkbox(
                               value: task.isCompleted,
                               activeColor: AppTheme.primaryColor,
@@ -408,7 +492,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                               },
                             ),
                           ),
-                        );
+                        ));
                       },
                     ),
                   ),
