@@ -422,11 +422,30 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
           appBar: AppBar(
-            title: Text('The Day Architect', style: TextStyle(color: textColor)),
+             title: InkWell(
+                  onTap: _pickDate,
+                  child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                          Text(
+                              isToday ? "The Day Architect" : AnalyticsHelper.formatDate(_selectedDate), 
+                              style: TextStyle(color: textColor)
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(Icons.arrow_drop_down, color: textColor),
+                      ],
+                  ),
+              ),
             backgroundColor: Colors.transparent,
             elevation: 0,
             iconTheme: IconThemeData(color: textColor),
           ),
+          floatingActionButton: _generatedPlan == null ? FloatingActionButton.extended(
+                onPressed: () => _showQuickAdd(context, provider),
+                backgroundColor: AppTheme.primaryColor,
+                icon: const Icon(Icons.add, color: Colors.white),
+                label: const Text("Add Manual Task", style: TextStyle(color: Colors.white)),
+            ) : null,
           body: SafeArea(
             child: Column(
               children: [
@@ -439,7 +458,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            "What needs to happen today?",
+                            isToday ? "What needs to happen today?" : "What needs to happen on ${AnalyticsHelper.formatDate(_selectedDate)}?",
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                               color: textColor,
                               fontSize: 24,
