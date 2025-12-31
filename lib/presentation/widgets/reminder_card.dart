@@ -228,7 +228,7 @@ class _ReminderCardState extends State<ReminderCard>
                   ),
                   
                   // Metadata Row (Priority, Category)
-                  if (!isDone && (widget.reminder.priority != ReminderPriority.medium || widget.reminder.category != ReminderCategory.other))
+                  if (widget.reminder.priority != ReminderPriority.medium || widget.reminder.category != ReminderCategory.other)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Row(

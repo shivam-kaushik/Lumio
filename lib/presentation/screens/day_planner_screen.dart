@@ -279,20 +279,19 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
             }));
         }
 
-        // 2. Inbox Tasks (Scheduled for this date)
+        // 2. Inbox Tasks - REMOVED to align with Analytics strict "Daily Plan" view
+        // The user explicitly requested to show ONLY tasks made for today's plan.
+        /*
         try {
            final inboxGoal = provider.goals.firstWhere((g) => g.name == 'Inbox');
            final inboxTasks = provider.getTasksForGoal(inboxGoal.id);
            final inboxForDay = inboxTasks.where((t) {
-               // Check Scheduled OR Created date for Inbox
-               // This allows "Quick Capture" tasks (no date) to appear on the day they were created.
                final dateToCheck = t.scheduledDate ?? t.createdAt; 
                return AnalyticsHelper.isSameDay(dateToCheck, _selectedDate);
            });
            tasks.addAll(inboxForDay);
-        } catch (_) {
-           // No Inbox or errors
-        }
+        } catch (_) {}
+        */
         
         // Check tasks
         final hasPlan = tasks.isNotEmpty;

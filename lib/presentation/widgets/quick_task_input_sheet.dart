@@ -127,7 +127,26 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
     }
     if (widget.initialTags != null) {
         _parsedTags.addAll(widget.initialTags!);
+        // Append to text so they persist and are editable by the regex parser
+        // BUT only if not already there (to prevent #tag #tag duplication on edit)
+        final List<String> newTags = [];
+        for (final tag in widget.initialTags!) {
+            final checkTag = tag.startsWith('#') ? tag : '#$tag';
+            if (!_controller.text.toLowerCase().contains(checkTag.toLowerCase())) {
+                newTags.add(checkTag);
+            }
+        }
+        
+        if (newTags.isNotEmpty) {
+            final tagsStr = newTags.join(' ');
+            if (_controller.text.isNotEmpty) {
+               _controller.text = "${_controller.text} $tagsStr";
+            } else {
+               _controller.text = tagsStr;
+            }
+        }
     }
+
     if (widget.initialRepeat != null) {
         _parsedRepeat = widget.initialRepeat;
     }
@@ -228,10 +247,10 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
     String cleanTitle = _controller.text;
     String originalTitle = cleanTitle; // Backup
     
-    // User Update 2025: Keep date/time in text (so "at 5pm" remains), 
-    // but remove tags/priority markers so they become metadata.
+    // User Update: STRIP tags from title for display cleanliness.
+    // They are preserved in the 'tags' list metadata.
     cleanTitle = cleanTitle.replaceAll(_priorityPattern, '')
-                           .replaceAll(_tagPattern, ''); // Remove tags (#work)
+                           .replaceAll(_tagPattern, ''); 
     
     cleanTitle = cleanTitle.replaceAll(RegExp(r'\s+'), ' ').trim();
     

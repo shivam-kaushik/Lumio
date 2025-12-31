@@ -247,13 +247,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                                           isEditing: true,
                                                           initialTitle: originalTask!.title,
                                                           initialPriority: originalTask!.priority,
-                                                          initialTags: [], // TODO: extract tags from title if needed
+                                                          // Extract tags from description (words starting with #)
+                                                          initialTags: RegExp(r'(#[a-zA-Z0-9_]+)', caseSensitive: false)
+                                                              .allMatches(originalTask!.description ?? '')
+                                                              .map((m) => m.group(0)!)
+                                                              .toList(),
                                                           initialRepeat: originalTask!.frequency != 'one-time' ? originalTask!.frequency : null,
                                                           initialLocation: originalTask!.suggestedLocation != 'any' ? originalTask!.suggestedLocation : null,
                                                           onSubmit: (title, date, priority, tags, repeat, location) {
                                                               // Update Task
                                                               final updatedTask = originalTask!.copyWith(
                                                                   title: title,
+                                                                  // Put tags into description
+                                                                  description: tags.join(" "),
                                                                   priority: priority,
                                                                   frequency: repeat ?? 'one-time',
                                                                   suggestedLocation: location ?? 'any',
@@ -286,7 +292,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   ReminderCategory newCat = ReminderCategory.other;
                                                   for (var tag in tags) {
                                                       try {
-                                                          newCat = ReminderCategory.values.firstWhere((e) => e.name.toLowerCase() == tag.toLowerCase());
+                                                          // Strip '#' if present
+                                                          final cleanTag = tag.startsWith('#') ? tag.substring(1) : tag;
+                                                          newCat = ReminderCategory.values.firstWhere((e) => e.name.toLowerCase() == cleanTag.toLowerCase());
                                                           break; // Take first valid category
                                                       } catch (_) {}
                                                   }
@@ -388,13 +396,20 @@ class _HomeScreenState extends State<HomeScreen> {
             // Strict Filter: Must be Inbox OR Today
             if (!isInbox && !isToday) continue;
             
+            // Clean title for display (Strip tags)
+            final displayTitle = task.title
+                .replaceAll(RegExp(r'#[a-zA-Z0-9_]+', caseSensitive: false), '')
+                .trim();
+
             allReminders.add(Reminder(
                 id: "task_${task.id}", 
-                text: task.title,
+                text: displayTitle.isNotEmpty ? displayTitle : 'Untitled Task',
                 timeAt: task.scheduledDate ?? task.createdAt, 
                 priority: _mapPriority(task.priority),
                 category: _parseCategoryFromDescription(task.description), // Parse Category
                 linkedGoalId: task.goalId,
+                // store suggestedLocation in geofenceId for UI display
+                geofenceId: task.suggestedLocation != 'any' ? task.suggestedLocation : null,
                 enabled: !task.isCompleted, 
             ));
       }
