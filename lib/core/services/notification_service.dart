@@ -415,7 +415,7 @@ class NotificationService {
       enableLights: true,
       autoCancel: true,
       ongoing: false,
-      fullScreenIntent: true, // Shows notification even when screen is off
+      fullScreenIntent: false, // Changed to false to prevent auto-opening app
       actions: actions,
     );
 
@@ -570,7 +570,7 @@ class NotificationService {
       enableLights: true,
       autoCancel: true,
       ongoing: false,
-      fullScreenIntent: true, // Critical for showing when screen is off
+      fullScreenIntent: false, // Changed to false to prevent auto-opening app
       visibility: NotificationVisibility.public,
       actions: actions,
     );
