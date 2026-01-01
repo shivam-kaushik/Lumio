@@ -4,6 +4,7 @@ import '../../data/models/goal_task.dart';
 import '../../data/models/goal_phase.dart';
 import '../../data/repositories/firestore_growth_repository.dart';
 import '../../core/services/privacy_gpt_service.dart';
+import '../../core/services/motivational_engine.dart';
 import '../../core/services/sound_service.dart';
 import '../../core/services/notification_service.dart'; // NEW
 import '../../data/models/user_location.dart'; 
@@ -171,10 +172,24 @@ class GrowthProvider with ChangeNotifier {
           if (triggerTime.isAfter(DateTime.now())) {
             final notificationId = currentTask.id % 2147483647;
             
+
+            // Find Goal Name directly from provider state
+            final goal = _goals.firstWhere(
+                (g) => g.id == currentTask.goalId, 
+                orElse: () => Goal(id: 0, name: 'Goal', createdAt: DateTime.now())
+            );
+
+            String body;
+            if (currentTask.priority == 'high') {
+                body = "🔥 High Priority: ${currentTask.title}. Do it for '${goal.name}'!";
+            } else {
+                body = TemplateEngine.getTaskReminder(currentTask.title, goal.name);
+            }
+            
             await _notificationService.scheduleNotification(
               id: notificationId,
               title: "Time for: ${currentTask.title}",
-              body: currentTask.priority == 'high' ? "🔥 High priority task pending!" : "Let's make progress on your goals.",
+              body: body,
               scheduledTime: triggerTime,
               payload: jsonEncode({
                    'action': 'open_task',

@@ -286,6 +286,21 @@ class TemplateEngine {
       "Set yourself up for success tomorrow by checking '$goalName' now.",
     ][Random().nextInt(3)];
   }
+
+  static String getTaskReminder(String taskTitle, String goalName) {
+    if (Random().nextBool()) {
+        return _getRandomQuote();
+    }
+
+    final templates = [
+      "Time for '$taskTitle'. One step closer to '$goalName'!",
+      "Let's crush '$taskTitle' for your '$goalName' goal.",
+      "Focus time: '$taskTitle'. You got this!",
+      "Making progress on '$goalName' starts with '$taskTitle'.",
+      "Don't put off '$taskTitle'. Do it for '$goalName'.",
+    ];
+    return templates[Random().nextInt(templates.length)];
+  }
   
   static String _getRandomQuote() {
      return _quotes[Random().nextInt(_quotes.length)];
