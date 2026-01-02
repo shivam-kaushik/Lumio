@@ -228,20 +228,19 @@ class _ReminderCardState extends State<ReminderCard>
                   ),
                   
                   // Metadata Row (Priority, Category)
-                  if (widget.reminder.priority != ReminderPriority.medium || widget.reminder.category != ReminderCategory.other)
+                  if (true) // Always show row if we have priority (which is always) or category
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Row(
                         children: [
-                          if (widget.reminder.priority != ReminderPriority.medium)
-                            _buildMetadataChip(
+                          _buildMetadataChip(
                               context,
                               label: widget.reminder.priority.displayName,
                               color: _getPriorityColor(widget.reminder.priority),
                               icon: Icons.flag_rounded,
                             ),
                           
-                          if (widget.reminder.priority != ReminderPriority.medium && widget.reminder.category != ReminderCategory.other)
+                          if (widget.reminder.category != ReminderCategory.other)
                              const SizedBox(width: 6),
 
                           if (widget.reminder.category != ReminderCategory.other)

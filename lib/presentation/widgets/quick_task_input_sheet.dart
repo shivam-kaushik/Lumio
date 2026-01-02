@@ -96,7 +96,12 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
   DateTime? _parsedDate;
   TimeOfDay? _parsedTime;
   String _parsedPriority = 'medium'; 
-  final List<String> _parsedTags = [];
+  final Set<String> _manualTags = {}; // Tags added via UI
+  final Set<String> _textTags = {};   // Tags detected in text
+  
+  // Combined getter for all tags
+  List<String> get _allTags => {..._manualTags, ..._textTags}.toList();
+
   String? _parsedRepeat;
   String? _parsedLocation;
   
@@ -126,24 +131,10 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
         _parsedPriority = widget.initialPriority!;
     }
     if (widget.initialTags != null) {
-        _parsedTags.addAll(widget.initialTags!);
-        // Append to text so they persist and are editable by the regex parser
-        // BUT only if not already there (to prevent #tag #tag duplication on edit)
-        final List<String> newTags = [];
+        // Add valid tags to manual tags
         for (final tag in widget.initialTags!) {
             final checkTag = tag.startsWith('#') ? tag : '#$tag';
-            if (!_controller.text.toLowerCase().contains(checkTag.toLowerCase())) {
-                newTags.add(checkTag);
-            }
-        }
-        
-        if (newTags.isNotEmpty) {
-            final tagsStr = newTags.join(' ');
-            if (_controller.text.isNotEmpty) {
-               _controller.text = "${_controller.text} $tagsStr";
-            } else {
-               _controller.text = tagsStr;
-            }
+            _manualTags.add(checkTag);
         }
     }
 
@@ -170,7 +161,7 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
     DateTime? newDate = _parsedDate;
     TimeOfDay? newTime = _parsedTime;
     String newPriority = _parsedPriority;
-    List<String> newTags = List.from(_parsedTags);
+    Set<String> newTextTags = {};
 
     // 1. Date Detection
     final dateMatch = _datePattern.firstMatch(text);
@@ -216,20 +207,22 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
     }
 
     // 4. Tags
-    newTags.clear();
     final tagMatches = _tagPattern.allMatches(text);
     for (var m in tagMatches) {
-        newTags.add(m.group(0)!);
+        newTextTags.add(m.group(0)!);
     }
 
     // Update state only if changed to avoid rebuild loops if we were more complex
-    if (newDate != _parsedDate || newTime != _parsedTime || newPriority != _parsedPriority || newTags.length != _parsedTags.length) {
+    // Note: We need to compare sets effectively
+    bool tagsChanged = newTextTags.length != _textTags.length || !newTextTags.containsAll(_textTags);
+
+    if (newDate != _parsedDate || newTime != _parsedTime || newPriority != _parsedPriority || tagsChanged) {
        setState(() {
            _parsedDate = newDate;
            _parsedTime = newTime;
            _parsedPriority = newPriority;
-           _parsedTags.clear();
-           _parsedTags.addAll(newTags);
+           _textTags.clear();
+           _textTags.addAll(newTextTags);
        });
     }
   }
@@ -275,7 +268,7 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
         }
     }
 
-    widget.onSubmit(cleanTitle, finalDate, _parsedPriority, _parsedTags, _parsedRepeat, _parsedLocation);
+    widget.onSubmit(cleanTitle, finalDate, _parsedPriority, _allTags, _parsedRepeat, _parsedLocation);
   }
 
   @override
@@ -353,7 +346,7 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
           // Smart Detected Chips (Animated)
           AnimatedContainer(
             duration: 300.ms,
-            height: (_parsedDate != null || _parsedTime != null || _parsedRepeat != null || _parsedLocation != null || _parsedPriority != 'medium' || _parsedTags.isNotEmpty) ? 40 : 0,
+            height: (_parsedDate != null || _parsedTime != null || _parsedRepeat != null || _parsedLocation != null || _allTags.isNotEmpty || true) ? 40 : 0,
             child: SingleChildScrollView(
                  scrollDirection: Axis.horizontal,
                  padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -383,13 +376,29 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
                                 label: _parsedLocation!,
                                 color: Colors.pinkAccent,
                             ).animate().scale(duration: 200.ms, delay: 100.ms),
-                        if (_parsedPriority != 'medium')
-                            _InfoChip(
-                                icon: Icons.flag, 
-                                label: _parsedPriority.toUpperCase(),
-                                color: _parsedPriority == 'high' ? Colors.red : Colors.orange,
-                            ).animate().scale(duration: 200.ms, delay: 100.ms),
-                        ..._parsedTags.map((t) => _InfoChip(icon: Icons.tag, label: t, color: Colors.green).animate().scale(duration: 200.ms)),
+                        _InfoChip(
+                            icon: Icons.flag, 
+                            label: _parsedPriority.toUpperCase(),
+                            color: _parsedPriority == 'high' ? Colors.red : (_parsedPriority == 'low' ? Colors.blueGrey : Colors.orange),
+                        ).animate().scale(duration: 200.ms, delay: 100.ms),
+                        ..._allTags.map((t) => _InfoChip(
+                            icon: Icons.tag, 
+                            label: t.replaceAll('#', ''), 
+                            color: Colors.green,
+                            onDeleted: () {
+                                setState(() {
+                                    // If it's a manual tag, remove it directly
+                                    if (_manualTags.contains(t)) {
+                                        _manualTags.remove(t);
+                                    }
+                                    // If it's in the text, we might want to remove it from text? 
+                                    // For now, let's just remove manual ones via chip tap.
+                                    // Removing from text is harder because we need to know WHICH instance to remove.
+                                    // So we only support removing manual tags via chip.
+                                    // If user wants to remove text tag, they delete text.
+                                });
+                            },
+                        ).animate().scale(duration: 200.ms)),
                     ],
                  ),
              ),
@@ -443,8 +452,10 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
                        icon: const Icon(Icons.tag_rounded),
                        tooltip: 'Tags',
                        onSelected: (v) {
-                           _controller.text = "${_controller.text} #$v ";
-                           _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
+                           setState(() {
+                               _manualTags.add('#$v');
+                           });
+                           // Explicitly ensure we do NOT touch _controller.text here
                        },
                        itemBuilder: (context) => [
                            const PopupMenuItem(value: 'work', child: Row(children: [Text("💼 Work")])),
@@ -617,25 +628,34 @@ class _InfoChip extends StatelessWidget {
     final IconData icon;
     final String label;
     final Color color;
-    const _InfoChip({required this.icon, required this.label, required this.color});
+    final VoidCallback? onDeleted; // NEW
+
+    const _InfoChip({required this.icon, required this.label, required this.color, this.onDeleted});
 
     @override
     Widget build(BuildContext context) {
-        return Container(
-            margin: const EdgeInsets.only(right: 8, bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.withOpacity(0.2)),
-            ),
-            child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                    Icon(icon, size: 14, color: color),
-                    const SizedBox(width: 4),
-                    Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
-                ],
+        return GestureDetector(
+            onTap: onDeleted,
+            child: Container(
+                margin: const EdgeInsets.only(right: 8, bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: color.withOpacity(0.2)),
+                ),
+                child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                        Icon(icon, size: 14, color: color),
+                        const SizedBox(width: 4),
+                        Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+                        if (onDeleted != null) ...[
+                             const SizedBox(width: 4),
+                             Icon(Icons.close, size: 12, color: color.withOpacity(0.7)),
+                        ]
+                    ],
+                ),
             ),
         );
     }
