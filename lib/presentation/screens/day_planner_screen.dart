@@ -138,32 +138,30 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     
     // 1. Call AI
     final gpt = PrivacyGptService();
+    // Get plan but don't set separate state yet
     final plan = await gpt.generateDailySchedule(_inputController.text);
     
-    setState(() {
-      _isConverting = false;
-      _generatedPlan = plan;
-    });
-    
-    SoundService().playMagic();
-  }
+    if (plan == null) {
+       setState(() => _isConverting = false);
+       if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(content: Text('Could not generate plan. Please try different text.')),
+           );
+       }
+       return;
+    }
 
-  Future<void> _confirmAndSave() async {
-    if (_generatedPlan == null) return;
-    
-    setState(() => _isConverting = true); // Reuse loading state
-
+    // 2. Auto-Confirm & Save (Skip Review Screen)
     try {
       final provider = context.read<GrowthProvider>();
       
-      // 1. Ensure Daily Goal Exists for SELECTED DATE
+      // Ensure Daily Goal Exists for SELECTED DATE
       final goalId = await provider.ensureDailyGoal(_selectedDate);
       
-      // 2. Create Tasks
-      // Note: We create them sequentially to preserve order
-      for (var item in _generatedPlan!) {
+      // Create Tasks
+      for (var item in plan) {
         final task = GoalTask(
-          id: 0, // Temporary
+          id: 0, 
           goalId: goalId,
           title: item['title'] ?? 'Untitled',
           description: item['description'] ?? '',
@@ -173,7 +171,6 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
           createdAt: DateTime.now(),
           isCompleted: false,
           subtasks: [],
-          // Set scheduledDate to today/selected date
           scheduledDate: _selectedDate,
         );
         
@@ -181,10 +178,10 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
       }
 
       if (mounted) {
-        // Clear state to switch to Dashboard Mode
         _inputController.clear();
-        setState(() => _generatedPlan = null);
+        _generatedPlan = null; // Ensure this stays null so we don't trigger review UI
         
+        SoundService().playMagic();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Day Plan Created Successfully!')),
         );
@@ -199,6 +196,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
       if (mounted) setState(() => _isConverting = false);
     }
   }
+
+
 
   void _showQuickAdd(BuildContext context, GrowthProvider provider) {
       showModalBottomSheet(
@@ -514,148 +513,81 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
             child: Column(
               children: [
                 // 1. Input Section
-                if (_generatedPlan == null) ...[
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            isToday ? "What needs to happen today?" : "What needs to happen on ${AnalyticsHelper.formatDate(_selectedDate)}?",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            "Dump your thoughts. We'll structure them.",
-                            style: TextStyle(color: subtleColor),
-                          ),
-                          const SizedBox(height: 32),
-                          Stack(
-                            alignment: Alignment.bottomRight,
-                            children: [
-                              TextField(
-                                controller: _inputController,
-                                style: TextStyle(color: textColor, fontSize: 18),
-                                maxLines: 6,
-                                decoration: InputDecoration(
-                                  hintText: "e.g., Finish the report, call John at 2pm, gym at 5...",
-                                  hintStyle: TextStyle(color: subtleColor.withOpacity(0.5)),
-                                  filled: true,
-                                  fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 48), // Space for fab
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: FloatingActionButton.small(
-                                  onPressed: _toggleListening,
-                                  backgroundColor: _isListening ? AppTheme.errorColor : AppTheme.primaryColor,
-                                  child: Icon(_isListening ? Icons.stop : Icons.mic, color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 32),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: _isConverting ? null : _generatePlan,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primaryColor,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              child: _isConverting 
-                                  ? const CircularProgressIndicator(color: Colors.white)
-                                  : const Text("Structure My Day", style: TextStyle(fontSize: 18, color: Colors.white)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  // 2. Review Section
-                  Expanded(
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
                     child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text(
-                            "Here is your Plan",
-                            style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.w600),
+                        const SizedBox(height: 20), // Add top spacing for scroll
+                        Text(
+                          isToday ? "What needs to happen today?" : "What needs to happen on ${AnalyticsHelper.formatDate(_selectedDate)}?",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: _generatedPlan!.length,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemBuilder: (context, index) {
-                              final item = _generatedPlan![index];
-                              return Card(
-                                color: isDark ? const Color(0xFF1E1E20) : Colors.white,
-                                elevation: 2,
-                                margin: const EdgeInsets.only(bottom: 12),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: AppTheme.primaryColor.withOpacity(0.2),
-                                    child: Text('${index + 1}', style: TextStyle(color: AppTheme.primaryColor)),
-                                  ),
-                                  title: Text(item['title'], style: TextStyle(color: textColor)),
-                                  subtitle: Text(
-                                    "${item['estimatedMinutes']} mins • ${item['priority']}",
-                                    style: TextStyle(color: subtleColor),
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.close, color: Colors.grey),
-                                    onPressed: () {
-                                      setState(() {
-                                        _generatedPlan!.removeAt(index);
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ).animate().fadeIn(delay: (100 * index).ms).slideX();
-                            },
-                          ),
+                        const SizedBox(height: 16),
+                        Text(
+                          "Dump your thoughts. We'll structure them.",
+                          style: TextStyle(color: subtleColor),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: _isConverting ? null : _confirmAndSave,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.successColor,
-                                shape: RoundedRectangleBorder(
+                        const SizedBox(height: 32),
+                        Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            TextField(
+                              controller: _inputController,
+                              style: TextStyle(color: textColor, fontSize: 18),
+                              maxLines: 6,
+                              decoration: InputDecoration(
+                                hintText: "e.g., Finish the report, call John at 2pm, gym at 5...",
+                                hintStyle: TextStyle(color: subtleColor.withOpacity(0.5)),
+                                filled: true,
+                                fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+                                border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
                                 ),
+                                contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 48), // Space for fab
                               ),
-                              child: _isConverting 
-                                  ? const CircularProgressIndicator(color: Colors.white)
-                                  : const Text("Confirm & Start Day", style: TextStyle(fontSize: 18, color: Colors.white)),
                             ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: FloatingActionButton.small(
+                                onPressed: _toggleListening,
+                                backgroundColor: _isListening ? AppTheme.errorColor : AppTheme.primaryColor,
+                                child: Icon(_isListening ? Icons.stop : Icons.mic, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: _isConverting ? null : _generatePlan,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: _isConverting 
+                                ? const CircularProgressIndicator(color: Colors.white)
+                                : const Text("Structure My Day", style: TextStyle(fontSize: 18, color: Colors.white)),
                           ),
                         ),
+                        const SizedBox(height: 100), // Bottom padding for keyboard/FAB
                       ],
                     ),
                   ),
+                ),
                 ],
-              ],
-            ),
+              ),
           ),
         );
       },

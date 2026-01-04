@@ -259,7 +259,29 @@ class GrowthProvider with ChangeNotifier {
 
   @override
   Future<void> deleteTask(int taskId) async {
+    // 1. Optimistic Update: Remove locally first
+    int? goalId;
+    GoalTask? deletedTask;
+
+    for (var key in _tasksByGoal.keys) {
+      final list = _tasksByGoal[key];
+      if (list != null) {
+        final index = list.indexWhere((t) => t.id == taskId);
+        if (index != -1) {
+          goalId = key;
+          deletedTask = list[index];
+          list.removeAt(index);
+          break;
+        }
+      }
+    }
+
+    if (deletedTask != null) {
+      notifyListeners(); // Trigger UI rebuild immediately
+    }
+
     try {
+      // 2. Perform actual delete
       await _repository.deleteTask(taskId);
       
       // Cancel Notification
@@ -267,8 +289,14 @@ class GrowthProvider with ChangeNotifier {
       
       await loadGrowthData();
     } catch (e) {
+      // 3. Rollback on error
+      if (goalId != null && deletedTask != null) {
+        _tasksByGoal[goalId]?.add(deletedTask!);
+        // Sort might be needed here ideally, but simple add is enough for rollback
+        notifyListeners();
+      }
+      
       _error = e.toString();
-      notifyListeners();
       rethrow;
     }
   }
