@@ -13,7 +13,9 @@ import 'daily_report_screen.dart';
 import 'day_planner_history_screen.dart'; 
 import '../widgets/active_task_timer.dart';
 import '../widgets/quick_task_input_sheet.dart';
+import '../widgets/timeline_task_tile.dart';
 import '../utils/analytics_helper.dart'; 
+import 'package:intl/intl.dart'; 
 
 class DayPlannerScreen extends StatefulWidget {
   final DateTime? initialDate;
@@ -285,206 +287,49 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
              activeTask = tasks.firstWhere((t) => t.startedAt != null);
           } catch (_) {}
 
+          // Sort tasks for timeline
+          tasks.sort((a, b) {
+            final aTime = _getSortableTime(a);
+            final bTime = _getSortableTime(b);
+            return aTime.compareTo(bTime);
+          });
+
           return Scaffold(
             backgroundColor: theme.scaffoldBackgroundColor,
-            appBar: AppBar(
-              title: InkWell(
-                  onTap: _pickDate,
-                  child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                          Text(
-                              isToday ? "Today's Plan" : AnalyticsHelper.formatDate(_selectedDate), 
-                              style: TextStyle(color: textColor)
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(Icons.arrow_drop_down, color: textColor),
-                      ],
-                  ),
-              ),
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              iconTheme: IconThemeData(color: textColor),
-              actions: [
-                 IconButton(
-                   icon: const Icon(Icons.history, color: Colors.grey),
-                   onPressed: () {
-                     Navigator.push(context, MaterialPageRoute(builder: (_) => const DayPlannerHistoryScreen()));
-                   },
-                 ),
-                 IconButton(
-                   icon: Icon(Icons.analytics_outlined, color: textColor),
-                   onPressed: () {
-                     Navigator.push(context, MaterialPageRoute(builder: (_) => DailyReportScreen()));
-                   },
-                 )
-               ],
-            ),
-            floatingActionButton: FloatingActionButton.extended(
-                onPressed: () => _showQuickAdd(context, provider),
-                backgroundColor: AppTheme.primaryColor,
-                icon: const Icon(Icons.add, color: Colors.white),
-                label: const Text("Add Task", style: TextStyle(color: Colors.white)),
-            ),
             body: SafeArea(
               child: Column(
                 children: [
+                  // 1. Header & Date Strip
+                  _buildDateHeader(theme, textColor, subtleColor),
                   
-                  // Active Timer Section
+                  // 2. Active Timer (Floating at top if active)
                   if (activeTask != null)
                       Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           child: ActiveTaskTimer(task: activeTask),
                       ),
 
+                  // 3. Timeline Content
                   Expanded(
-                    child: ListView.builder(
-                      itemCount: tasks.length,
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80), // Bottom padding for FAB
-                      itemBuilder: (context, index) {
-                        final task = tasks[index];
-                        final isRunning = task.startedAt != null;
-
-                        return Dismissible(
-                          key: Key('task_${task.id}'),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
-                            decoration: BoxDecoration(
-                              color: AppTheme.errorColor,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: const [
-                                Text(
-                                  'Delete',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Icon(
-                                  Icons.delete_rounded,
-                                  color: Colors.white,
-                                  size: 32,
-                                ),
-                              ],
-                            ),
-                          ),
-                          confirmDismiss: (direction) async {
-                             return await showDialog<bool>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                    title: const Text('Delete Task'),
-                                    content: Text('Are you sure you want to delete "${task.title}"?'),
-                                    actions: [
-                                        TextButton(
-                                            onPressed: () => Navigator.pop(context, false),
-                                            child: const Text('Cancel'),
-                                        ),
-                                        ElevatedButton(
-                                            onPressed: () => Navigator.pop(context, true),
-                                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
-                                            child: const Text('Delete'),
-                                        ),
-                                    ],
-                                ),
-                             ) ?? false;
-                          },
-                          onDismissed: (direction) {
-                             provider.deleteTask(task.id);
-                             ScaffoldMessenger.of(context).showSnackBar(
-                                 const SnackBar(content: Text('Task deleted')),
-                             );
-                          },
-                          child: Card(
-                          color: isRunning 
-                             ? (isDark ? const Color(0xFF2C2C30) : Colors.blue.shade50) 
-                             : (isDark ? const Color(0xFF1E1E20) : Colors.white),
-                          elevation: isRunning ? 4 : 2,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              side: isRunning ? BorderSide(color: AppTheme.primaryColor, width: 2) : BorderSide.none
-                          ),
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            onTap: () async {
-                                // EDIT TASK
-                                await showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    backgroundColor: Colors.transparent,
-                                    builder: (context) => QuickTaskInputSheet(
-                                        isEditing: true,
-                                        initialTitle: task.title,
-                                        initialPriority: task.priority,
-                                        initialTags: [], // Extract from description if needed, or pass empty
-                                        initialRepeat: task.frequency != 'one-time' ? task.frequency : null,
-                                        initialLocation: task.suggestedLocation != 'any' ? task.suggestedLocation : null,
-                                        onSubmit: (title, date, priority, tags, repeat, location) {
-                                            final updatedTask = task.copyWith(
-                                                title: title,
-                                                priority: priority,
-                                                frequency: repeat ?? 'one-time',
-                                                suggestedLocation: location ?? 'any',
-                                                scheduledDate: date ?? task.scheduledDate,
-                                            );
-                                            provider.updateTask(updatedTask);
-                                            Navigator.pop(context);
-                                        },
-                                        initialDate: task.scheduledDate,
-                                    ),
-                                );
-                            },
-                            leading: Checkbox(
-                              value: task.isCompleted,
-                              activeColor: AppTheme.primaryColor,
-                              onChanged: (val) {
-                                if (val == true) {
-                                  provider.completeTask(task.id);
-                                } else {
-                                  provider.uncompleteTask(task.id);
-                                }
-                              },
-                            ),
-                            title: Text(
-                              task.title, 
-                              style: TextStyle(
-                                color: textColor,
-                                decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-                                decorationColor: subtleColor,
-                                fontWeight: FontWeight.w500,
-                              )
-                            ),
-                            trailing: IconButton(
-                              icon: Icon(
-                                isRunning ? Icons.pause_circle_filled : Icons.play_circle_fill,
-                                color: isRunning ? Colors.amber : AppTheme.primaryColor,
-                                size: 32,
-                              ),
-                              onPressed: () {
-                                provider.toggleTaskTimer(task.id);
-                              },
-                            ),
-                          ),
-                        ));
-                      },
-                    ),
+                    child: _buildTimelineList(context, provider, tasks, activeTask?.id, isDark, textColor, subtleColor),
                   ),
                 ],
               ),
+            ),
+            floatingActionButton: FloatingActionButton(
+                onPressed: () => _showQuickAdd(context, provider),
+                backgroundColor: const Color(0xFFFF8E8E), // Coral/Pinkish from mockup
+                child: const Icon(Icons.add, color: Colors.white),
             ),
           );
         }
 
         // MODE A: MORNING DUMP (No Plan or Creating New)
+        // ... (Keep existing implementation) ...
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
           appBar: AppBar(
+            // ... existing app bar code ...
              title: InkWell(
                   onTap: _pickDate,
                   child: Row(
@@ -593,4 +438,286 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
       },
     );
   }
+
+  // --- Helpers for Timeline UI ---
+
+  DateTime _getSortableTime(GoalTask task) {
+    if (task.scheduledDate != null) {
+      if (task.scheduledDate!.hour == 0 && task.scheduledDate!.minute == 0) {
+        // Map fuzzy times to approximate hours for sorting
+        if (task.suggestedTime == 'morning') return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 9);
+        if (task.suggestedTime == 'afternoon') return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 14);
+        if (task.suggestedTime == 'evening') return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 18);
+        return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 12); // "Any" -> Noon
+      }
+      return task.scheduledDate!;
+    }
+    return DateTime.now().add(const Duration(days: 365)); // Put undefined at end
+  }
+
+  Widget _buildDateHeader(ThemeData theme, Color textColor, Color subtleColor) {
+    // Generate dates for the strip (e.g., this week)
+    // For simplicity, we center on _selectedDate and show +/- 3 days
+    final startDate = _selectedDate.subtract(const Duration(days: 3));
+    final dates = List.generate(7, (index) => startDate.add(Duration(days: index)));
+
+    return Container(
+      color: theme.scaffoldBackgroundColor, // Or specific header color
+      padding: const EdgeInsets.only(top: 16, bottom: 24),
+      child: Column(
+        children: [
+          // Month Year Row with Calendar Icon
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  DateFormat('MMMM yyyy').format(_selectedDate),
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 24, 
+                    fontWeight: FontWeight.bold
+                  ),
+                ),
+                IconButton(
+                  onPressed: _pickDate,
+                  icon: const Icon(Icons.calendar_month, color: Color(0xFFFF8E8E)), // Pinkish
+                )
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Horizontal Date Strip
+          SizedBox(
+            height: 70, 
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              itemCount: dates.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 20),
+              itemBuilder: (context, index) {
+                final date = dates[index];
+                final isSelected = AnalyticsHelper.isSameDay(date, _selectedDate);
+                final isToday = AnalyticsHelper.isSameDay(date, DateTime.now());
+                
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedDate = date),
+                  child: Column(
+                    children: [
+                      Text(
+                        DateFormat('E').format(date), 
+                        style: TextStyle(
+                          color: isSelected 
+                              ? const Color(0xFFFF8E8E) 
+                              : (isToday ? textColor : subtleColor),
+                          fontWeight: FontWeight.w600
+                        )
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFFFF8E8E) : Colors.transparent,
+                          shape: BoxShape.circle,
+                          border: isToday && !isSelected ? Border.all(color: const Color(0xFFFF8E8E)) : null,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          "${date.day}",
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : textColor,
+                            fontWeight: FontWeight.bold
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineList(BuildContext context, GrowthProvider provider, List<GoalTask> tasks, int? activeTaskId, bool isDark, Color textColor, Color subtleColor) {
+     return ListView(
+       padding: const EdgeInsets.only(left: 24, right: 24, bottom: 100),
+       children: [
+         // 1. Rise and Shine Anchor
+         _buildTimelineAnchor(
+           icon: Icons.wb_sunny_rounded, // or Alarm icon
+           time: "08:00 AM", // Mockup time
+           title: "Rise and Shine",
+           color: const Color(0xFFFF8E8E),
+           isStart: true,
+           isDark: isDark,
+           textColor: textColor,
+           subtleColor: subtleColor,
+         ),
+         
+         // 2. Task List
+         if (tasks.isEmpty)
+           Padding(
+             padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 40),
+             child: Text(
+               "No tasks scheduled yet. Tap + to add one!", 
+               style: TextStyle(color: subtleColor.withOpacity(0.5)),
+               textAlign: TextAlign.center,
+             ),
+           )
+         else
+           ...tasks.asMap().entries.map((entry) {
+             final index = entry.key;
+             final task = entry.value;
+             return TimelineTaskTile(
+               task: task,
+               isFirst: index == 0,
+               isLast: index == tasks.length - 1,
+               isPast: task.isCompleted, // Simplify "past" logic for now
+               onTap: () => _showEditTask(task, provider),
+               onDelete: () => provider.deleteTask(task.id),
+               onToggle: (val) {
+                 if (val == true) {
+                    provider.completeTask(task.id);
+                 } else {
+                    provider.uncompleteTask(task.id);
+                 }
+               },
+               onToggleTimer: () => provider.toggleTaskTimer(task.id),
+             );
+           }),
+
+         // 3. Wind Down Anchor
+         _buildTimelineAnchor(
+           icon: Icons.nights_stay_rounded,
+           time: "10:00 PM",
+           title: "Wind Down",
+           color: const Color(0xFF6C757D), // Greyish blue
+           isStart: false,
+           isDark: isDark,
+           textColor: textColor,
+           subtleColor: subtleColor,
+         ),
+       ],
+     );
+  }
+
+  Widget _buildTimelineAnchor({
+    required IconData icon,
+    required String time,
+    required String title,
+    required Color color,
+    required bool isStart,
+    required bool isDark,
+    required Color textColor,
+    required Color subtleColor,
+  }) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+           // Time
+           SizedBox(
+             width: 80,
+             child: Padding(
+               padding: const EdgeInsets.symmetric(vertical: 20),
+               child: Text(
+                 time,
+                 textAlign: TextAlign.right,
+                 style: TextStyle(
+                   color: subtleColor, // Use subtleColor
+                   fontWeight: FontWeight.w600,
+                   fontSize: 12,
+                 ),
+               ),
+             ),
+           ),
+           // Line & Node
+           SizedBox(
+              width: 40,
+              child: Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                   if (isStart)
+                     Positioned(
+                       top: 40, bottom: 0, 
+                       child: Container(width: 2, color: subtleColor.withOpacity(0.3))
+                     ),
+                   if (!isStart)
+                     Positioned(
+                       top: 0, bottom: 40, 
+                       child: Container(width: 2, color: subtleColor.withOpacity(0.3))
+                     ),
+                   
+                   Container(
+                     margin: const EdgeInsets.only(top: 10),
+                     width: 50, height: 50,
+                     decoration: BoxDecoration(
+                       color: isStart ? color : (isDark ? const Color(0xFF3E3E42) : Colors.grey.shade300),
+                       shape: BoxShape.circle,
+                     ),
+                     child: Icon(icon, color: isStart || isDark ? Colors.white : Colors.black54, size: 24),
+                   ),
+                ],
+              )
+           ),
+           // Title
+           Expanded(
+             child: Padding(
+               padding: const EdgeInsets.only(left: 16, top: 24),
+               child: Column(
+                 crossAxisAlignment: CrossAxisAlignment.start,
+                 children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: textColor, 
+                        fontSize: 18, 
+                        fontWeight: FontWeight.bold
+                      )
+                    ),
+                    if (isStart) ...[
+                      const SizedBox(height: 4),
+                    ]
+                 ],
+               )
+             )
+           )
+        ],
+      ),
+    );
+  }
+
+  void _showEditTask(GoalTask task, GrowthProvider provider) {
+     showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => QuickTaskInputSheet(
+              isEditing: true,
+              initialTitle: task.title,
+              initialPriority: task.priority,
+              initialTags: [],
+              initialRepeat: task.frequency != 'one-time' ? task.frequency : null,
+              initialLocation: task.suggestedLocation != 'any' ? task.suggestedLocation : null,
+              onSubmit: (title, date, priority, tags, repeat, location) {
+                  final updatedTask = task.copyWith(
+                      title: title,
+                      priority: priority,
+                      frequency: repeat ?? 'one-time',
+                      suggestedLocation: location ?? 'any',
+                      scheduledDate: date ?? task.scheduledDate,
+                  );
+                  provider.updateTask(updatedTask);
+                  Navigator.pop(context);
+              },
+              initialDate: task.scheduledDate,
+          ),
+      );
+  }
+
 }
