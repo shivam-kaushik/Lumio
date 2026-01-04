@@ -15,6 +15,7 @@ import '../theme/app_theme.dart';
 import '../../data/models/reminder.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../../core/services/home_detection_service.dart';
+import '../utils/analytics_helper.dart'; // NEW import
 
 // Day Architect Imports
 import 'day_planner_screen.dart';
@@ -111,26 +112,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       final dateStr = "${today.year}-${today.month}-${today.day}";
                       final todayGoalName = "Daily Plan - $dateStr";
                       
-                      final todayGoal = growthProvider.goals.where((g) => g.name == todayGoalName).firstOrNull;
-                      final inboxGoal = growthProvider.goals.where((g) => g.name == 'Inbox').firstOrNull;
-                      
                       List<GoalTask> calculatedTasks = [];
                       
-                      // 1. Add Daily Plan Tasks (Strictly for today goal)
-                      if (todayGoal != null) {
-                          calculatedTasks.addAll(growthProvider.getTasksForGoal(todayGoal.id));
-                      }
+                      // Aggregated calculation for "Today's Plan" stats
+                      // Must match DayPlanner logic: All tasks scheduled for today
                       
-                      // 2. Add Inbox Tasks (Scheduled/Created Today)
-                      if (inboxGoal != null) {
-                          final inboxTasks = growthProvider.getTasksForGoal(inboxGoal.id);
-                          final relevantInbox = inboxTasks.where((t) {
-                               final date = t.scheduledDate ?? t.createdAt;
-                               return date.year == today.year && 
-                                      date.month == today.month && 
-                                      date.day == today.day;
-                          });
-                          calculatedTasks.addAll(relevantInbox);
+                      for (final goal in growthProvider.goals) {
+                         final tasks = growthProvider.getTasksForGoal(goal.id);
+                         final tasksForToday = tasks.where((t) {
+                             final dateToCheck = t.scheduledDate ?? t.createdAt;
+                             return AnalyticsHelper.isSameDay(dateToCheck, today);
+                         });
+                         calculatedTasks.addAll(tasksForToday);
                       }
 
                       final completedTaskCount = calculatedTasks.where((t) => t.isCompleted).length; 

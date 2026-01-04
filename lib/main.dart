@@ -35,9 +35,15 @@ void callbackDispatcher() {
         options: DefaultFirebaseOptions.currentPlatform,
       );
 
-      // Initialize services for background context
       final notificationService = NotificationService();
       await notificationService.initialize();
+
+      // NEW: Load environment variables for background isolate (Critical for PrivacyGptService)
+      try {
+        await dotenv.load(fileName: '.env');
+      } catch (e) {
+        debugPrint('⚠️ Background .env load error: $e');
+      }
 
       // Ensure timezone data is available in background isolate
       tz.initializeTimeZones();

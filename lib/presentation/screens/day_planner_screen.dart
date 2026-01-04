@@ -260,38 +260,19 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
         final dateStr = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
         final goalName = "Daily Plan - $dateStr";
         
-        // Find goals
-        int? dayGoalId;
-        try {
-          dayGoalId = provider.goals.firstWhere((g) => g.name == goalName).id;
-        } catch (_) {}
-        
-        // Collect tasks (Strictly Daily Plan only + Date Check)
-        // Collect tasks (Daily Plan + Inbox for this date)
+        // Collect tasks for the selected date from ALL goals
         List<GoalTask> tasks = [];
         
-        // 1. Daily Plan Goal Tasks
-        if (dayGoalId != null) {
-            final goalTasks = provider.getTasksForGoal(dayGoalId);
-            tasks.addAll(goalTasks.where((t) {
-                final dateToCheck = t.scheduledDate ?? t.createdAt;
-                return AnalyticsHelper.isSameDay(dateToCheck, _selectedDate);
-            }));
+        for (final goal in provider.goals) {
+           final goalTasks = provider.getTasksForGoal(goal.id);
+           tasks.addAll(goalTasks.where((t) {
+               // Must be scheduled for this specific date
+               if (t.scheduledDate != null) {
+                   return AnalyticsHelper.isSameDay(t.scheduledDate!, _selectedDate);
+               }
+               return false;
+           }));
         }
-
-        // 2. Inbox Tasks - REMOVED to align with Analytics strict "Daily Plan" view
-        // The user explicitly requested to show ONLY tasks made for today's plan.
-        /*
-        try {
-           final inboxGoal = provider.goals.firstWhere((g) => g.name == 'Inbox');
-           final inboxTasks = provider.getTasksForGoal(inboxGoal.id);
-           final inboxForDay = inboxTasks.where((t) {
-               final dateToCheck = t.scheduledDate ?? t.createdAt; 
-               return AnalyticsHelper.isSameDay(dateToCheck, _selectedDate);
-           });
-           tasks.addAll(inboxForDay);
-        } catch (_) {}
-        */
         
         // Check tasks
         final hasPlan = tasks.isNotEmpty;
