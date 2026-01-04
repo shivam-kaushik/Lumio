@@ -218,8 +218,19 @@ class NotificationService {
       
       final reminderRepository = FirestoreReminderRepository();
       
-      // Mark occurrence as completed by notification ID
-      await reminderRepository.completeOccurrenceByNotificationId(notificationId);
+      if (reminderId.startsWith('task_')) {
+        // It's a GoalTask
+        final taskIdStr = reminderId.replaceFirst('task_', '');
+        final taskId = int.tryParse(taskIdStr);
+        if (taskId != null) {
+          final growthRepo = FirestoreGrowthRepository();
+          await growthRepo.completeTask(taskId);
+          debugPrint('✅ Successfully completed GoalTask $taskId');
+        }
+      } else {
+         // Legacy: Mark occurrence as completed by notification ID
+         await reminderRepository.completeOccurrenceByNotificationId(notificationId);
+      }
       
       // Create context event for completion
       await reminderRepository.createContextEvent(

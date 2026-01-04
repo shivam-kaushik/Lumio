@@ -78,13 +78,13 @@ void main() {
   group('MotivationalEngine Tests', () {
     // 1. Test that Kickstart returns a string
     test('Kickstart returns a non-empty string', () {
-      final msg = TemplateEngine.getKickstart("My Goal", 5);
+      final msg = TemplateEngine.getKickstart("My Goal", "My Context");
       expect(msg, isNotEmpty);
     });
 
     // 2. Test that Deadline Nudge returns a string
     test('Deadline Nudge returns a non-empty string', () {
-      final msg = TemplateEngine.getDeadlineNudge("My Goal", 2);
+      final msg = TemplateEngine.getDeadlineNudge("My Goal", "tomorrow");
       expect(msg, isNotEmpty);
     });
 
@@ -97,7 +97,7 @@ void main() {
     // 4. Test that messages contain goal name (mostly - quotes might not)
     // This is tricky because quotes are random. We can check if it's EITHER a quote OR contains goal name.
     test('Messages are valid', () {
-      final msg = TemplateEngine.getKickstart("UniqueGoalName", 0);
+      final msg = TemplateEngine.getKickstart("UniqueGoalName", "Context");
       bool isQuote = !msg.contains("UniqueGoalName");
       if (!isQuote) {
         expect(msg, contains("UniqueGoalName"));
@@ -108,7 +108,7 @@ void main() {
     test('Kickstart produces variability', () {
       Set<String> outputs = {};
       for(int i=0; i<50; i++) {
-        outputs.add(TemplateEngine.getKickstart("Goal", 0));
+        outputs.add(TemplateEngine.getKickstart("Goal", "Context"));
       }
       // Should have at least 2 different outputs (template vs quote)
       expect(outputs.length, greaterThan(1));
@@ -117,7 +117,7 @@ void main() {
     test('Deadline produces variability', () {
        Set<String> outputs = {};
       for(int i=0; i<50; i++) {
-        outputs.add(TemplateEngine.getDeadlineNudge("Goal", 1));
+        outputs.add(TemplateEngine.getDeadlineNudge("Goal", "today"));
       }
       expect(outputs.length, greaterThan(1));
     });

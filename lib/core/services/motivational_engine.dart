@@ -48,42 +48,57 @@ class MotivationalEngine {
         return;
       }
 
-      // 2. Filter Active Goals
-      List<Goal> activeGoals = [];
-      for (var g in goals) {
-         // Filter out system goals
-         if (g.name == 'Inbox' || g.name.startsWith('Daily Plan')) continue;
+      // 2. Data Gathering: Flatten all pending items (Goals and Subtasks)
+      List<_PendingItem> allPendingItems = [];
+
+      for (var goal in goals) {
+         if (goal.name == 'Inbox' || goal.name.startsWith('Daily Plan')) continue;
          
-         final tasks = await _repository.getTasksForGoal(g.id);
-         final isCompleted = tasks.isNotEmpty && tasks.every((t) => t.isCompleted);
+         // Add the goal itself if active
+         // We consider it active if we are processing it (filtering happens by checking tasks later)
+         // or we can assume all non-archived goals are active for now.
          
-         if (!isCompleted && tasks.isNotEmpty) {
-           activeGoals.add(g);
-         }
+         // Add pending tasks (Goal itself doesn't need to be in the list as "goal_*",
+         // effective motivation comes from specific tasks usually. 
+         // But if we want generic goal motivation, we can keep it without the progress check).
+         allPendingItems.add(_PendingItem(
+              id: "goal_${goal.id}", 
+              title: goal.name, 
+              type: _ItemType.goal, 
+              deadline: goal.targetDeadline,
+              parentGoalName: goal.name,
+              priority: 1, // Base priority
+            ));
+
+         // Add its pending tasks recursively
+         final tasks = await _repository.getTasksForGoal(goal.id);
+         allPendingItems.addAll(_getPendingTasksRecursive(tasks, goal.name));
       }
 
-      if (activeGoals.isEmpty) {
-        debugPrint('⚠️ MotivationalEngine: No active goals to motivate.');
+      if (allPendingItems.isEmpty) {
+        debugPrint('⚠️ MotivationalEngine: No pending items to motivate.');
         return;
       }
+
+      debugPrint('📋 Found ${allPendingItems.length} pending items (Goals + Subtasks)');
 
       // A. Morning Kickstart (Wake Time +/- 1 hour, or Force)
       if (force || debug || hour == wakeTime) {
         debugPrint('☀️ Checking Morning Kickstart...');
-        await _checkMorningKickstart(activeGoals);
-        if (force) return; // If forced, just do one
+        await _checkMorningKickstart(allPendingItems);
+        if (force) return; 
       }
       
       // B. Deadline Nudges
       if (!force && (hour > wakeTime && hour < sleepTime)) {
         debugPrint('⏳ Checking Deadline Nudges...');
-        await _checkDeadlineNudges(activeGoals);
+        await _checkDeadlineNudges(allPendingItems);
       }
 
       // C. Consistency Check
       if (!force && hour == (sleepTime - 2)) {
         debugPrint('🌙 Checking Consistency...');
-        await _checkConsistency(activeGoals);
+        await _checkConsistency(allPendingItems);
       }
       
     } catch (e) {
@@ -91,206 +106,219 @@ class MotivationalEngine {
     }
   }
 
-  Future<void> _checkMorningKickstart(List<Goal> goals) async {
-    if (goals.isEmpty) return;
+  /// Recursively flatten tasks into _PendingItem list
+  List<_PendingItem> _getPendingTasksRecursive(List<GoalTask> tasks, String parentGoalName) {
+    List<_PendingItem> pending = [];
+    for (var task in tasks) {
+      if (task.isCompleted) continue;
 
-    // Pick a goal to focus on
-    final focusGoal = goals[Random().nextInt(goals.length)];
-    // Verify streak (mock for now, or fetch from goal metadata if available)
-    int streak = 0; 
+      // Map priority string to int for simple sorting
+      int priorityVal = 1;
+      if (task.priority == 'high') priorityVal = 3;
+      if (task.priority == 'medium') priorityVal = 2;
+
+      pending.add(_PendingItem(
+        id: "task_${task.id}",
+        title: task.title,
+        type: _ItemType.task,
+        deadline: task.scheduledDate,
+        parentGoalName: parentGoalName,
+        priority: priorityVal,
+      ));
+
+      // Recurse
+      if (task.subtasks.isNotEmpty) {
+        pending.addAll(_getPendingTasksRecursive(task.subtasks, parentGoalName));
+      }
+    }
+    return pending;
+  }
+
+
+  Future<void> _checkMorningKickstart(List<_PendingItem> items) async {
+    // Pick high priority item
+    final highPriorityItems = items.where((i) => i.priority >= 2).toList();
+    final focusItem = highPriorityItems.isNotEmpty 
+        ? highPriorityItems[Random().nextInt(highPriorityItems.length)]
+        : items[Random().nextInt(items.length)];
     
     // Generate Content
-    String title = "Good Morning! ☀️";
-    String body = "Ready to crush '${focusGoal.name}'? Let's make today count.";
+    String title = "Morning Focus ☀️";
+    String body = "Let's tackle '${focusItem.title}' today. Small steps!";
+
+    if (focusItem.type == _ItemType.task) {
+       body = "Today's mission: '${focusItem.title}' for your '${focusItem.parentGoalName}' goal.";
+    }
 
     try {
       if (await _premiumService.isPremium()) {
-         // AI Generation (Premium)
-         final prompt = "Generate a short morning motivation (MAX 15 words) for a user working on goal '${focusGoal.name}'. Streak: $streak days.";
+         final prompt = "Morning motivation for task '${focusItem.title}' (part of goal '${focusItem.parentGoalName}'). User needs to start. Max 15 words.";
          final aiResponse = await _gptService.generateContextAwareMessage(
-            systemInstruction: 'You are a motivational coach. Keep messages under 15 words.',
+            systemInstruction: 'You are a concise motivational coach.',
             userPrompt: prompt, 
-            maxTokens: 30, // Reduced tokens
+            maxTokens: 35,
          );
          if (aiResponse != null) body = aiResponse;
       } else {
-         // Template (Free)
-         body = TemplateEngine.getKickstart(focusGoal.name, streak);
+         body = TemplateEngine.getKickstart(focusItem.title, focusItem.parentGoalName);
       }
     } catch (e) {
-      // Fallback to template if AI/Premium fails
-      body = TemplateEngine.getKickstart(focusGoal.name, streak);
+      // Fallback
+      body = TemplateEngine.getKickstart(focusItem.title, focusItem.parentGoalName);
     }
 
-    _schedule(1001, title, body);
+    _schedule(1001, title, body, payload: '{"reminder_id": "${focusItem.id}"}');
   }
 
-  Future<void> _checkDeadlineNudges(List<Goal> goals) async {
+  Future<void> _checkDeadlineNudges(List<_PendingItem> items) async {
     final now = DateTime.now();
 
-    for (var goal in goals) {
-      if (goal.targetDeadline == null) continue;
+    for (var item in items) {
+      if (item.deadline == null) continue;
 
-      final deadline = goal.targetDeadline!;
+      final deadline = item.deadline!;
       final difference = deadline.difference(now);
       final daysLeft = difference.inDays;
+      final hoursLeft = difference.inHours;
 
-      // Nudge at 48h and 24h
-      if (daysLeft == 1 || daysLeft == 2) {
-         String title = "Deadline Approaching ⏳";
-         String body = "Only $daysLeft days left for '${goal.name}'. You got this!";
+      // Nudge at < 24h and < 48h
+      bool urgent = hoursLeft > 0 && hoursLeft < 24;
+      bool upcoming = daysLeft >= 1 && daysLeft <= 2;
+
+      if (urgent || upcoming) {
+         String title = urgent ? "Due Today! ⏰" : "Coming Up ⏳";
+         String timeString = urgent ? "today" : "in $daysLeft days";
+         String body = "Don't forget '${item.title}' is due $timeString.";
 
          if (await _premiumService.isPremium()) {
-             final prompt = "User's goal '${goal.name}' is due in $daysLeft days. Write a urgent nudge (MAX 15 words).";
+             final prompt = "Task '${item.title}' is due $timeString. Write a short urgent notification. Max 15 words.";
              final aiResponse = await _gptService.generateContextAwareMessage(
-                systemInstruction: 'You are a motivational coach. Keep messages under 15 words.',
+                systemInstruction: 'You are a helpful reminder assistant.',
                 userPrompt: prompt, 
                 maxTokens: 30,
              );
              if (aiResponse != null) body = aiResponse;
          } else {
-             body = TemplateEngine.getDeadlineNudge(goal.name, daysLeft);
+             body = TemplateEngine.getDeadlineNudge(item.title, timeString);
          }
 
-         // Use modulo to prevent 32-bit integer overflow with timestamp-based Goal IDs
-         _schedule(2000 + (goal.id % 2000000000), title, body);
+    _schedule(2000 + (item.id.hashCode.abs() % 100000), title, body, payload: '{"reminder_id": "${item.id}"}');
       }
     }
   }
 
-  Future<void> _checkConsistency(List<Goal> goals) async {
-    if (goals.isEmpty) return;
+  Future<void> _checkConsistency(List<_PendingItem> items) async {
+    // Pick a random pending item
+    if (items.isEmpty) return;
+    final item = items[Random().nextInt(items.length)];
     
-    final goal = goals.first;
-    
-    String title = "End the day strong 🌙";
-    String body = "Any unfinished tasks for '${goal.name}'? 15 mins is all it takes.";
+    String title = "Daily Check-in 🌙";
+    String body = "Did you make progress on '${item.title}' today?";
 
     if (await _premiumService.isPremium()) {
-         final prompt = "It's evening. User might have unfinished tasks for '${goal.name}'. Write a gentle nudge (MAX 15 words).";
+         final prompt = "Evening check-in. Ask if user made progress on '${item.title}'. Gentle tone. Max 15 words.";
          final aiResponse = await _gptService.generateContextAwareMessage(
-             systemInstruction: 'You are a gentle accountability partner. Keep messages under 15 words.',
+             systemInstruction: 'You are a gentle accountability partner.',
              userPrompt: prompt, 
              maxTokens: 30,
          );
          if (aiResponse != null) body = aiResponse;
     } else {
-         body = TemplateEngine.getConsistency(goal.name);
+         body = TemplateEngine.getConsistency(item.title);
     }
 
-    _schedule(3001, title, body);
+    _schedule(3001, title, body, payload: '{"reminder_id": "${item.id}"}');
   }
 
-  void _schedule(int id, String title, String body) {
+  void _schedule(int id, String title, String body, {String? payload}) {
+    // Merge title/body into payload if not already there
+    String finalPayload = payload ?? '{}';
+    try {
+      if (payload != null) {
+         // If payload exists, define structure or append
+         final cleanPayload = payload.trim();
+         if (cleanPayload.startsWith('{') && cleanPayload.endsWith('}')) {
+             // It's JSON, inject title/body
+             final content = cleanPayload.substring(1, cleanPayload.length - 1);
+             finalPayload = '{"title": "$title", "body": "$body", $content}'; 
+         }
+      } else {
+         finalPayload = '{"type": "motivational", "title": "$title", "body": "$body"}';
+      }
+    } catch (_) {
+       finalPayload = '{"type": "motivational", "title": "$title", "body": "$body"}';
+    }
+
     _notifications.showNotification(
       id: id,
       title: title,
       body: body,
-      payload: '{"type": "motivational"}',
+      payload: finalPayload,
     );
   }
+}
+
+enum _ItemType { goal, task }
+
+class _PendingItem {
+  final String id;
+  final String title;
+  final _ItemType type;
+  final DateTime? deadline;
+  final String parentGoalName;
+  final int priority;
+
+  _PendingItem({
+    required this.id,
+    required this.title,
+    required this.type,
+    this.deadline,
+    required this.parentGoalName,
+    this.priority = 1,
+  });
 }
 
 /// Helper for Free Tier Templates
 class TemplateEngine {
   static final List<String> _quotes = [
-    "The only way to do great work is to love what you do.",
-    "Believe you can and you're halfway there.",
-    "Your limitation—it's only your imagination.",
-    "Push yourself, because no one else is going to do it for you.",
-    "Great things never come from comfort zones.",
-    "Dream it. Wish it. Do it.",
-    "Success doesn’t just find you. You have to go out and get it.",
-    "The harder you work for something, the greater you’ll feel when you achieve it.",
-    "Dream bigger. Do bigger.",
-    "Don’t stop when you’re tired. Stop when you’re done.",
-    "Wake up with determination. Go to bed with satisfaction.",
-    "Do something today that your future self will thank you for.",
-    "Little things make big days.",
-    "It’s going to be hard, but hard does not mean impossible.",
-    "Don’t wait for opportunity. Create it.",
-    "Sometimes we’re tested not to show our weaknesses, but to discover our strengths.",
-    "The key to success is to focus on goals, not obstacles.",
-    "Dream it. Believe it. Build it.",
-    "Discipline is doing what needs to be done, even if you don't want to do it.",
-    "Success is the sum of small efforts, repeated day-in and day-out.",
-    "The future depends on what you do today.",
-    "You don’t have to be great to start, but you have to start to be great.",
-    "Action is the foundational key to all success.",
-    "Don’t watch the clock; do what it does. Keep going.",
     "The secret of getting ahead is getting started.",
     "It always seems impossible until it’s done.",
+    "Don’t watch the clock; do what it does. Keep going.",
     "Quality is not an act, it is a habit.",
-    "Start where you are. Use what you have. Do what you can.",
-    "If you can dream it, you can do it.",
-    "A year from now you may wish you had started today.",
-    "Everything you’ve ever wanted is on the other side of fear.",
-    "Your time is limited, don't waste it living someone else's life.",
-    "Pain is temporary. Quitting lasts forever.",
-    "The pain you feel today will be the strength you feel tomorrow.",
-    "Don't count the days, make the days count.",
-    "Success is not final, failure is not fatal: it is the courage to continue that counts.",
-    "What you get by achieving your goals is not as important as what you become by achieving your goals.",
-    "Believe in yourself and all that you are.",
-    "If it doesn’t challenge you, it won’t change you.",
-    "Don't let yesterday take up too much of today.",
-    "You are never too old to set another goal or to dream a new dream.",
-    "Goals are dreams with deadlines.",
-    "A goal without a plan is just a wish.",
-    "Be stubborn about your goals and flexible about your methods.",
-    "The only limit to our realization of tomorrow will be our doubts of today.",
-    "Do what you can, with what you have, where you are.",
-    "Focus on being productive instead of busy.",
-    "You don't need to see the whole staircase, just take the first step.",
-    "Success is walking from failure to failure with no loss of enthusiasm.",
-    "The only place where success comes before work is in the dictionary."
+    "Believe you can and you're halfway there.",
   ];
+  
+  static String getRandomQuote() => _quotes[Random().nextInt(_quotes.length)];
 
-  static String getKickstart(String goalName, int streak) {
-    if (Random().nextBool()) {
-        // 50% chance for a quote
-        return _getRandomQuote();
-    }
+  static String getKickstart(String title, String context) {
+    if (Random().nextBool()) return getRandomQuote();
     
     final templates = [
-      "Rise and shine! ⚡ Time to work on '$goalName'.",
-      "New day, new progress on '$goalName'. Let's go!",
-      "You're doing great! Keep the momentum going on '$goalName'.",
+      "Ready to tackle '$title'? Let's move '$context' forward!",
+      "Focus time: '$title'. You got this.",
+      "Make today count. Start with '$title'.",
     ];
-    if (streak > 2) {
-      templates.add("You're on a $streak-day streak! Don't break it now!");
-    }
     return templates[Random().nextInt(templates.length)];
   }
 
-  static String getDeadlineNudge(String goalName, int daysLeft) {
-    if (Random().nextBool()) {
-        return _getRandomQuote();
-    }
-
+  static String getDeadlineNudge(String title, String timeString) {
     return [
-      "Crunch time! '$goalName' is due in $daysLeft days.",
-      "Just $daysLeft days left for '$goalName'. Finish strong!",
-      "Almost there! '$goalName' needs you.",
+      "Heads up! '$title' is due $timeString.",
+      "Finish strong! '$title' needs your attention $timeString.",
+      "Deadline approaching for '$title'.",
     ][Random().nextInt(3)];
   }
 
-  static String getConsistency(String goalName) {
-     if (Random().nextBool()) {
-        return _getRandomQuote();
-    }
-
+  static String getConsistency(String title) {
     return [
-      "Still up? Review your progress on '$goalName'.",
-      "Small steps matter. Do one thing for '$goalName' tonight.",
-      "Set yourself up for success tomorrow by checking '$goalName' now.",
+      "How did it go with '$title' today?",
+      "Small progress on '$title' is still progress.",
+      "Ready for tomorrow? Review '$title' status.",
     ][Random().nextInt(3)];
   }
 
   static String getTaskReminder(String taskTitle, String goalName) {
-    if (Random().nextBool()) {
-        return _getRandomQuote();
-    }
+    if (Random().nextBool()) return getRandomQuote();
 
     final templates = [
       "Time for '$taskTitle'. One step closer to '$goalName'!",
@@ -300,9 +328,5 @@ class TemplateEngine {
       "Don't put off '$taskTitle'. Do it for '$goalName'.",
     ];
     return templates[Random().nextInt(templates.length)];
-  }
-  
-  static String _getRandomQuote() {
-     return _quotes[Random().nextInt(_quotes.length)];
   }
 }
