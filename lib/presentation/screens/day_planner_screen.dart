@@ -367,18 +367,29 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
         final dateStr = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
         final goalName = "Daily Plan - $dateStr";
         
-        // Collect tasks for the selected date from ALL goals
+        // Collect tasks for the selected date: ONLY from "Daily Plan" and "Inbox"
         List<GoalTask> tasks = [];
         
-        for (final goal in provider.goals) {
-           final goalTasks = provider.getTasksForGoal(goal.id);
-           tasks.addAll(goalTasks.where((t) {
-               // Must be scheduled for this specific date
+        // 1. Daily Plan Tasks
+        try {
+           final dailyPlanGoal = provider.goals.firstWhere((g) => g.name == goalName);
+           tasks.addAll(provider.getTasksForGoal(dailyPlanGoal.id));
+        } catch (_) {
+           // No daily plan goal yet, that's fine
+        }
+
+        // 2. Inbox Tasks (Scheduled for today)
+        try {
+           final inboxGoal = provider.goals.firstWhere((g) => g.name == 'Inbox');
+           final inboxTasks = provider.getTasksForGoal(inboxGoal.id);
+           tasks.addAll(inboxTasks.where((t) {
                if (t.scheduledDate != null) {
                    return AnalyticsHelper.isSameDay(t.scheduledDate!, _selectedDate);
                }
                return false;
            }));
+        } catch (_) {
+           // No Inbox, or no inbox tasks
         }
         
         // Check tasks
@@ -423,6 +434,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
               ),
             ),
             floatingActionButton: FloatingActionButton(
+                heroTag: "day_planner_fab_mode_b",
                 onPressed: () => _showQuickAdd(context, provider),
                 backgroundColor: AppTheme.primaryColor,
                 child: const Icon(Icons.add, color: Colors.white),
@@ -454,12 +466,17 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
             elevation: 0,
             iconTheme: IconThemeData(color: textColor),
           ),
-          floatingActionButton: _generatedPlan == null ? FloatingActionButton.extended(
-                onPressed: () => _showQuickAdd(context, provider),
-                backgroundColor: AppTheme.primaryColor,
-                icon: const Icon(Icons.add, color: Colors.white),
-                label: const Text("Add Manual Task", style: TextStyle(color: Colors.white)),
+          floatingActionButton: _generatedPlan == null ? Padding(
+                padding: const EdgeInsets.only(bottom: 90), 
+                child: FloatingActionButton(
+                    heroTag: "day_planner_fab_mode_a",
+                    onPressed: () => _showQuickAdd(context, provider),
+                    backgroundColor: AppTheme.primaryColor,
+                    tooltip: "Add Manual Task",
+                    child: const Icon(Icons.add, color: Colors.white),
+                ),
             ) : null,
+          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           body: SafeArea(
             child: Column(
               children: [

@@ -153,32 +153,40 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
   // Helpers
   List<GoalTask> _getTasksForRange(List<GoalTask> all, List<dynamic> goals, TimeRange range, DateTime ref) {
       return all.where((t) {
-          // 1. First, check if it belongs to a "Daily Plan" goal and extract Date
-          DateTime taskDate;
+          // 1. First, check if it belongs to a "Daily Plan" goal OR "Inbox"
+          bool isRelevant = false;
+          DateTime? taskDate;
+
           try {
              final goal = goals.firstWhere((g) => g.id == t.goalId);
-             if (!goal.name.startsWith("Daily Plan")) {
-                return false;
-             }
              
-             // Extract date from "Daily Plan - YYYY-M-D"
-             // Format from GrowthProvider.ensureDailyGoal: "${date.year}-${date.month}-${date.day}"
-             final parts = goal.name.split(' - ');
-             if (parts.length < 2) return false;
-             
-             final dateParts = parts[1].split('-');
-             if (dateParts.length != 3) {
-                 // Fallback if format is weird
+             // A. Daily Plan
+             if (goal.name.startsWith("Daily Plan")) {
+                 isRelevant = true;
+                 // Extract date from "Daily Plan - YYYY-M-D"
+                 final parts = goal.name.split(' - ');
+                 if (parts.length >= 2) {
+                     final dateParts = parts[1].split('-');
+                     if (dateParts.length == 3) {
+                         final y = int.parse(dateParts[0]);
+                         final m = int.parse(dateParts[1]);
+                         final d = int.parse(dateParts[2]);
+                         taskDate = DateTime(y, m, d);
+                     }
+                 }
+             } 
+             // B. Inbox
+             else if (goal.name == "Inbox") {
+                 isRelevant = true;
                  taskDate = t.scheduledDate ?? t.createdAt;
-             } else {
-                 final y = int.parse(dateParts[0]);
-                 final m = int.parse(dateParts[1]);
-                 final d = int.parse(dateParts[2]);
-                 taskDate = DateTime(y, m, d);
              }
           } catch (e) {
              return false;
           }
+
+          if (!isRelevant) return false;
+          if (taskDate == null) taskDate = t.scheduledDate ?? t.createdAt;
+
 
           // 2. Then check Date Range using the Goal's Date
           if (range == TimeRange.day) {
