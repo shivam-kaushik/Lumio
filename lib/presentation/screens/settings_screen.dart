@@ -157,18 +157,16 @@ class _SettingsScreenState extends State<SettingsScreen>
                     return ModernSmartCard(
                       useGradient: true,
                       elevationLevel: 1,
-                      child: SwitchListTile(
+                      child: ListTile(
                         contentPadding: EdgeInsets.zero,
-                        secondary: Icon(
-                          themeProvider.isDarkMode(context)
-                              ? Icons.dark_mode_rounded
-                              : Icons.light_mode_rounded,
+                        leading: Icon(
+                          _getThemeIcon(themeProvider.themeMode),
                           color: isDark 
                               ? AppTheme.darkTextPrimary 
                               : AppTheme.textPrimary,
                         ),
                         title: Text(
-                          'Dark Mode',
+                          'App Theme',
                           style: TextStyle(
                             color: isDark 
                                 ? AppTheme.darkTextPrimary 
@@ -177,9 +175,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                           ),
                         ),
                         subtitle: Text(
-                          themeProvider.isDarkMode(context)
-                              ? 'Dark theme enabled'
-                              : 'Light theme enabled',
+                          _getThemeModeName(themeProvider.themeMode),
                           style: TextStyle(
                             color: isDark 
                                 ? AppTheme.darkTextSecondary 
@@ -187,12 +183,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                             fontSize: 12,
                           ),
                         ),
-                        value: themeProvider.themeMode == ThemeMode.dark,
-                        onChanged: (value) {
-                          themeProvider.setThemeMode(
-                            value ? ThemeMode.dark : ThemeMode.light,
-                          );
-                        },
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: isDark 
+                              ? AppTheme.darkTextTertiary 
+                              : AppTheme.textTertiary,
+                        ),
+                        onTap: () => _showThemeSelectionDialog(context, themeProvider),
                       ),
                     );
                   },
@@ -772,5 +769,107 @@ class _SettingsScreenState extends State<SettingsScreen>
         ],
       ),
     );
+  }
+  void _showThemeSelectionDialog(BuildContext context, ThemeProvider themeProvider) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        
+        return AlertDialog(
+          title: const Text('Choose Theme'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildThemeOption(
+                context, 
+                themeProvider, 
+                ThemeMode.light, 
+                'Light Mode', 
+                Icons.light_mode_rounded,
+                isDark,
+              ),
+              _buildThemeOption(
+                context, 
+                themeProvider, 
+                ThemeMode.dark, 
+                'Dark Mode', 
+                Icons.dark_mode_rounded,
+                 isDark,
+              ),
+              _buildThemeOption(
+                context, 
+                themeProvider, 
+                ThemeMode.system, 
+                'System Default', 
+                Icons.settings_system_daydream_rounded,
+                 isDark,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildThemeOption(
+    BuildContext context,
+    ThemeProvider provider,
+    ThemeMode mode,
+    String label,
+    IconData icon,
+    bool isDarkDialog,
+  ) {
+    final isSelected = provider.themeMode == mode;
+    return RadioListTile<ThemeMode>(
+      value: mode,
+      groupValue: provider.themeMode,
+      onChanged: (value) {
+        if (value != null) {
+          provider.setThemeMode(value);
+          Navigator.pop(context);
+        }
+      },
+      title: Text(
+        label,
+        style: TextStyle(
+            color: isDarkDialog ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+        ),
+      ),
+      secondary: Icon(
+        icon,
+        color: isSelected ? AppTheme.primaryColor : (isDarkDialog ? AppTheme.darkTextSecondary : AppTheme.textSecondary),
+      ),
+      activeColor: AppTheme.primaryColor,
+      contentPadding: EdgeInsets.zero,
+    );
+  }
+
+  String _getThemeModeName(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Light Mode';
+      case ThemeMode.dark:
+        return 'Dark Mode';
+      case ThemeMode.system:
+        return 'System Default';
+    }
+  }
+
+  IconData _getThemeIcon(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return Icons.light_mode_rounded;
+      case ThemeMode.dark:
+        return Icons.dark_mode_rounded;
+      case ThemeMode.system:
+        return Icons.settings_brightness_rounded;
+    }
   }
 }
