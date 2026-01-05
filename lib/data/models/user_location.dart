@@ -26,6 +26,8 @@ class UserLocation {
   }
 
   factory UserLocation.fromMap(Map<String, dynamic> map) {
+
+
     return UserLocation(
       id: map['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
       name: map['name'] ?? 'Unknown',

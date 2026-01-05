@@ -69,6 +69,7 @@ class _MainNavigatorState extends State<MainNavigator>
     const GoalsScreen(), // Goals
     const SubtasksCalendarScreen(), // Calendar (showing subtasks)
     const AccountScreen(), // Account
+    const DayPlannerScreen(), // Day Planner
   ];
 
   @override
@@ -77,13 +78,13 @@ class _MainNavigatorState extends State<MainNavigator>
     
     // Initialize navigator keys for each tab
     _navigatorKeys = List.generate(
-      _tabs.length,
+      5, // 5 pages total
       (index) => GlobalKey<NavigatorState>(),
     );
     
     // Initialize fade controllers for smooth transitions
     _fadeControllers = List.generate(
-      _tabs.length,
+      5, // 4 tabs + 1 extra page (Day Planner)
       (index) => AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 200),
@@ -141,11 +142,11 @@ class _MainNavigatorState extends State<MainNavigator>
         },
         onPlanDay: () {
           Navigator.pop(context);
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const DayPlannerScreen(),
-            ),
-          );
+          setState(() {
+            _fadeControllers[_currentIndex].reverse();
+            _currentIndex = 4; // Index of DayPlannerScreen
+            _fadeControllers[_currentIndex].forward();
+          });
         },
         onStartHandsFree: () {
           Navigator.pop(context);
@@ -419,11 +420,12 @@ class _MainNavigatorState extends State<MainNavigator>
             child: InkWell(
               onTap: () {
                  HapticFeedback.mediumImpact();
-                 Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const DayPlannerScreen(),
-                    ),
-                 );
+                 // Switch to Day Planner Mode directly
+                 setState(() {
+                   _fadeControllers[_currentIndex].reverse();
+                   _currentIndex = 4; // Index of DayPlannerScreen
+                   _fadeControllers[_currentIndex].forward();
+                 });
               },
               customBorder: const CircleBorder(),
               child: const Icon(

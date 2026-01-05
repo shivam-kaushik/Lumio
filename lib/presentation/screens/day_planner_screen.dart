@@ -16,6 +16,7 @@ import '../widgets/quick_task_input_sheet.dart';
 import '../widgets/timeline_task_tile.dart';
 import '../utils/analytics_helper.dart'; 
 import 'package:intl/intl.dart'; 
+import 'package:shared_preferences/shared_preferences.dart'; // Added
 
 class DayPlannerScreen extends StatefulWidget {
   final DateTime? initialDate;
@@ -38,6 +39,12 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
   bool _isViewingToday = true;
   late DateTime _selectedDate; 
 
+  // Schedule Settings
+  TimeOfDay _wakeUpTime = const TimeOfDay(hour: 8, minute: 0);
+  String _wakeUpTitle = "Rise and Shine";
+  TimeOfDay _bedTime = const TimeOfDay(hour: 22, minute: 0);
+  String _bedTimeTitle = "Wind Down";
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +56,105 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     
     _initSpeech();
     _startRolloverCheck();
+    _loadScheduleSettings(); // Load saved custom schedule
+  }
+
+  Future<void> _loadScheduleSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _wakeUpTitle = prefs.getString('schedule_wakeup_title') ?? "Rise and Shine";
+      _bedTimeTitle = prefs.getString('schedule_bedtime_title') ?? "Wind Down";
+      
+      final wakeHour = prefs.getInt('schedule_wakeup_hour') ?? 8;
+      final wakeMin = prefs.getInt('schedule_wakeup_min') ?? 0;
+      _wakeUpTime = TimeOfDay(hour: wakeHour, minute: wakeMin);
+      
+      final bedHour = prefs.getInt('schedule_bedtime_hour') ?? 22;
+      final bedMin = prefs.getInt('schedule_bedtime_min') ?? 0;
+      _bedTime = TimeOfDay(hour: bedHour, minute: bedMin);
+    });
+  }
+
+  Future<void> _saveScheduleSetting(String key, dynamic value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (value is String) {
+      await prefs.setString(key, value);
+    } else if (value is int) {
+      await prefs.setInt(key, value);
+    }
+  }
+
+  void _showEditAnchorDialog(bool isMaskUp) {
+     final isWakeUp = isMaskUp;
+     final initialTime = isWakeUp ? _wakeUpTime : _bedTime;
+     final initialTitle = isWakeUp ? _wakeUpTitle : _bedTimeTitle;
+     final controller = TextEditingController(text: initialTitle);
+
+     showDialog(
+       context: context,
+       builder: (context) => AlertDialog(
+         title: Text(isWakeUp ? 'Edit Morning Routine' : 'Edit Night Routine'),
+         content: Column(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+             TextField(
+               controller: controller,
+               decoration: const InputDecoration(
+                 labelText: 'Routine Name',
+                 hintText: 'e.g. Rise and Shine',
+               ),
+             ),
+             const SizedBox(height: 16),
+             ListTile(
+               title: const Text('Schedule Time'),
+               trailing: Text(initialTime.format(context)),
+               onTap: () async {
+                 final picked = await showTimePicker(
+                   context: context,
+                   initialTime: initialTime,
+                 );
+                 if (picked != null) {
+                    Navigator.pop(context); // Close current dialog to refresh (simple way)
+                    // Save temporarily and reopen? Or better, use StatefulWidget dialog.
+                    // For simplicity, let's just update main state and reopen content
+                    if (isWakeUp) {
+                       setState(() => _wakeUpTime = picked);
+                    } else {
+                       setState(() => _bedTime = picked);
+                    }
+                    _showEditAnchorDialog(isWakeUp); // Reopen with new time
+                 }
+               },
+             ),
+           ],
+         ),
+         actions: [
+           TextButton(
+             onPressed: () => Navigator.pop(context),
+             child: const Text('Cancel'),
+           ),
+           ElevatedButton(
+             onPressed: () {
+               setState(() {
+                 if (isWakeUp) {
+                   _wakeUpTitle = controller.text;
+                   _saveScheduleSetting('schedule_wakeup_title', _wakeUpTitle);
+                   _saveScheduleSetting('schedule_wakeup_hour', _wakeUpTime.hour);
+                   _saveScheduleSetting('schedule_wakeup_min', _wakeUpTime.minute);
+                 } else {
+                   _bedTimeTitle = controller.text;
+                   _saveScheduleSetting('schedule_bedtime_title', _bedTimeTitle);
+                   _saveScheduleSetting('schedule_bedtime_hour', _bedTime.hour);
+                   _saveScheduleSetting('schedule_bedtime_min', _bedTime.minute);
+                 }
+               });
+               Navigator.pop(context);
+             },
+             child: const Text('Save'),
+           ),
+         ],
+       ),
+     );
   }
 
   @override
@@ -251,8 +357,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final subtleColor = isDark ? Colors.white54 : Colors.black54;
+    final textColor = isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary;
+    final subtleColor = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
 
     return Consumer<GrowthProvider>(
       builder: (context, provider, _) {
@@ -318,7 +424,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
             ),
             floatingActionButton: FloatingActionButton(
                 onPressed: () => _showQuickAdd(context, provider),
-                backgroundColor: const Color(0xFFFF8E8E), // Coral/Pinkish from mockup
+                backgroundColor: AppTheme.primaryColor,
                 child: const Icon(Icons.add, color: Colors.white),
             ),
           );
@@ -482,7 +588,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                 ),
                 IconButton(
                   onPressed: _pickDate,
-                  icon: const Icon(Icons.calendar_month, color: Color(0xFFFF8E8E)), // Pinkish
+                  icon: const Icon(Icons.calendar_month, color: AppTheme.primaryColor),
                 )
               ],
             ),
@@ -509,7 +615,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                         DateFormat('E').format(date), 
                         style: TextStyle(
                           color: isSelected 
-                              ? const Color(0xFFFF8E8E) 
+                              ? AppTheme.primaryColor 
                               : (isToday ? textColor : subtleColor),
                           fontWeight: FontWeight.w600
                         )
@@ -519,9 +625,9 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFFFF8E8E) : Colors.transparent,
+                          color: isSelected ? AppTheme.primaryColor : Colors.transparent,
                           shape: BoxShape.circle,
-                          border: isToday && !isSelected ? Border.all(color: const Color(0xFFFF8E8E)) : null,
+                          border: isToday && !isSelected ? Border.all(color: AppTheme.primaryColor) : null,
                         ),
                         alignment: Alignment.center,
                         child: Text(
@@ -549,14 +655,15 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
        children: [
          // 1. Rise and Shine Anchor
          _buildTimelineAnchor(
-           icon: Icons.wb_sunny_rounded, // or Alarm icon
-           time: "08:00 AM", // Mockup time
-           title: "Rise and Shine",
-           color: const Color(0xFFFF8E8E),
+           icon: Icons.wb_sunny_rounded,
+           time: _wakeUpTime.format(context),
+           title: _wakeUpTitle,
+           color: AppTheme.primaryColor,
            isStart: true,
            isDark: isDark,
            textColor: textColor,
            subtleColor: subtleColor,
+           onTap: () => _showEditAnchorDialog(true),
          ),
          
          // 2. Task List
@@ -594,13 +701,14 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
          // 3. Wind Down Anchor
          _buildTimelineAnchor(
            icon: Icons.nights_stay_rounded,
-           time: "10:00 PM",
-           title: "Wind Down",
-           color: const Color(0xFF6C757D), // Greyish blue
+           time: _bedTime.format(context),
+           title: _bedTimeTitle,
+           color: const Color(0xFF6C757D), 
            isStart: false,
            isDark: isDark,
            textColor: textColor,
            subtleColor: subtleColor,
+           onTap: () => _showEditAnchorDialog(false),
          ),
        ],
      );
@@ -615,79 +723,84 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     required bool isDark,
     required Color textColor,
     required Color subtleColor,
+    VoidCallback? onTap,
   }) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-           // Time
-           SizedBox(
-             width: 80,
-             child: Padding(
-               padding: const EdgeInsets.symmetric(vertical: 20),
-               child: Text(
-                 time,
-                 textAlign: TextAlign.right,
-                 style: TextStyle(
-                   color: subtleColor, // Use subtleColor
-                   fontWeight: FontWeight.w600,
-                   fontSize: 12,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+             // Time
+             SizedBox(
+               width: 80,
+               child: Padding(
+                 padding: const EdgeInsets.symmetric(vertical: 20),
+                 child: Text(
+                   time,
+                   textAlign: TextAlign.right,
+                   style: TextStyle(
+                     color: subtleColor, // Use subtleColor
+                     fontWeight: FontWeight.w600,
+                     fontSize: 12,
+                   ),
                  ),
                ),
              ),
-           ),
-           // Line & Node
-           SizedBox(
-              width: 40,
-              child: Stack(
-                alignment: Alignment.topCenter,
-                children: [
-                   if (isStart)
-                     Positioned(
-                       top: 40, bottom: 0, 
-                       child: Container(width: 2, color: subtleColor.withOpacity(0.3))
+             // Line & Node
+             SizedBox(
+                width: 40,
+                child: Stack(
+                  alignment: Alignment.topCenter,
+                  children: [
+                     if (isStart)
+                       Positioned(
+                         top: 40, bottom: 0, 
+                         child: Container(width: 2, color: subtleColor.withOpacity(0.3))
+                       ),
+                     if (!isStart)
+                       Positioned(
+                         top: 0, bottom: 40, 
+                         child: Container(width: 2, color: subtleColor.withOpacity(0.3))
+                       ),
+                     
+                     Container(
+                       margin: const EdgeInsets.only(top: 10),
+                       width: 50, height: 50,
+                       decoration: BoxDecoration(
+                         color: isStart ? color : (isDark ? const Color(0xFF3E3E42) : Colors.grey.shade300),
+                         shape: BoxShape.circle,
+                       ),
+                       child: Icon(icon, color: isStart || isDark ? Colors.white : Colors.black54, size: 24),
                      ),
-                   if (!isStart)
-                     Positioned(
-                       top: 0, bottom: 40, 
-                       child: Container(width: 2, color: subtleColor.withOpacity(0.3))
-                     ),
-                   
-                   Container(
-                     margin: const EdgeInsets.only(top: 10),
-                     width: 50, height: 50,
-                     decoration: BoxDecoration(
-                       color: isStart ? color : (isDark ? const Color(0xFF3E3E42) : Colors.grey.shade300),
-                       shape: BoxShape.circle,
-                     ),
-                     child: Icon(icon, color: isStart || isDark ? Colors.white : Colors.black54, size: 24),
-                   ),
-                ],
-              )
-           ),
-           // Title
-           Expanded(
-             child: Padding(
-               padding: const EdgeInsets.only(left: 16, top: 24),
-               child: Column(
-                 crossAxisAlignment: CrossAxisAlignment.start,
-                 children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: textColor, 
-                        fontSize: 18, 
-                        fontWeight: FontWeight.bold
-                      )
-                    ),
-                    if (isStart) ...[
-                      const SizedBox(height: 4),
-                    ]
-                 ],
+                  ],
+                )
+             ),
+             // Title
+             Expanded(
+               child: Padding(
+                 padding: const EdgeInsets.only(left: 16, top: 24),
+                 child: Column(
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: textColor, 
+                          fontSize: 18, 
+                          fontWeight: FontWeight.bold
+                        )
+                      ),
+                      if (isStart) ...[
+                        const SizedBox(height: 4),
+                      ]
+                   ],
+                 )
                )
              )
-           )
-        ],
+          ],
+        ),
       ),
     );
   }

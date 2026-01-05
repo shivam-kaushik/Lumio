@@ -33,7 +33,7 @@ dependencies:
   # Local Storage
   sqflite: ^2.3.0
   path_provider: ^2.1.1
-  shared_preferences: ^2.2.2
+  shared_preferences: ^2.5.4
   
   # Context Detection
   geolocator: ^10.1.0
