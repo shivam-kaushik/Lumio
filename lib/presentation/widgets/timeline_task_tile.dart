@@ -171,29 +171,9 @@ class TimelineTaskTile extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (task.estimatedMinutes != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: subtleColor.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  "${task.estimatedMinutes}m",
-                                  style: TextStyle(fontSize: 10, color: subtleColor),
-                                ),
-                              ),
                           ],
                         ),
-                        if (task.description.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                             task.description,
-                             maxLines: 1,
-                             overflow: TextOverflow.ellipsis,
-                             style: TextStyle(color: subtleColor, fontSize: 12),
-                          ),
-                        ],
+
                         const SizedBox(height: 8),
                          Row(
                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
