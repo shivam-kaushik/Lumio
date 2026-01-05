@@ -378,15 +378,13 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
            // No daily plan goal yet, that's fine
         }
 
-        // 2. Inbox Tasks (Scheduled for today)
+        // 2. Inbox Tasks (Scheduled for today OR Created today)
         try {
            final inboxGoal = provider.goals.firstWhere((g) => g.name == 'Inbox');
            final inboxTasks = provider.getTasksForGoal(inboxGoal.id);
            tasks.addAll(inboxTasks.where((t) {
-               if (t.scheduledDate != null) {
-                   return AnalyticsHelper.isSameDay(t.scheduledDate!, _selectedDate);
-               }
-               return false;
+               final dateToCheck = t.scheduledDate ?? t.createdAt;
+               return AnalyticsHelper.isSameDay(dateToCheck, _selectedDate);
            }));
         } catch (_) {
            // No Inbox, or no inbox tasks
