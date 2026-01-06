@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../../core/services/firestore_service.dart';
 import '../models/goal.dart';
+import '../models/goal_settings.dart';
 import '../models/goal_task.dart';
 import '../models/goal_phase.dart';
 
@@ -18,6 +19,7 @@ class FirestoreGrowthRepository {
     DateTime? targetDeadline,
     double? hoursPerDay,
     int? totalEstimatedHours,
+    GoalSettings? settings,
   }) async {
     final collection = _firestoreService.goalsCollection;
     if (collection == null) {
@@ -31,6 +33,7 @@ class FirestoreGrowthRepository {
       targetDeadline: targetDeadline,
       hoursPerDay: hoursPerDay,
       totalEstimatedHours: totalEstimatedHours,
+      settings: settings,
     );
 
     // Generate a unique ID (using timestamp-based approach)

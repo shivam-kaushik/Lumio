@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../data/models/goal.dart';
+import '../../data/models/goal_settings.dart';
 import '../../data/models/goal_task.dart';
 import '../../data/models/goal_phase.dart';
 import '../../data/repositories/firestore_growth_repository.dart';
@@ -8,6 +9,7 @@ import '../../core/services/motivational_engine.dart';
 import '../../core/services/sound_service.dart';
 import '../../core/services/notification_service.dart'; // NEW
 import '../../data/models/user_location.dart'; 
+import 'package:flutter_local_notifications/flutter_local_notifications.dart' show DateTimeComponents;
 import 'package:shared_preferences/shared_preferences.dart'; 
 import 'dart:convert';
 
@@ -92,6 +94,7 @@ class GrowthProvider with ChangeNotifier {
     DateTime? targetDeadline,
     double? hoursPerDay,
     int? totalEstimatedHours,
+    GoalSettings? settings,
   }) async {
     try {
       final id = await _repository.createGoal(
@@ -99,6 +102,7 @@ class GrowthProvider with ChangeNotifier {
         targetDeadline: targetDeadline,
         hoursPerDay: hoursPerDay,
         totalEstimatedHours: totalEstimatedHours,
+        settings: settings,
       );
       await loadGrowthData(); // Reload to get updated list
       return id;
@@ -142,55 +146,114 @@ class GrowthProvider with ChangeNotifier {
   // ==================== Notifications ====================
   
   Future<void> _scheduleTaskNotification(GoalTask task) async {
-    // 1. Recursive Helper
     Future<void> scheduleRecursive(GoalTask currentTask) async {
-       // A. If completed or no date, cancel/skip
+       // 1. Check completion or missing date
        if (currentTask.isCompleted || currentTask.scheduledDate == null) {
-          // Try to cancel (id collision risk is low with modulo, but good hygiene)
           await _notificationService.cancelNotification(currentTask.id % 2147483647);
        } else {
-          // B. Determine Trigger Time
-          DateTime triggerTime = currentTask.scheduledDate!;
+          // 2. Find Goal & Settings
+          final goal = _goals.firstWhere(
+              (g) => g.id == currentTask.goalId, 
+              orElse: () => Goal(id: 0, name: 'Goal', createdAt: DateTime.now())
+          );
+          final settings = goal.settings;
           
-          // If time is midnight (00:00), it implies "Any time this day"
-          if (triggerTime.hour == 0 && triggerTime.minute == 0) {
-             int hour = 9; // Default 'any' or 'morning'
+          if (settings != null && !settings.enableNotifications) {
+             // Notifications disabled for this goal
+             await _notificationService.cancelNotification(currentTask.id % 2147483647);
+             return;
+          }
+
+          // 3. Determine Base Time
+          DateTime baseTime = currentTask.scheduledDate!;
+          
+          // If task time is generic (midnight) AND we have a preferred notification time in settings
+          if (baseTime.hour == 0 && baseTime.minute == 0 && settings?.notificationTime != null) {
+             final t = settings!.notificationTime!;
+             baseTime = DateTime(baseTime.year, baseTime.month, baseTime.day, t.hour, t.minute);
+          } else if (baseTime.hour == 0 && baseTime.minute == 0) {
+              // Default fallback if no settings
+             int hour = 9; 
              if (currentTask.suggestedTime == 'afternoon') hour = 14;
              else if (currentTask.suggestedTime == 'evening') hour = 18;
-             else if (currentTask.suggestedTime == 'morning') hour = 9;
-             
-             triggerTime = DateTime(
-               triggerTime.year, 
-               triggerTime.month, 
-               triggerTime.day, 
-               hour, 
-               0
-             );
+             baseTime = DateTime(baseTime.year, baseTime.month, baseTime.day, hour, 0);
           }
-           
-          // C. Schedule if in future
-          if (triggerTime.isAfter(DateTime.now())) {
+
+          // 4. Determine Frequency (Recurrence)
+          // Default to task's frequency if not 'one-time', else check Goal settings
+          // NOTE: GoalSettings frequency implies a default for the goal, effectively making all tasks repeat?
+          // More likely: GoalSettings frequency overrides task frequency IF task is generic.
+          // Let's assume GoalSettings frequency dictates the recurrence pattern for notifications.
+          
+          DateTimeComponents? matchComponents;
+          if (settings != null) {
+              switch (settings.frequency) {
+                  case NotificationFrequency.daily:
+                      matchComponents = DateTimeComponents.time;
+                      break;
+                  case NotificationFrequency.weekly:
+                      matchComponents = DateTimeComponents.dayOfWeekAndTime;
+                      break;
+                  case NotificationFrequency.monthly:
+                      matchComponents = DateTimeComponents.dayOfMonthAndTime;
+                      break;
+                  case NotificationFrequency.deadline: // Treat as one-time at deadline
+                  case NotificationFrequency.once:
+                  default:
+                      matchComponents = null;
+                      break;
+              }
+          }
+
+          // 5. Apply Alert Timing Offset
+          DateTime triggerTime = baseTime;
+          if (settings != null) {
+             switch (settings.alertTiming) {
+               case AlertTiming.fifteenMinBefore:
+                 triggerTime = baseTime.subtract(const Duration(minutes: 15));
+                 break;
+               case AlertTiming.atEnd:
+                 // Use estimated hours (default 1)
+                 final minutes = ((currentTask.estimatedHours ?? 1.0) * 60).round();
+                 triggerTime = baseTime.add(Duration(minutes: minutes));
+                 break;
+               case AlertTiming.custom:
+                 if (settings.customAlertMinutes != null) {
+                    triggerTime = baseTime.subtract(Duration(minutes: settings.customAlertMinutes!));
+                 }
+                 break;
+               case AlertTiming.atStart:
+               default:
+                 // No change
+                 break;
+             }
+          }
+
+          // 6. Schedule if in future (for one-time) or if it's recurring (we schedule based on component)
+          // For recurring, we still need a future start date ideally, but technically any date works if component matches.
+          // However, we want to ensure we don't schedule a 'one-time' notification in the past.
+          
+          bool shouldSchedule = true;
+          if (matchComponents == null) {
+              if (triggerTime.isBefore(DateTime.now())) {
+                  shouldSchedule = false;
+              }
+          }
+          // If recurring, we technically schedule it 'at the date', loops from there.
+          // If the date is past, but time is future, local_notifications handles it? 
+          // Best practice: Ensure 'triggerTime' is the NEXT occurrence if strict. 
+          // But 'zonedSchedule' with 'matchDateTimeComponents' usually handles "reverting to next" automatically.
+
+          if (shouldSchedule) {
             final notificationId = currentTask.id % 2147483647;
-            
-
-            // Find Goal Name directly from provider state
-            final goal = _goals.firstWhere(
-                (g) => g.id == currentTask.goalId, 
-                orElse: () => Goal(id: 0, name: 'Goal', createdAt: DateTime.now())
-            );
-
-            String body;
-            if (currentTask.priority == 'high') {
-                body = "🔥 High Priority: ${currentTask.title}. Do it for '${goal.name}'!";
-            } else {
-                body = TemplateEngine.getTaskReminder(currentTask.title, goal.name);
-            }
+            String body = _getNotificationBody(currentTask, goal, settings);
             
             await _notificationService.scheduleNotification(
               id: notificationId,
               title: "Time for: ${currentTask.title}",
               body: body,
               scheduledTime: triggerTime,
+              matchDateTimeComponents: matchComponents,
               payload: jsonEncode({
                    'action': 'open_task',
                    'task_id': currentTask.id,
@@ -206,8 +269,23 @@ class GrowthProvider with ChangeNotifier {
        }
     }
 
-    // 2. Start recursion
     await scheduleRecursive(task);
+  }
+
+  String _getNotificationBody(GoalTask task, Goal goal, GoalSettings? settings) {
+    if (settings == null) return TemplateEngine.getTaskReminder(task.title, goal.name);
+
+    switch (settings.tone) {
+      case NotificationTone.funny:
+         return "Hey! '${task.title}' isn't going to do itself. The world needs you! 🌍";
+      case NotificationTone.severe:
+         return "ACT NOW: ${task.title}. Delay is the enemy of success.";
+      case NotificationTone.quotes:
+         return '"Action is the foundational key to all success."\nTask: ${task.title}';
+      case NotificationTone.motivational:
+      default:
+         return "Time to make progress on '${goal.name}'! Tackle '${task.title}' now.";
+    }
   }
 
   @override

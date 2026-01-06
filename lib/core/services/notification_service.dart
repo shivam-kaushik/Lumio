@@ -515,6 +515,7 @@ class NotificationService {
     required String body,
     required DateTime scheduledTime,
     String? payload,
+    DateTimeComponents? matchDateTimeComponents,
   }) async {
     // Validate scheduled time is in the future
     if (scheduledTime.isBefore(DateTime.now())) {
@@ -617,8 +618,7 @@ class NotificationService {
           AndroidScheduleMode.exactAllowWhileIdle, // This allows waking device
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents:
-          null, // Important: null for one-time notifications
+      matchDateTimeComponents: matchDateTimeComponents,
     );
 
     // Verify it was scheduled

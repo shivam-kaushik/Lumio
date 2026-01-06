@@ -11,6 +11,8 @@ import '../../data/models/goal_task.dart';
 import 'dart:async'; // Add async for Timer
 import '../../data/models/subtask.dart' show Task;
 import '../../data/models/goal.dart';
+import '../../data/models/goal_settings.dart';
+import 'goal_settings_screen.dart';
 
 class UnifiedGoalEditorScreen extends StatefulWidget {
   final Map<String, dynamic>? aiResult; // Nullable now
@@ -38,6 +40,7 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
   Timer? _debounce; // For auto-save
   DateTime? _goalDeadline; // NEW: Local deadline state
   int? _localGoalId; // NEW: Track ID of locally created goal (for "new" goals that become "existing" mid-session)
+  GoalSettings? _currentSettings;
 
   @override
   void initState() {
@@ -45,6 +48,7 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
     if (widget.existingGoal != null) {
       _titleController.text = widget.existingGoal!.name;
       _goalDeadline = widget.existingGoal!.targetDeadline; // Load existing
+      _currentSettings = widget.existingGoal!.settings;
       _loadExistingGoal();
     } else if (widget.aiResult != null) {
       _parseAiResult();
@@ -281,6 +285,19 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
                     padding: EdgeInsets.only(right: 16.0),
                     child: Icon(Icons.cloud_done, color: Colors.green, size: 20), // "Saved" icon
                 ),
+            IconButton(
+              icon: const Icon(Icons.settings),
+              tooltip: "Goal Settings",
+              onPressed: () async {
+                 final newSettings = await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => GoalSettingsScreen(initialSettings: _currentSettings))
+                 );
+                 if (newSettings != null && newSettings is GoalSettings) {
+                    setState(() => _currentSettings = newSettings);
+                    _triggerAutoSave();
+                 }
+              },
+            ),
         ],
       ),
       body: PopScope(

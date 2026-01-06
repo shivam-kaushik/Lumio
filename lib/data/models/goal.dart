@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show DocumentSnapshot, Timestamp, FieldValue;
+import 'goal_settings.dart';
 
 /// Goal model for business goals
 class Goal {
@@ -8,6 +9,7 @@ class Goal {
   final DateTime? targetDeadline;
   final double? hoursPerDay;
   final int? totalEstimatedHours;
+  final GoalSettings? settings;
 
   Goal({
     required this.id,
@@ -16,6 +18,7 @@ class Goal {
     this.targetDeadline,
     this.hoursPerDay,
     this.totalEstimatedHours,
+    this.settings,
   });
 
   /// Create Goal from database map
@@ -33,6 +36,9 @@ class Goal {
               : (map['hours_per_day'] as num).toDouble())
           : null,
       totalEstimatedHours: map['total_estimated_hours'] as int?,
+      settings: map['settings'] != null 
+          ? GoalSettings.fromMap(map['settings'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -45,6 +51,7 @@ class Goal {
       'target_deadline': targetDeadline?.toIso8601String(),
       'hours_per_day': hoursPerDay,
       'total_estimated_hours': totalEstimatedHours,
+      'settings': settings?.toMap(),
     };
   }
 
@@ -56,6 +63,7 @@ class Goal {
       'target_deadline': targetDeadline?.toIso8601String(),
       'hours_per_day': hoursPerDay,
       'total_estimated_hours': totalEstimatedHours,
+      'settings': settings?.toMap(),
     };
   }
 
@@ -67,6 +75,7 @@ class Goal {
     DateTime? targetDeadline,
     double? hoursPerDay,
     int? totalEstimatedHours,
+    GoalSettings? settings,
   }) {
     return Goal(
       id: id ?? this.id,
@@ -75,6 +84,7 @@ class Goal {
       targetDeadline: targetDeadline ?? this.targetDeadline,
       hoursPerDay: hoursPerDay ?? this.hoursPerDay,
       totalEstimatedHours: totalEstimatedHours ?? this.totalEstimatedHours,
+      settings: settings ?? this.settings,
     );
   }
 
@@ -96,6 +106,9 @@ class Goal {
           : null,
       hoursPerDay: (data['hoursPerDay'] as num?)?.toDouble(),
       totalEstimatedHours: data['totalEstimatedHours'] as int?,
+      settings: data['settings'] != null 
+          ? GoalSettings.fromMap(data['settings'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -107,6 +120,7 @@ class Goal {
       'targetDeadline': targetDeadline != null ? Timestamp.fromDate(targetDeadline!) : null,
       'hoursPerDay': hoursPerDay,
       'totalEstimatedHours': totalEstimatedHours,
+      'settings': settings?.toMap(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
