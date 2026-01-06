@@ -15,7 +15,8 @@ import '../theme/app_theme.dart';
 import '../../data/models/reminder.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../../core/services/home_detection_service.dart';
-import '../utils/analytics_helper.dart'; // NEW import
+import '../utils/analytics_helper.dart'; 
+import '../navigation/main_navigator.dart'; // NEW import for navigation control
 
 // Day Architect Imports
 import 'day_planner_screen.dart';
@@ -24,6 +25,7 @@ import '../widgets/execution_card.dart';
 import '../widgets/day_planner_widgets.dart';
 import '../widgets/quick_task_input_sheet.dart';
 import '../../data/models/goal_task.dart';
+import '../../data/models/goal.dart';
 
 /// Premium home screen with minimal, elegant design
 class HomeScreen extends StatefulWidget {
@@ -117,14 +119,27 @@ class _HomeScreenState extends State<HomeScreen> {
                       // Aggregated calculation for "Today's Plan" stats
                       // Must match DayPlanner logic: All tasks scheduled for today
                       
-                      for (final goal in growthProvider.goals) {
-                         final tasks = growthProvider.getTasksForGoal(goal.id);
-                         final tasksForToday = tasks.where((t) {
-                             final dateToCheck = t.scheduledDate ?? t.createdAt;
-                             return AnalyticsHelper.isSameDay(dateToCheck, today);
-                         });
-                         calculatedTasks.addAll(tasksForToday);
-                      }
+                       // 1. Daily Plan Tasks
+                       final dailyPlanGoal = growthProvider.goals.firstWhere(
+                           (g) => g.name == todayGoalName, 
+                           orElse: () => Goal(id: -1, name: 'temp', createdAt: DateTime.now())
+                       );
+                       if (dailyPlanGoal.id != -1) {
+                           calculatedTasks.addAll(growthProvider.getTasksForGoal(dailyPlanGoal.id));
+                       }
+
+                       // 2. Inbox Tasks (Scheduled for Today)
+                       final inboxGoal = growthProvider.goals.firstWhere(
+                           (g) => g.name == 'Inbox', 
+                           orElse: () => Goal(id: -1, name: 'temp', createdAt: DateTime.now())
+                       );
+                       if (inboxGoal.id != -1) {
+                           final inboxTasks = growthProvider.getTasksForGoal(inboxGoal.id);
+                           calculatedTasks.addAll(inboxTasks.where((t) {
+                               if (t.scheduledDate == null) return false;
+                               return AnalyticsHelper.isSameDay(t.scheduledDate!, today);
+                           }));
+                       }
 
                       final completedTaskCount = calculatedTasks.where((t) => t.isCompleted).length; 
                       final totalTaskCount = calculatedTasks.length;
@@ -177,7 +192,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                         completedTasks: completedTaskCount,
                                         totalTasks: totalTaskCount,
                                         onTap: () {
-                                          Navigator.push(context, MaterialPageRoute(builder: (_) => const DayPlannerScreen()));
+                                          // Navigate strictly via MainNavigator to keep navbar
+                                          MainNavigator.of(context).switchToDayPlanner();
                                         },
                                       ),
                                     ),
@@ -189,9 +205,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD, vertical: 8),
                                   sliver: SliverToBoxAdapter(
                                     child: MorningHeroCard(
-                                      userName: "Shivam", // TODO: Get from profile
+                                      userName: "Shivam", 
                                       onTap: () {
-                                        Navigator.push(context, MaterialPageRoute(builder: (_) => const DayPlannerScreen()));
+                                        MainNavigator.of(context).switchToDayPlanner();
                                       },
                                     ),
                                   ),
@@ -382,12 +398,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       for (var task in allTasks) {
-            // FILTER: Only Inbox tasks OR Tasks Scheduled for Today
+            // FILTER: STRICTLY Inbox tasks only.
+            // Goal Tasks should NOT appear here, even if scheduled for today (they appear in Day Planner)
             final isInbox = inboxGoalId != null && task.goalId == inboxGoalId;
-            final isToday = task.scheduledDate != null && DateTimeUtils.isToday(task.scheduledDate!.toLocal());
 
-            // Strict Filter: Must be Inbox OR Today
-            if (!isInbox && !isToday) continue;
+            // Strict Filter: Must be Inbox
+            if (!isInbox) continue;
             
             // Clean title for display (Strip tags)
             final displayTitle = task.title

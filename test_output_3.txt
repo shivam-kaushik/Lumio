@@ -1,97 +1,193 @@
-00:00 +0: loading C:/Users/Public/Documents/Learning/Awarely/test/unit/notification_enhanced_test.dart
-00:00 +0: MotivationalEngine Tests Kickstart returns a non-empty string
-00:00 +1: MotivationalEngine Tests Deadline Nudge returns a non-empty string
-00:00 +2: MotivationalEngine Tests Consistency Nudge returns a non-empty string
-00:00 +3: MotivationalEngine Tests Messages are valid
-00:00 +4: MotivationalEngine Tests Kickstart produces variability
-00:00 +5: MotivationalEngine Tests Deadline produces variability
-00:00 +6: MotivationalEngine Tests Consistency produces variability
-00:00 +7: Recursive Notification Scheduling Tests Schedules notification for root task
-🌱 GrowthProvider: createTask called for "Root Task" (GoalID: 1)
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-00:00 +8: Recursive Notification Scheduling Tests Schedules notification for subtask
-🌱 GrowthProvider: createTask called for "Root" (GoalID: 1)
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-00:00 +9: Recursive Notification Scheduling Tests Schedules notification for deep subtask
-🌱 GrowthProvider: createTask called for "Root" (GoalID: 1)
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-00:00 +10: Recursive Notification Scheduling Tests Does not schedule past tasks
-🌱 GrowthProvider: createTask called for "Past" (GoalID: 1)
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-00:00 +11: Recursive Notification Scheduling Tests Schedules root but ignores past subtask
-🌱 GrowthProvider: createTask called for "Future Root" (GoalID: 1)
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-00:00 +12: Recursive Notification Scheduling Tests Does not schedule completed tasks
-🌱 GrowthProvider: createTask called for "Done" (GoalID: 1)
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-00:00 +13: Recursive Notification Scheduling Tests Cancels notification if completed
-🌱 GrowthProvider: createTask called for "Active" (GoalID: 1)
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-00:00 +14: Recursive Notification Scheduling Tests Cancels subtask notification if subtask completed
-🌱 GrowthProvider: createTask called for "Root" (GoalID: 1)
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-00:00 +14 -1: Recursive Notification Scheduling Tests Cancels subtask notification if subtask completed [E]
-  Expected: <1>
-    Actual: <2>
+Resolving dependencies...
+Downloading packages...
+  _fe_analyzer_shared 91.0.0 (92.0.0 available)
+  _flutterfire_internals 1.3.64 (1.3.65 available)
+  analyzer 8.4.1 (9.0.0 available)
+  bloc 8.1.4 (9.2.0 available)
+  built_value 8.12.0 (8.12.1 available)
+  characters 1.4.0 (1.4.1 available)
+  cloud_firestore 6.1.0 (6.1.1 available)
+  cloud_firestore_platform_interface 7.0.4 (7.0.5 available)
+  cloud_firestore_web 5.1.0 (5.1.1 available)
+  code_builder 4.11.0 (4.11.1 available)
+  connectivity_plus 5.0.2 (7.0.0 available)
+  connectivity_plus_platform_interface 1.2.4 (2.0.1 available)
+  firebase_auth 6.1.2 (6.1.3 available)
+  firebase_auth_platform_interface 8.1.4 (8.1.5 available)
+  firebase_auth_web 6.1.0 (6.1.1 available)
+  firebase_core 4.2.1 (4.3.0 available)
+  firebase_core_web 3.3.0 (3.3.1 available)
+  fl_location 3.1.0 (5.0.0 available)
+  fl_location_platform_interface 3.0.0 (5.1.0 available)
+  fl_location_web 3.0.0 (5.0.0 available)
+  flutter_activity_recognition 3.1.0 (4.0.0 available)
+  flutter_bloc 8.1.6 (9.1.1 available)
+  flutter_dotenv 5.2.1 (6.0.0 available)
+  flutter_launcher_icons 0.13.1 (0.14.4 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_local_notifications 17.2.4 (19.5.0 available)
+  flutter_local_notifications_linux 4.0.1 (6.0.0 available)
+  flutter_local_notifications_platform_interface 7.2.0 (9.1.0 available)
+  flutter_plugin_android_lifecycle 2.0.32 (2.0.33 available)
+  flutter_slidable 3.1.2 (4.0.3 available)
+  flutter_svg 2.2.2 (2.2.3 available)
+  flutter_tts 4.2.3 (4.2.5 available)
+  geofence_service 6.0.0+1 (discontinued replaced by geofencing_api)
+  geolocator 10.1.1 (14.0.2 available)
+  geolocator_android 4.6.2 (5.0.2 available)
+  geolocator_web 2.2.1 (4.1.3 available)
+  go_router 14.8.1 (17.0.1 available)
+  google_fonts 6.3.2 (6.3.3 available)
+  google_maps_flutter_android 2.18.5 (2.18.6 available)
+  google_maps_flutter_platform_interface 2.14.0 (2.14.1 available)
+  google_sign_in 6.3.0 (7.2.0 available)
+  google_sign_in_android 6.2.1 (7.2.7 available)
+  google_sign_in_ios 5.9.0 (6.2.4 available)
+  google_sign_in_platform_interface 2.5.0 (3.1.0 available)
+  google_sign_in_web 0.12.4+4 (1.1.0 available)
+  image 4.5.4 (4.7.2 available)
+  intl 0.19.0 (0.20.2 available)
+  js 0.6.7 (0.7.2 available)
+  lints 3.0.0 (6.0.0 available)
+  matcher 0.12.17 (0.12.18 available)
+  material_color_utilities 0.11.1 (0.13.0 available)
+  meta 1.16.0 (1.17.0 available)
+  mockito 5.5.1 (5.6.1 available)
+  path_provider_android 2.2.21 (2.2.22 available)
+  path_provider_foundation 2.4.4 (2.5.1 available)
+  permission_handler 11.4.0 (12.0.1 available)
+  permission_handler_android 12.1.0 (13.0.1 available)
+  shared_preferences_android 2.4.16 (2.4.18 available)
+  test_api 0.7.6 (0.7.8 available)
+  timezone 0.9.4 (0.10.1 available)
+  watcher 1.1.4 (1.2.0 available)
+  web_socket_channel 2.4.0 (3.0.3 available)
+  workmanager 0.6.0 (0.9.0+3 available)
+Got dependencies!
+1 package is discontinued.
+62 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading C:/Users/Public/Documents/Learning/Awarely/test/unit/motivational_engine_test.dart
+00:00 +0: MotivationalEngine Tests 1. Schedules generic nudge for Urgent task (< 24h) without settings
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +1: MotivationalEngine Tests 2. Schedules generic nudge for Upcoming task (1-2 days) without settings
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +2: MotivationalEngine Tests 3. Does NOT schedule generic nudge for Far Future task (> 2 days)
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +3: MotivationalEngine Tests 4. Should NOT schedule generic nudge if notifications disabled in Settings
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +4: MotivationalEngine Tests 5. Should CANCEL generic nudge if custom settings exist (Duplicate Prevention)
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +5: MotivationalEngine Tests 6. Mixed Scenario: Custom Goal cancels, Generic Goal schedules
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 4 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +6: MotivationalEngine Tests 7. Morning Kickstart uses Funny Tone
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+📋 Found 2 pending items (Goals + Subtasks)
+☀️ Checking Morning Kickstart...
+00:00 +7: MotivationalEngine Tests 8. Morning Kickstart uses Severe Tone
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+📋 Found 2 pending items (Goals + Subtasks)
+☀️ Checking Morning Kickstart...
+00:00 +8: MotivationalEngine Tests 9. Morning Kickstart uses Quotes Tone
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+📋 Found 2 pending items (Goals + Subtasks)
+☀️ Checking Morning Kickstart...
+00:00 +9: MotivationalEngine Tests 10. Morning Kickstart uses Motivational Tone (Default)
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+📋 Found 2 pending items (Goals + Subtasks)
+☀️ Checking Morning Kickstart...
+00:00 +10: MotivationalEngine Tests 11. Skips Morning Kickstart during Quiet Hours testing logic
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 23:00:00.000)
+⚠️ MotivationalEngine: No pending items to motivate.
+00:00 +11: MotivationalEngine Tests 12. Force=true bypasses Quiet Hours
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+📋 Found 2 pending items (Goals + Subtasks)
+☀️ Checking Morning Kickstart...
+00:00 +12: MotivationalEngine Tests 13. Daily Plan goals are excluded from suggestions
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+⚠️ MotivationalEngine: No pending items to motivate.
+00:00 +13: MotivationalEngine Tests 14. Inbox goals are excluded from suggestions
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+⚠️ MotivationalEngine: No pending items to motivate.
+00:00 +14: MotivationalEngine Tests 15. Completed tasks are ignored (Goal might trigger, but Task should NOT)
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+📋 Found 1 pending items (Goals + Subtasks)
+☀️ Checking Morning Kickstart...
+00:00 +15: MotivationalEngine Tests 16. Empty goals list returns early
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+⚠️ MotivationalEngine: No pending items to motivate.
+00:00 +16: MotivationalEngine Tests 17. Goal with no tasks schedules nothing (if Goal has no schedule itself?)
+00:00 +17: MotivationalEngine Tests 18. Subtasks are recursively included in candidates
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+📋 Found 3 pending items (Goals + Subtasks)
+☀️ Checking Morning Kickstart...
+00:00 +18: MotivationalEngine Tests 19. Task without deadline ignored for Deadline Nudges
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +19: MotivationalEngine Tests 20. Priority Low tasks can be picked if no High priority (Kickstart)
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+📋 Found 2 pending items (Goals + Subtasks)
+☀️ Checking Morning Kickstart...
+00:00 +20: MotivationalEngine Tests 21. Cancellation failure does not crash engine (Needs Deadline Check)
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+❌ MotivationalEngine Error: Exception: Native error
+00:00 +21: MotivationalEngine Tests 22. Premium Service check is awaited correctly
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+📋 Found 2 pending items (Goals + Subtasks)
+☀️ Checking Morning Kickstart...
+00:00 +22: MotivationalEngine Tests 23. Task ID collision handling (Robustness)
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: true, Time: null)
+📋 Found 3 pending items (Goals + Subtasks)
+☀️ Checking Morning Kickstart...
+00:00 +23: MotivationalEngine Tests 24. Null Settings in task inheritance checks (Deadline)
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +24: MotivationalEngine Tests 25. Empty Task Title fallback
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +25: MotivationalEngine Tests 26. Very long Task Title truncation (Implicit)
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +26: MotivationalEngine Tests 27. Future Deadline (>48h) ignores generic nudge
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +27: MotivationalEngine Tests 28. Exact 24h Deadline (Boundary check)
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +27 -1: MotivationalEngine Tests 28. Exact 24h Deadline (Boundary check) [E]
+  No matching calls. All calls: MockNotificationService.showNotification({id: 33479, title: Coming Up ⏳, body: Deadline approaching for 'Task'., payload: {"title": "Coming Up ⏳", "body": "Deadline approaching for 'Task'.", "reminder_id": "task_2801"}})
+  (If you called `verify(...).called(0);`, please instead use `verifyNever(...);`.)
+  package:matcher                                 fail
+  package:mockito/src/mock.dart 852:7             _VerifyCall._checkWith
+  package:mockito/src/mock.dart 1152:18           _makeVerify.<fn>
+  test\unit\motivational_engine_test.dart 509:14  main.<fn>.<fn>
   
-  package:matcher                                     expect
-  package:flutter_test/src/widget_tester.dart 473:18  expect
-  test\unit\notification_enhanced_test.dart 322:7     main.<fn>.<fn>
-  
-00:00 +14 -1: Recursive Notification Scheduling Tests Payload contains correct data
-🌱 GrowthProvider: createTask called for "Task" (GoalID: 2)
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-00:00 +15 -1: Recursive Notification Scheduling Tests Midnight (00:00) adjusts to morning/preference
-🌱 GrowthProvider: createTask called for "Midnight Task" (GoalID: 1)
-Error loading locations: Binding has not yet been initialized.
-The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
-Typically, this is done by calling "WidgetsFlutterBinding.ensureInitialized()" or "runApp()" (the latter calls the former). Typically this call is done in the "void main()" method. The "ensureInitialized" method is idempotent; calling it multiple times is not harmful. After calling that method, the "instance" getter will return the binding.
-In a test, one can call "TestWidgetsFlutterBinding.ensureInitialized()" as the first line in the test's "main()" method to initialize the binding.
-If ServicesBinding is a custom binding mixin, there must also be a custom binding class, like WidgetsFlutterBinding, but that mixes in the selected binding, and that is the class that must be constructed before using the "instance" getter.
-00:00 +16 -1: Some tests failed.
+00:00 +27 -1: MotivationalEngine Tests 29. Past Deadline (Overdue)
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +28 -1: MotivationalEngine Tests 30. Final sanity check with multiple mixed goals
+🚀 MotivationalEngine: Starting check... (Debug: false, Force: false, Time: 2026-01-06 14:00:00.000)
+📋 Found 2 pending items (Goals + Subtasks)
+⏳ Checking Deadline Nudges...
+00:00 +29 -1: Some tests failed.

@@ -55,9 +55,8 @@ class _RecentNotificationsScreenState extends State<RecentNotificationsScreen> {
   Future<void> _loadEvents() async {
     setState(() => _loading = true);
     try {
-      final events = await _reminderRepo.getAllContextEvents();
-      // Sort by triggerTime descending (newest first)
-      events.sort((a, b) => b.triggerTime.compareTo(a.triggerTime));
+      // Use the efficient new query (Limit 20, Past Only)
+      final events = await _reminderRepo.getRecentTriggeredEvents();
       
       final List<NotificationViewModel> viewModels = [];
       

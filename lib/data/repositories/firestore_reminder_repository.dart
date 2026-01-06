@@ -159,6 +159,22 @@ class FirestoreReminderRepository {
         .toList();
   }
 
+  /// Get recent triggered events (past only, limit 20)
+  Future<List<ContextEvent>> getRecentTriggeredEvents() async {
+    final collection = _firestoreService.contextEventsCollection;
+    if (collection == null) return [];
+
+    final snapshot = await collection
+        .where('triggerTime', isLessThanOrEqualTo: Timestamp.now())
+        .orderBy('triggerTime', descending: true)
+        .limit(20)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => ContextEvent.fromFirestore(doc))
+        .toList();
+  }
+
   /// Update context event outcome
   Future<int> updateContextEventOutcome(String eventId, String outcome) async {
     final collection = _firestoreService.contextEventsCollection;

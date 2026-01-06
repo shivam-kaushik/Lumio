@@ -27,15 +27,15 @@ class MotivationalEngine {
         _gptService = gptService ?? PrivacyGptService(),
         _premiumService = premiumService ?? PremiumService();
 
-  Future<void> checkAndSchedule({bool debug = false, bool force = false}) async {
-    debugPrint('🚀 MotivationalEngine: Starting check... (Debug: $debug, Force: $force)');
+  Future<void> checkAndSchedule({bool debug = false, bool force = false, DateTime? nowOverride}) async {
+    debugPrint('🚀 MotivationalEngine: Starting check... (Debug: $debug, Force: $force, Time: $nowOverride)');
     
     try {
       // 1. Load User Context
       final goals = await _repository.getGoals();
       final prefs = await SharedPreferences.getInstance();
       
-      final now = DateTime.now();
+      final now = nowOverride ?? DateTime.now();
       final hour = now.hour;
       
       // Load settings (with defaults)
@@ -91,9 +91,9 @@ class MotivationalEngine {
       }
       
       // B. Deadline Nudges
-      if (!force && (hour > wakeTime && hour < sleepTime)) {
+        if (!force && (hour > wakeTime && hour < sleepTime)) {
         debugPrint('⏳ Checking Deadline Nudges...');
-        await _checkDeadlineNudges(allPendingItems);
+        await _checkDeadlineNudges(allPendingItems, now);
       }
 
       // C. Consistency Check
@@ -160,19 +160,24 @@ class MotivationalEngine {
     _schedule(1001, title, body, payload: '{"reminder_id": "${focusItem.id}"}');
   }
 
-  Future<void> _checkDeadlineNudges(List<_PendingItem> items) async {
-    final now = DateTime.now();
+  Future<void> _checkDeadlineNudges(List<_PendingItem> items, DateTime now) async {
+    // final now = DateTime.now(); // Removed, using passed now
 
     for (var item in items) {
       if (item.deadline == null) continue;
       
       // CRITICAL: Skip if user has valid settings (GrowthProvider handles it), OR if explicitly disabled
+      // CRITICAL: Skip if user has valid settings (GrowthProvider handles it), OR if explicitly disabled
       if (item.settings != null) {
+          // FIX: Explicitly cancel any potentially existing generic nudge for this item
+          // consistently, whether enabled (handled by Growth) or disabled.
+          final genericId = 2000 + (item.id.hashCode.abs() % 100000);
+          await _notifications.cancelNotification(genericId);
+
           // If notifications disabled, definitely skip
           if (!item.settings!.enableNotifications) continue;
           
           // If enabled, we assume GrowthProvider scheduled precise alerts.
-          // Therefore, "Generic Deadline Nudges" are duplicates. Skip them.
           continue; 
       }
 

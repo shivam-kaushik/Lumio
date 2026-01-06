@@ -26,10 +26,14 @@ class MainNavigator extends StatefulWidget {
   const MainNavigator({super.key});
 
   @override
-  State<MainNavigator> createState() => _MainNavigatorState();
+  State<MainNavigator> createState() => MainNavigatorState();
+  
+  static MainNavigatorState of(BuildContext context) {
+    return context.findAncestorStateOfType<MainNavigatorState>()!;
+  }
 }
 
-class _MainNavigatorState extends State<MainNavigator>
+class MainNavigatorState extends State<MainNavigator>
     with TickerProviderStateMixin {
   int _currentIndex = 0;
   late final List<GlobalKey<NavigatorState>> _navigatorKeys;
@@ -118,6 +122,17 @@ class _MainNavigatorState extends State<MainNavigator>
       // Fade in new tab
       _fadeControllers[_currentIndex].forward();
     });
+  }
+
+  void switchToDayPlanner() {
+      // Public method to switch to Day Planner tab
+      if (_currentIndex != 4) {
+          setState(() {
+            _fadeControllers[_currentIndex].reverse();
+            _currentIndex = 4; // Index of DayPlannerScreen
+            _fadeControllers[_currentIndex].forward();
+          });
+      }
   }
 
   void _onRecordButtonPressed() {
