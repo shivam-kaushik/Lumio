@@ -444,26 +444,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
         // ... (Keep existing implementation) ...
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
-          appBar: AppBar(
-            // ... existing app bar code ...
-             title: InkWell(
-                  onTap: _pickDate,
-                  child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                          Text(
-                              isToday ? "The Day Architect" : AnalyticsHelper.formatDate(_selectedDate), 
-                              style: TextStyle(color: textColor)
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(Icons.arrow_drop_down, color: textColor),
-                      ],
-                  ),
-              ),
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            iconTheme: IconThemeData(color: textColor),
-          ),
+          // Removed AppBar to match Timeline style
+
           floatingActionButton: _generatedPlan == null ? Padding(
                 padding: const EdgeInsets.only(bottom: 90), 
                 child: FloatingActionButton(
@@ -478,6 +460,9 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
           body: SafeArea(
             child: Column(
               children: [
+                // 1. Unified Header
+                _buildDateHeader(theme, textColor, subtleColor),
+                
                 // 1. Input Section
                 Expanded(
                   child: SingleChildScrollView(
