@@ -1,7 +1,7 @@
 name: lumio
 description: "Lumio - The Context-Aware Reminder Assistant. Turning goals into actions."
 publish_to: 'none'
-version: 1.0.2+5
+version: 1.0.3+7
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -69,6 +69,7 @@ dependencies:
   web_socket_channel: ^2.4.0
   http: ^1.2.0
   flutter_dotenv: ^5.1.0
+  in_app_purchase: ^3.2.3
 
 dev_dependencies:
   flutter_test:

@@ -10,11 +10,17 @@ import '../../core/services/premium_service.dart';
 import 'settings_screen.dart';
 import 'login_screen.dart';
 import 'recent_notifications_screen.dart';
+import 'premium_subscription_screen.dart';
 
 /// Account screen showing user profile and settings access
-class AccountScreen extends StatelessWidget {
+class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
 
+  @override
+  State<AccountScreen> createState() => _AccountScreenState();
+}
+
+class _AccountScreenState extends State<AccountScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -224,56 +230,91 @@ class AccountScreen extends StatelessWidget {
                             future: PremiumService().isPremium(),
                             builder: (context, snapshot) {
                               final isPremium = snapshot.data ?? false;
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppTheme.spacingMD,
-                                  vertical: AppTheme.spacingXS,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isPremium
-                                      ? Colors.amber.withOpacity(0.2)
-                                      : AppTheme.primaryColor.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(AppTheme.radiusRound),
-                                  border: Border.all(
-                                    color: isPremium
-                                        ? Colors.amber.withOpacity(0.5)
-                                        : AppTheme.primaryColor.withOpacity(0.3),
-                                    width: 1,
+                              
+                              if (isPremium) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppTheme.spacingMD,
+                                    vertical: AppTheme.spacingXS,
                                   ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      isPremium
-                                          ? Icons.star_rounded
-                                          : (user.providerData.any(
-                                                (info) => info.providerId == 'google.com',
-                                              )
-                                              ? Icons.account_circle_rounded
-                                              : Icons.email_rounded),
-                                      size: 16,
-                                      color: isPremium
-                                          ? Colors.amber
-                                          : AppTheme.primaryColor,
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(AppTheme.radiusRound),
+                                    border: Border.all(
+                                      color: Colors.amber.withOpacity(0.5),
+                                      width: 1,
                                     ),
-                                    const SizedBox(width: AppTheme.spacingXS),
-                                    Text(
-                                      isPremium
-                                          ? 'Premium Member'
-                                          : (user.providerData.any(
-                                                (info) => info.providerId == 'google.com',
-                                              )
-                                              ? 'Google Account'
-                                              : 'Email Account'),
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: isPremium
-                                            ? Colors.amber.shade700
-                                            : AppTheme.primaryColor,
-                                        fontWeight: FontWeight.w600,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.star_rounded,
+                                        size: 16,
+                                        color: Colors.amber,
                                       ),
+                                      const SizedBox(width: AppTheme.spacingXS),
+                                      Text(
+                                        'Premium Member',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: Colors.amber.shade700,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+
+                              // Not Premium - Show Upgrade Button
+                              return InkWell(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => const PremiumSubscriptionScreen(),
                                     ),
-                                  ],
+                                  ).then((_) => setState(() {})); // Refresh state on return
+                                },
+                                borderRadius: BorderRadius.circular(AppTheme.radiusRound),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppTheme.spacingMD,
+                                    vertical: AppTheme.spacingXS,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        AppTheme.primaryColor,
+                                        AppTheme.primaryColor.withBlue(200),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(AppTheme.radiusRound),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.primaryColor.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.auto_awesome,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                                      const SizedBox(width: AppTheme.spacingXS),
+                                      Text(
+                                        'Upgrade to Premium',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               );
                             },
@@ -594,4 +635,3 @@ class _InfoTile extends StatelessWidget {
     );
   }
 }
-

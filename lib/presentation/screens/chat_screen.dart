@@ -6,6 +6,7 @@ import '../models/chat_message.dart';
 import '../theme/app_theme.dart';
 import '../../core/services/premium_service.dart';
 import 'unified_goal_editor_screen.dart';
+import 'premium_subscription_screen.dart';
 
 class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key});
@@ -87,7 +88,13 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                 ),
                 const SizedBox(height: 32),
                 ElevatedButton(
-                  onPressed: () => Navigator.pop(context), // TODO: Go to paywall
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const PremiumSubscriptionScreen(),
+                      ),
+                    ).then((_) => _checkPremium()); // Check premium again
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryColor,
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),

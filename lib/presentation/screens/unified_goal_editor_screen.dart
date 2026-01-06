@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/services/premium_service.dart'; // Add PremiumService import
+import 'premium_subscription_screen.dart';
 import '../models/plan_block.dart';
 import '../theme/app_theme.dart';
 import '../providers/growth_provider.dart';
@@ -694,7 +695,11 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
           ElevatedButton(
             onPressed: () {
                Navigator.pop(context);
-               // TODO: Navigate to paywall
+               Navigator.of(context).push(
+                 MaterialPageRoute(
+                   builder: (context) => const PremiumSubscriptionScreen(),
+                 ),
+               );
             }, 
             child: const Text("Upgrade Now")
           ),
