@@ -11,6 +11,7 @@ import 'package:lumio/data/models/goal.dart';
 import 'package:lumio/data/models/goal_task.dart';
 import 'package:lumio/data/models/reminder.dart';
 import 'package:lumio/data/models/goal_phase.dart';
+import 'package:lumio/data/models/goal_settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ==================== Mocks & Fakes ====================
@@ -22,13 +23,14 @@ class FakeGrowthRepository extends Fake implements FirestoreGrowthRepository {
   
   // Goals
   @override
-  Future<int> createGoal(String name, {DateTime? targetDeadline, double? hoursPerDay, int? totalEstimatedHours}) async {
+  Future<int> createGoal(String name, {DateTime? targetDeadline, double? hoursPerDay, int? totalEstimatedHours, GoalSettings? settings}) async {
     final id = _goals.length + 1;
     _goals.add(Goal(
       id: id,
       name: name,
       createdAt: DateTime.now(),
       targetDeadline: targetDeadline,
+      settings: settings,
     ));
     return id;
   }
