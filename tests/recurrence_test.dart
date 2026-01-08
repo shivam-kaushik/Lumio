@@ -1,5 +1,6 @@
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:mockito/mockito.dart';
 import 'package:lumio/presentation/providers/growth_provider.dart';
 import 'package:lumio/data/repositories/firestore_growth_repository.dart';
@@ -7,6 +8,8 @@ import 'package:lumio/core/services/notification_service.dart';
 import 'package:lumio/data/models/goal.dart';
 import 'package:lumio/data/models/goal_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:lumio/data/models/goal_phase.dart';
 
 // Mocks
 class MockGrowthRepository extends Fake implements FirestoreGrowthRepository {
@@ -22,6 +25,11 @@ class MockGrowthRepository extends Fake implements FirestoreGrowthRepository {
   @override
   Future<List<GoalTask>> getTasksForGoal(int goalId) async {
     return _tasks.where((t) => t.goalId == goalId).toList();
+  }
+  
+  @override
+  Future<List<GoalPhase>> getPhasesForGoal(int goalId) async {
+    return [];
   }
 
   @override
@@ -63,6 +71,7 @@ class FakeNotificationService extends Fake implements NotificationService {
     required String body,
     required DateTime scheduledTime,
     String? payload,
+    DateTimeComponents? matchDateTimeComponents,
   }) async {
     scheduled.add({
       'id': id,
