@@ -6,6 +6,7 @@ import 'package:lumio/presentation/providers/growth_provider.dart';
 import 'package:lumio/data/models/goal_task.dart';
 import 'package:lumio/data/models/goal.dart';
 import 'package:lumio/data/models/goal_phase.dart';
+import 'package:lumio/data/models/goal_settings.dart';
 import 'package:lumio/core/services/notification_service.dart';
 import 'package:lumio/data/repositories/firestore_growth_repository.dart';
 
@@ -20,6 +21,7 @@ class MockNotificationService implements NotificationService {
     required String body,
     required DateTime scheduledTime,
     String? payload,
+    dynamic matchDateTimeComponents, // Match signature
   }) async {
     scheduledNotifications[id] = title;
     debugPrint("MOCK SCHEDULE: $id - $title at $scheduledTime");
@@ -110,7 +112,7 @@ class MockGrowthRepository implements FirestoreGrowthRepository {
 
   // Missing Stubs
   @override
-  Future<int> createGoal(String name, {DateTime? targetDeadline, double? hoursPerDay, int? totalEstimatedHours}) async => 0;
+  Future<int> createGoal(String name, {DateTime? targetDeadline, double? hoursPerDay, int? totalEstimatedHours, GoalSettings? settings}) async => 0;
   @override
   Future<Goal?> getGoal(int id) async => null;
   @override
