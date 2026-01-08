@@ -22,8 +22,14 @@ class MockNotificationService extends Mock implements NotificationService {
     required String body,
     required DateTime scheduledTime,
     String? payload,
+    dynamic matchDateTimeComponents, // Changed from DateTimeComponents? to dynamic to avoid import if not available, strictly matching signature requires exact type but mock might interpret differently. 
+    // Wait, the error message said:
+    // 'Future<void> Function({required String body, required int id, DateTimeComponents? matchDateTimeComponents, String? payload, required DateTime scheduledTime, required String title})'
+    // My previous override was:
+    // Future<void> scheduleNotification({ required int id, required String title, required String body, required DateTime scheduledTime, String? payload, })
+    // I need to match the named parameters exactly.
   }) async {
-    scheduledNotifications.removeWhere((n) => n['id'] == id); // Overwrite
+    scheduledNotifications.removeWhere((n) => n['id'] == id);
     scheduledNotifications.add({
       'id': id,
       'title': title,
