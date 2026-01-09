@@ -116,14 +116,37 @@ class GrowthProvider with ChangeNotifier {
   /// Update goal
   Future<void> updateGoal(Goal goal) async {
     try {
+      // Logic: Only reschedule notifications if Settings changed meaningfully.
+      // 1. Get old goal
+      Goal? oldGoal;
+      try {
+         oldGoal = _goals.firstWhere((g) => g.id == goal.id);
+      } catch (_) {}
+
       await _repository.updateGoal(goal);
       await loadGrowthData();
 
-      // NEW: Reschedule notifications for all tasks to apply new Settings (Time, Tone, etc.)
-      final tasks = _tasksByGoal[goal.id] ?? [];
-      for (var task in tasks) {
-          await _scheduleTaskNotification(task);
+      // 2. Compare Settings
+      bool settingsChanged = false;
+      if (oldGoal != null) {
+          if (oldGoal.settings != goal.settings) { 
+              settingsChanged = true;
+          }
+      } else {
+         settingsChanged = true; // New or unknown, force update
       }
+
+      // 3. Reschedule only if needed
+      if (settingsChanged) {
+        debugPrint('⚙️ Goal Settings changed for "${goal.name}". Rescheduling notifications...');
+        final tasks = _tasksByGoal[goal.id] ?? [];
+        for (var task in tasks) {
+            await _scheduleTaskNotification(task);
+        }
+      } else {
+        debugPrint('ℹ️ Goal Settings unchanged for "${goal.name}". Skipping reschedule.');
+      }
+
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -188,29 +211,25 @@ class GrowthProvider with ChangeNotifier {
           }
 
           // 4. Determine Frequency (Recurrence)
-          // Default to task's frequency if not 'one-time', else check Goal settings
-          // NOTE: GoalSettings frequency implies a default for the goal, effectively making all tasks repeat?
-          // More likely: GoalSettings frequency overrides task frequency IF task is generic.
-          // Let's assume GoalSettings frequency dictates the recurrence pattern for notifications.
+          // PRIORITIZE Task Frequency. Goal Settings Frequency should NOT force one-time tasks to repeat.
           
           DateTimeComponents? matchComponents;
-          if (settings != null) {
-              switch (settings.frequency) {
-                  case NotificationFrequency.daily:
-                      matchComponents = DateTimeComponents.time;
-                      break;
-                  case NotificationFrequency.weekly:
-                      matchComponents = DateTimeComponents.dayOfWeekAndTime;
-                      break;
-                  case NotificationFrequency.monthly:
-                      matchComponents = DateTimeComponents.dayOfMonthAndTime;
-                      break;
-                  case NotificationFrequency.deadline: // Treat as one-time at deadline
-                  case NotificationFrequency.once:
-                  default:
-                      matchComponents = null;
-                      break;
-              }
+          
+          // Only apply recurrence if the TASK explicitly calls for it
+          switch (currentTask.frequency) {
+              case 'daily':
+                  matchComponents = DateTimeComponents.time;
+                  break;
+              case 'weekly':
+                  matchComponents = DateTimeComponents.dayOfWeekAndTime;
+                  break;
+              case 'monthly':
+                  matchComponents = DateTimeComponents.dayOfMonthAndTime;
+                  break;
+              case 'one-time':
+              default:
+                  matchComponents = null;
+                  break;
           }
 
           // 5. Apply Alert Timing Offset
@@ -509,13 +528,41 @@ class GrowthProvider with ChangeNotifier {
   /// Replace all tasks for a goal
   Future<void> replaceTasksForGoal(int goalId, List<GoalTask> rootTasks) async {
     try {
+      // 1. Cancel OLD notifications to prevent orphans
+      if (_tasksByGoal.containsKey(goalId)) {
+         final oldTasks = _tasksByGoal[goalId]!;
+         final allOldIds = oldTasks.expand((t) => _getAllTaskIds(t)).toList();
+         for (var id in allOldIds) {
+            await _notificationService.cancelNotification(id % 2147483647);
+         }
+      }
+
+      // 2. Replace in DB
       await _repository.replaceTasksForGoal(goalId, rootTasks);
+      
+      // 3. Reload to get new IDs/State
       await loadGrowthData();
+      
+      // 4. Schedule NEW notifications
+      final newTasks = _tasksByGoal[goalId] ?? [];
+      for (var task in newTasks) {
+          await _scheduleTaskNotification(task);
+      }
+
     } catch (e) {
       _error = e.toString();
       notifyListeners();
       rethrow;
     }
+  }
+
+  // Recursive helper to get ID of task + all subtasks
+  List<int> _getAllTaskIds(GoalTask task) {
+    List<int> ids = [task.id];
+    for (var sub in task.subtasks) {
+      ids.addAll(_getAllTaskIds(sub));
+    }
+    return ids;
   }
 
   // ==================== Phases ====================

@@ -71,6 +71,30 @@ class GoalSettings {
       'enableNotifications': enableNotifications,
     };
   }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is GoalSettings &&
+        other.frequency == frequency &&
+        other.notificationTime?.hour == notificationTime?.hour &&
+        other.notificationTime?.minute == notificationTime?.minute &&
+        other.tone == tone &&
+        other.alertTiming == alertTiming &&
+        other.customAlertMinutes == customAlertMinutes &&
+        other.enableNotifications == enableNotifications;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+     frequency, 
+     notificationTime?.hour,
+     notificationTime?.minute, 
+     tone, 
+     alertTiming, 
+     customAlertMinutes, 
+     enableNotifications
+  );
 
   // From Map
   factory GoalSettings.fromMap(Map<String, dynamic> map) {
