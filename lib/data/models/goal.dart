@@ -37,7 +37,7 @@ class Goal {
           : null,
       totalEstimatedHours: map['total_estimated_hours'] as int?,
       settings: map['settings'] != null 
-          ? GoalSettings.fromMap(map['settings'] as Map<String, dynamic>)
+          ? GoalSettings.fromMap(Map<String, dynamic>.from(map['settings'] as Map))
           : null,
     );
   }
@@ -107,7 +107,7 @@ class Goal {
       hoursPerDay: (data['hoursPerDay'] as num?)?.toDouble(),
       totalEstimatedHours: data['totalEstimatedHours'] as int?,
       settings: data['settings'] != null 
-          ? GoalSettings.fromMap(data['settings'] as Map<String, dynamic>)
+          ? GoalSettings.fromMap(Map<String, dynamic>.from(data['settings'] as Map))
           : null,
     );
   }

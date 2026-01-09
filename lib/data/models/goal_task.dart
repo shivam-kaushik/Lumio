@@ -234,33 +234,35 @@ class GoalTask {
       estimatedHours: (data['estimatedHours'] as num?)?.toDouble() ?? (data['estimated_hours'] as num?)?.toDouble(),
       estimatedMinutes: (data['estimatedMinutes'] as num?)?.toInt() ?? (data['estimated_minutes'] as num?)?.toInt(),
       actualMinutes: (data['actualMinutes'] as num?)?.toInt() ?? (data['actual_minutes'] as num?)?.toInt(),
-      startedAt: data['startedAt'] != null
-          ? (data['startedAt'] is Timestamp
-              ? (data['startedAt'] as Timestamp).toDate()
-              : DateTime.tryParse(data['startedAt'].toString()))
+      startedAt: data['startedAt'] != null || data['started_at'] != null
+          ? ((data['startedAt'] ?? data['started_at']) is Timestamp
+              ? ((data['startedAt'] ?? data['started_at']) as Timestamp).toDate()
+              : DateTime.tryParse((data['startedAt'] ?? data['started_at']).toString()))
           : null,
       priority: data['priority'] as String? ?? 'medium',
       frequency: data['frequency'] as String? ?? 'one-time',
-      suggestedTime: data['suggestedTime'] as String? ?? 'any',
-      suggestedLocation: data['suggestedLocation'] as String? ?? 'any',
+      suggestedTime: data['suggestedTime'] as String? ?? (data['suggested_time'] as String?) ?? 'any',
+      suggestedLocation: data['suggestedLocation'] as String? ?? (data['suggested_location'] as String?) ?? 'any',
       isMilestone: (data['isMilestone'] ?? data['is_milestone']) == true || (data['isMilestone'] ?? data['is_milestone']) == 1,
       motivationAnchor: data['motivationAnchor'] as String? ?? data['motivation_anchor'] as String?,
-      scheduledDate: data['scheduledDate'] != null
-          ? (data['scheduledDate'] is Timestamp
-              ? (data['scheduledDate'] as Timestamp).toDate()
-              : DateTime.tryParse(data['scheduledDate'].toString()))
+      scheduledDate: data['scheduledDate'] != null || data['scheduled_date'] != null
+          ? ((data['scheduledDate'] ?? data['scheduled_date']) is Timestamp
+              ? ((data['scheduledDate'] ?? data['scheduled_date']) as Timestamp).toDate()
+              : DateTime.tryParse((data['scheduledDate'] ?? data['scheduled_date']).toString()))
           : null,
-      phaseId: data['phaseId'] != null ? int.tryParse(data['phaseId'].toString()) : null,
+      phaseId: data['phaseId'] != null || data['phase_id'] != null 
+          ? int.tryParse((data['phaseId'] ?? data['phase_id']).toString()) 
+          : null,
       isCompleted: (data['isCompleted'] ?? data['is_completed']) == true || (data['isCompleted'] ?? data['is_completed']) == 1,
-      completedAt: data['completedAt'] != null
-          ? (data['completedAt'] is Timestamp
-              ? (data['completedAt'] as Timestamp).toDate()
-              : DateTime.tryParse(data['completedAt'].toString()))
+      completedAt: data['completedAt'] != null || data['completed_at'] != null
+          ? ((data['completedAt'] ?? data['completed_at']) is Timestamp
+              ? ((data['completedAt'] ?? data['completed_at']) as Timestamp).toDate()
+              : DateTime.tryParse((data['completedAt'] ?? data['completed_at']).toString()))
           : null,
-      createdAt: data['createdAt'] != null
-          ? (data['createdAt'] is Timestamp
-              ? (data['createdAt'] as Timestamp).toDate()
-              : DateTime.tryParse(data['createdAt'].toString())) ?? DateTime.now()
+      createdAt: data['createdAt'] != null || data['created_at'] != null
+          ? ((data['createdAt'] ?? data['created_at']) is Timestamp
+              ? ((data['createdAt'] ?? data['created_at']) as Timestamp).toDate()
+              : DateTime.tryParse((data['createdAt'] ?? data['created_at']).toString())) ?? DateTime.now()
           : DateTime.now(),
       order: (data['order'] as num?)?.toInt() ?? (data['order_index'] as num?)?.toInt() ?? 0,
       indentLevel: (data['indentLevel'] as num?)?.toInt() ?? (data['indent_level'] as num?)?.toInt() ?? 0,

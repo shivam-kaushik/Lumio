@@ -75,19 +75,31 @@ class GoalSettings {
   // From Map
   factory GoalSettings.fromMap(Map<String, dynamic> map) {
     TimeOfDay? time;
-    if (map['notificationTime'] != null) {
-      final parts = (map['notificationTime'] as String).split(':');
-      if (parts.length == 2) {
-        time = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+    try {
+      if (map['notificationTime'] != null && map['notificationTime'] is String) {
+        final parts = (map['notificationTime'] as String).split(':');
+        if (parts.length == 2) {
+          time = TimeOfDay(
+            hour: int.tryParse(parts[0]) ?? 9, 
+            minute: int.tryParse(parts[1]) ?? 0
+          );
+        }
       }
+    } catch (_) {}
+
+    T getEnum<T>(List<T> values, dynamic index, T defaultValue) {
+      if (index is int && index >= 0 && index < values.length) {
+        return values[index];
+      }
+      return defaultValue;
     }
 
     return GoalSettings(
       notificationTime: time,
-      frequency: NotificationFrequency.values[map['frequency'] as int? ?? 1], // default daily
-      alertTiming: AlertTiming.values[map['alertTiming'] as int? ?? 2], // default 15 min
+      frequency: getEnum(NotificationFrequency.values, map['frequency'], NotificationFrequency.daily),
+      alertTiming: getEnum(AlertTiming.values, map['alertTiming'], AlertTiming.fifteenMinBefore),
       customAlertMinutes: map['customAlertMinutes'] as int?,
-      tone: NotificationTone.values[map['tone'] as int? ?? 0], // default motivational
+      tone: getEnum(NotificationTone.values, map['tone'], NotificationTone.motivational),
       enableNotifications: map['enableNotifications'] as bool? ?? true,
     );
   }

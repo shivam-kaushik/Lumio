@@ -222,6 +222,7 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
          goalId = await growthProvider.createGoal(
             goalName,
             targetDeadline: _goalDeadline ?? DateTime.now().add(const Duration(days: 30)), 
+            settings: _currentSettings, // SAVE FIX
          );
          _localGoalId = goalId; // Store for future updates
       } else {
@@ -235,6 +236,7 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
          await growthProvider.updateGoal(baseGoal.copyWith(
             name: goalName,
             targetDeadline: _goalDeadline,
+            settings: _currentSettings, // SAVE FIX
          ));
       }
 

@@ -68,6 +68,7 @@ class FirestoreGrowthRepository {
           targetDeadline: goal.targetDeadline,
           hoursPerDay: goal.hoursPerDay,
           totalEstimatedHours: goal.totalEstimatedHours,
+          settings: goal.settings,
         );
       } catch (e) {
         // If parsing fails, use hash of string ID
@@ -79,6 +80,7 @@ class FirestoreGrowthRepository {
           targetDeadline: goal.targetDeadline,
           hoursPerDay: goal.hoursPerDay,
           totalEstimatedHours: goal.totalEstimatedHours,
+          settings: goal.settings,
         );
       }
     }).toList();
@@ -115,6 +117,7 @@ class FirestoreGrowthRepository {
           targetDeadline: goal.targetDeadline,
           hoursPerDay: goal.hoursPerDay,
           totalEstimatedHours: goal.totalEstimatedHours,
+          settings: goal.settings,
         );
       }
     }

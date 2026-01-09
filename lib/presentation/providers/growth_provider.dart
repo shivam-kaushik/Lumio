@@ -118,6 +118,12 @@ class GrowthProvider with ChangeNotifier {
     try {
       await _repository.updateGoal(goal);
       await loadGrowthData();
+
+      // NEW: Reschedule notifications for all tasks to apply new Settings (Time, Tone, etc.)
+      final tasks = _tasksByGoal[goal.id] ?? [];
+      for (var task in tasks) {
+          await _scheduleTaskNotification(task);
+      }
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -167,16 +173,18 @@ class GrowthProvider with ChangeNotifier {
           // 3. Determine Base Time
           DateTime baseTime = currentTask.scheduledDate!;
           
-          // If task time is generic (midnight) AND we have a preferred notification time in settings
-          if (baseTime.hour == 0 && baseTime.minute == 0 && settings?.notificationTime != null) {
+          // STRICT OVERRIDE: If Goal Settings specifies a time, USE IT.
+          // This ensures that changing the "Default Time" actually updates the notifications,
+          // regardless of what the task's individual "scheduledDate" time component might be.
+          if (settings?.notificationTime != null) {
              final t = settings!.notificationTime!;
              baseTime = DateTime(baseTime.year, baseTime.month, baseTime.day, t.hour, t.minute);
           } else if (baseTime.hour == 0 && baseTime.minute == 0) {
-              // Default fallback if no settings
-             int hour = 9; 
-             if (currentTask.suggestedTime == 'afternoon') hour = 14;
-             else if (currentTask.suggestedTime == 'evening') hour = 18;
-             baseTime = DateTime(baseTime.year, baseTime.month, baseTime.day, hour, 0);
+               // Default fallback only if no settings AND time is midnight
+              int hour = 9; 
+              if (currentTask.suggestedTime == 'afternoon') hour = 14;
+              else if (currentTask.suggestedTime == 'evening') hour = 18;
+              baseTime = DateTime(baseTime.year, baseTime.month, baseTime.day, hour, 0);
           }
 
           // 4. Determine Frequency (Recurrence)
