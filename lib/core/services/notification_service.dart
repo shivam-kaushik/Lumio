@@ -486,7 +486,14 @@ class NotificationService {
       enableLights: true,
       autoCancel: true,
       ongoing: false,
-      fullScreenIntent: false, // Changed to false to prevent auto-opening app
+      fullScreenIntent: false, 
+      styleInformation: BigTextStyleInformation(
+        body,
+        htmlFormatBigText: true,
+        contentTitle: title,
+        htmlFormatContentTitle: true,
+        summaryText: null,
+      ),
       actions: actions,
     );
 
@@ -642,8 +649,15 @@ class NotificationService {
       enableLights: true,
       autoCancel: true,
       ongoing: false,
-      fullScreenIntent: false, // Changed to false to prevent auto-opening app
+      fullScreenIntent: false, 
       visibility: NotificationVisibility.public,
+      styleInformation: BigTextStyleInformation(
+        body,
+        htmlFormatBigText: true,
+        contentTitle: title,
+        htmlFormatContentTitle: true,
+        summaryText: null, // Keeps it clean
+      ),
       actions: actions,
     );
 
