@@ -345,10 +345,10 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
                                 ? "Deadline: ${_goalDeadline!.month}/${_goalDeadline!.day}/${_goalDeadline!.year}" 
                                 : "Set Deadline",
                             onPressed: () async {
-                              final picked = await showDatePicker(
+                                final picked = await showDatePicker(
                                 context: context,
                                 initialDate: _goalDeadline ?? DateTime.now().add(const Duration(days: 30)),
-                                firstDate: DateTime.now(),
+                                firstDate: DateTime(2024),
                                 lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
                               );
                               if (picked != null) {
@@ -480,7 +480,7 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
                                final date = await showDatePicker(
                                  context: context, 
                                  initialDate: deadline ?? DateTime.now(), 
-                                 firstDate: DateTime.now(), 
+                                 firstDate: DateTime(2024), // Allow past dates for corrections
                                  lastDate: DateTime.now().add(const Duration(days: 365 * 5))
                                );
                                if (date != null) {

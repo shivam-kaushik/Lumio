@@ -193,67 +193,52 @@ class GrowthProvider with ChangeNotifier {
              return;
           }
 
-          // 3. Determine Base Time
+          // 3. Determine Base Time (STRICT Mode)
           DateTime baseTime = currentTask.scheduledDate!;
           
-          // STRICT OVERRIDE: If Goal Settings specifies a time, USE IT.
-          // This ensures that changing the "Default Time" actually updates the notifications,
-          // regardless of what the task's individual "scheduledDate" time component might be.
-          if (settings?.notificationTime != null) {
-             final t = settings!.notificationTime!;
-             baseTime = DateTime(baseTime.year, baseTime.month, baseTime.day, t.hour, t.minute);
-          } else if (baseTime.hour == 0 && baseTime.minute == 0) {
-               // Default fallback only if no settings AND time is midnight
-              int hour = 9; 
-              if (currentTask.suggestedTime == 'afternoon') hour = 14;
-              else if (currentTask.suggestedTime == 'evening') hour = 18;
-              baseTime = DateTime(baseTime.year, baseTime.month, baseTime.day, hour, 0);
+          if (settings != null && settings.notificationTime != null) {
+              // STRICT: User has a specific "Default Time" in settings (e.g. 9:00 AM)
+              final t = settings.notificationTime!;
+              baseTime = DateTime(baseTime.year, baseTime.month, baseTime.day, t.hour, t.minute);
+          } else {
+             // Fallback only if NO settings time provided
+              if (baseTime.hour == 0 && baseTime.minute == 0) {
+                 int hour = 9; 
+                 if (currentTask.suggestedTime == 'afternoon') hour = 14;
+                 else if (currentTask.suggestedTime == 'evening') hour = 18;
+                 baseTime = DateTime(baseTime.year, baseTime.month, baseTime.day, hour, 0);
+              }
           }
 
-          // 4. Determine Frequency (Recurrence)
-          // PRIORITIZE Task Frequency. Goal Settings Frequency should NOT force one-time tasks to repeat.
-          
+          // 4. Determine Frequency
           DateTimeComponents? matchComponents;
-          
-          // Only apply recurrence if the TASK explicitly calls for it
           switch (currentTask.frequency) {
-              case 'daily':
-                  matchComponents = DateTimeComponents.time;
-                  break;
-              case 'weekly':
-                  matchComponents = DateTimeComponents.dayOfWeekAndTime;
-                  break;
-              case 'monthly':
-                  matchComponents = DateTimeComponents.dayOfMonthAndTime;
-                  break;
-              case 'one-time':
-              default:
-                  matchComponents = null;
-                  break;
+              case 'daily': matchComponents = DateTimeComponents.time; break;
+              case 'weekly': matchComponents = DateTimeComponents.dayOfWeekAndTime; break;
+              case 'monthly': matchComponents = DateTimeComponents.dayOfMonthAndTime; break;
+              case 'one-time': default: matchComponents = null; break;
           }
 
-          // 5. Apply Alert Timing Offset
+          // 5. Apply Alert Timing Offset (STRICT)
           DateTime triggerTime = baseTime;
           if (settings != null) {
-             switch (settings.alertTiming) {
-               case AlertTiming.fifteenMinBefore:
-                 triggerTime = baseTime.subtract(const Duration(minutes: 15));
-                 break;
-               case AlertTiming.atEnd:
-                 // Use estimated hours (default 1)
-                 final minutes = ((currentTask.estimatedHours ?? 1.0) * 60).round();
-                 triggerTime = baseTime.add(Duration(minutes: minutes));
-                 break;
-               case AlertTiming.custom:
-                 if (settings.customAlertMinutes != null) {
-                    triggerTime = baseTime.subtract(Duration(minutes: settings.customAlertMinutes!));
-                 }
-                 break;
-               case AlertTiming.atStart:
-               default:
-                 // No change
-                 break;
-             }
+              switch (settings.alertTiming) {
+                case AlertTiming.fifteenMinBefore:
+                  triggerTime = baseTime.subtract(const Duration(minutes: 15));
+                  break;
+                case AlertTiming.atEnd:
+                  final minutes = ((currentTask.estimatedHours ?? 1.0) * 60).round();
+                  triggerTime = baseTime.add(Duration(minutes: minutes));
+                  break;
+                case AlertTiming.custom:
+                  if (settings.customAlertMinutes != null) {
+                     triggerTime = baseTime.subtract(Duration(minutes: settings.customAlertMinutes!));
+                  }
+                  break;
+                case AlertTiming.atStart:
+                default:
+                  break;
+              }
           }
 
           // 6. Schedule if in future (for one-time) or if it's recurring (we schedule based on component)
@@ -528,25 +513,65 @@ class GrowthProvider with ChangeNotifier {
   /// Replace all tasks for a goal
   Future<void> replaceTasksForGoal(int goalId, List<GoalTask> rootTasks) async {
     try {
-      // 1. Cancel OLD notifications to prevent orphans
-      if (_tasksByGoal.containsKey(goalId)) {
-         final oldTasks = _tasksByGoal[goalId]!;
-         final allOldIds = oldTasks.expand((t) => _getAllTaskIds(t)).toList();
-         for (var id in allOldIds) {
-            await _notificationService.cancelNotification(id % 2147483647);
+      final oldTasks = _tasksByGoal[goalId] ?? [];
+      final oldTasksMap = {for (var t in _deepFlatten(oldTasks)) t.id: t};
+      
+      final newTasksFlat = _deepFlatten(rootTasks);
+      final newTasksMap = {for (var t in newTasksFlat) t.id: t};
+
+      final idsToCancel = <int>{};
+      final idsToSchedule = <int>{};
+
+      // 1. Identify what to Cancel (Deleted or Changed)
+      for (final oldTask in oldTasksMap.values) {
+        final newTask = newTasksMap[oldTask.id];
+        if (newTask == null) {
+          // Deleted
+          idsToCancel.add(oldTask.id);
+        } else {
+          // Exists in both - check if changed
+          if (_notificationParametersChanged(oldTask, newTask)) {
+             idsToCancel.add(oldTask.id);
+             idsToSchedule.add(newTask.id);
+          }
+        }
+      }
+
+      // 2. Identify what to Schedule (New or Changed)
+      // (Changed ones are already added above, just need New ones)
+      for (final newTask in newTasksFlat) {
+         if (!oldTasksMap.containsKey(newTask.id)) {
+            idsToSchedule.add(newTask.id);
          }
       }
 
-      // 2. Replace in DB
+      // 3. Execute Cancellations
+      if (idsToCancel.isNotEmpty) {
+        debugPrint('📉 Cancelling ${idsToCancel.length} obsolete notifications for Goal $goalId');
+        for (var id in idsToCancel) {
+           await _notificationService.cancelNotification(id % 2147483647);
+        }
+      }
+
+      // 4. Replace in DB
       await _repository.replaceTasksForGoal(goalId, rootTasks);
       
-      // 3. Reload to get new IDs/State
+      // 5. Reload to get new IDs/State
       await loadGrowthData();
       
-      // 4. Schedule NEW notifications
-      final newTasks = _tasksByGoal[goalId] ?? [];
-      for (var task in newTasks) {
-          await _scheduleTaskNotification(task);
+      // 6. Execute Scheduling
+      if (idsToSchedule.isNotEmpty) {
+        debugPrint('📈 Scheduling ${idsToSchedule.length} updated/new notifications for Goal $goalId');
+        // Retrieve fresh objects from state to ensure fully populated data if needed
+        final reloadedTasks = _tasksByGoal[goalId] ?? [];
+        final reloadedMap = {for (var t in _deepFlatten(reloadedTasks)) t.id: t};
+        
+        for (var id in idsToSchedule) {
+            final task = reloadedMap[id];
+            if (task != null) {
+               await _scheduleTaskNotification(task);
+            }
+        }
       }
 
     } catch (e) {
@@ -556,13 +581,28 @@ class GrowthProvider with ChangeNotifier {
     }
   }
 
-  // Recursive helper to get ID of task + all subtasks
-  List<int> _getAllTaskIds(GoalTask task) {
-    List<int> ids = [task.id];
-    for (var sub in task.subtasks) {
-      ids.addAll(_getAllTaskIds(sub));
+  // Recursive helper to flatten tasks
+  List<GoalTask> _deepFlatten(List<GoalTask> tasks) {
+    List<GoalTask> result = [];
+    for (var task in tasks) {
+      result.add(task);
+      result.addAll(_deepFlatten(task.subtasks));
     }
-    return ids;
+    return result;
+  }
+
+  // Check if notification-relevant fields changed
+  bool _notificationParametersChanged(GoalTask oldTask, GoalTask newTask) {
+     if (oldTask.title != newTask.title) return true;
+     if (oldTask.scheduledDate != newTask.scheduledDate) return true;
+     if (oldTask.frequency != newTask.frequency) return true;
+     if (oldTask.isCompleted != newTask.isCompleted) return true; 
+     // estimatedHours affects "At End" alerts, so check it too
+     if (oldTask.estimatedHours != newTask.estimatedHours) return true;
+     // suggestedTime can affect default time fallback
+     if (oldTask.suggestedTime != newTask.suggestedTime) return true;
+     
+     return false;
   }
 
   // ==================== Phases ====================

@@ -181,18 +181,34 @@ class MotivationalEngine {
           continue; 
       }
 
+      // 3. Reschedule logic for Nudges
+      // FIX logic: Don't use raw hours < 24 for "Due Today" if it is actually tomorrow.
       final deadline = item.deadline!;
+      
+      final isSameDay = now.year == deadline.year && now.month == deadline.month && now.day == deadline.day;
       final difference = deadline.difference(now);
-      final daysLeft = difference.inDays;
       final hoursLeft = difference.inHours;
 
-      // Nudge at < 24h and < 48h
-      bool urgent = hoursLeft > 0 && hoursLeft < 24;
-      bool upcoming = daysLeft >= 1 && daysLeft <= 2;
+      // "Urgent" means Due Today AND hours > 0 (future today)
+      // "Upcoming" means tomorrow or day after.
+      
+      bool istoday = isSameDay && difference.isNegative == false; 
+      // check if tomorrow
+      final tomorrow = now.add(const Duration(days: 1));
+      final isTomorrow = tomorrow.year == deadline.year && tomorrow.month == deadline.month && tomorrow.day == deadline.day;
 
-      if (urgent || upcoming) {
-         String title = urgent ? "Due Today! ⏰" : "Coming Up ⏳";
-         String timeString = urgent ? "today" : "in $daysLeft days";
+      if (istoday || isTomorrow) {
+         String title;
+         String timeString;
+         
+         if (istoday) {
+            title = "Due Today! ⏰";
+            timeString = "today";
+         } else {
+            title = "Due Tomorrow ⏳";
+            timeString = "tomorrow";
+         }
+         
          String body = "Don't forget '${item.title}' is due $timeString.";
          
          // ... (AI Generation for non-settings users) ...
