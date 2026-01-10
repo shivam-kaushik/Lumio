@@ -268,6 +268,19 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
       
       // Create Tasks
       for (var item in plan) {
+        // Parse explicit time if available
+        DateTime? finalDate = _selectedDate;
+        if (item['specificTime'] != null) {
+            final parts = item['specificTime'].toString().split(':');
+            if (parts.length == 2) {
+               final hour = int.tryParse(parts[0]);
+               final min = int.tryParse(parts[1]);
+               if (hour != null && min != null) {
+                  finalDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, hour, min);
+               }
+            }
+        }
+        
         final task = GoalTask(
           id: 0, 
           goalId: goalId,
@@ -279,7 +292,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
           createdAt: DateTime.now(),
           isCompleted: false,
           subtasks: [],
-          scheduledDate: _selectedDate,
+          scheduledDate: finalDate, // Use precise time if available
         );
         
         await provider.createTask(task);

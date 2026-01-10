@@ -1165,6 +1165,8 @@ CRITICAL RULES:
 4. If the user mentions specific times (e.g., "call at 2pm"), use them.
 5. If no times mentioned, suggest a logical order.
 
+6. Extract specific time to 'specificTime' field (HH:MM 24h format) if user mentioned it.
+
 Return ONLY a JSON Array:
 [
   {
@@ -1172,7 +1174,8 @@ Return ONLY a JSON Array:
     "description": "Brief details",
     "estimatedMinutes": 60,
     "priority": "high",
-    "suggestedTime": "morning" // or afternoon, evening
+    "suggestedTime": "morning", // or afternoon, evening
+    "specificTime": "14:30" // Optional: HH:MM 24h formt if user specified time
   }
 ]
 ''';
