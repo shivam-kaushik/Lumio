@@ -1165,7 +1165,7 @@ CRITICAL RULES:
 4. If the user mentions specific times (e.g., "call at 2pm"), use them.
 5. If no times mentioned, suggest a logical order.
 
-6. Extract specific time to 'specificTime' field (HH:MM 24h format) if user mentioned it.
+6. Extract specific time to 'specificTime' field (HH:MM 24h format). Handle "3.30pm" as "15:30", "3:30" as "03:30". Normalize all separators to colon.
 
 Return ONLY a JSON Array:
 [

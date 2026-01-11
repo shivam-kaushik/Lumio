@@ -109,8 +109,8 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
   static final _datePattern = RegExp(r'\b(today|tomorrow|mon|tue|wed|thu|fri|sat|sun)\b', caseSensitive: false);
   static final _priorityPattern = RegExp(r'(!high|!medium|!low|!p[1-3])', caseSensitive: false);
   static final _tagPattern = RegExp(r'(#[a-zA-Z0-9_]+)', caseSensitive: false);
-  // Simple time regex: 5pm, 5:30pm, 14:00
-  static final _timePattern = RegExp(r'\b((1[0-2]|0?[1-9])(:[0-5][0-9])?\s*(am|pm)|([01]?[0-9]|2[0-3]):[0-5][0-9])\b', caseSensitive: false);
+  // Simple time regex: 5pm, 5:30pm, 5.30pm, 14:00, 14.30
+  static final _timePattern = RegExp(r'\b((1[0-2]|0?[1-9])([:.][0-5][0-9])?\s*(am|pm)|([01]?[0-9]|2[0-3])[:.][0-5][0-9])\b', caseSensitive: false);
 
   @override
   void initState() {
@@ -176,9 +176,11 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
     // 2. Time Detection
     final timeMatch = _timePattern.firstMatch(text);
     if (timeMatch != null) {
-        // Very basic parsing for demo
         try {
-            final tStr = timeMatch.group(0)!.toLowerCase().replaceAll(' ', '');
+            var tStr = timeMatch.group(0)!.toLowerCase().replaceAll(' ', '');
+            // Normalize dot to colon
+            tStr = tStr.replaceAll('.', ':');
+            
             if (tStr.contains('am') || tStr.contains('pm')) {
                 // 12-hour format
                 final isPm = tStr.contains('pm');
