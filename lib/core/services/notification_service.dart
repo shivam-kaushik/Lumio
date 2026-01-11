@@ -715,10 +715,10 @@ class NotificationService {
   /// Get pending notifications
   Future<List<PendingNotificationRequest>> getPendingNotifications() async {
     final pending = await _notifications.pendingNotificationRequests();
-    debugPrint('📋 Pending notifications: ${pending.length}');
-    for (var p in pending) {
-      debugPrint('  - ID: ${p.id}, Title: ${p.title}, Body: ${p.body}');
-    }
+    // debugPrint('📋 Pending notifications: ${pending.length}');
+    // for (var p in pending) {
+    //   debugPrint('  - ID: ${p.id}, Title: ${p.title}, Body: ${p.body}');
+    // }
     return pending;
   }
 

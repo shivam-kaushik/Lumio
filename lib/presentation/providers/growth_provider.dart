@@ -353,6 +353,8 @@ class GrowthProvider with ChangeNotifier {
     int? goalId;
     GoalTask? deletedTask;
 
+    debugPrint('🗑️ Deleting Task ID: $taskId');
+
     for (var key in _tasksByGoal.keys) {
       final list = _tasksByGoal[key];
       if (list != null) {
@@ -361,6 +363,7 @@ class GrowthProvider with ChangeNotifier {
           goalId = key;
           deletedTask = list[index];
           list.removeAt(index);
+          debugPrint('✅ Task removed locally from Goal $goalId');
           break;
         }
       }
@@ -368,6 +371,8 @@ class GrowthProvider with ChangeNotifier {
 
     if (deletedTask != null) {
       notifyListeners(); // Trigger UI rebuild immediately
+    } else {
+      debugPrint('⚠️ Task ID $taskId not found in local state!');
     }
 
     try {

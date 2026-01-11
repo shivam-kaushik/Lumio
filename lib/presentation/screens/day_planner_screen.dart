@@ -699,7 +699,10 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                isLast: index == tasks.length - 1,
                isPast: task.isCompleted, // Simplify "past" logic for now
                onTap: () => _showEditTask(task, provider),
-               onDelete: () => provider.deleteTask(task.id),
+               onDelete: () {
+                 setState(() {});
+                 provider.deleteTask(task.id);
+               },
                onToggle: (val) {
                  if (val == true) {
                     provider.completeTask(task.id);
