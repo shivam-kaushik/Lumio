@@ -25,6 +25,7 @@ class GrowthProvider with ChangeNotifier {
   List<UserLocation> _savedLocations = []; // NEW: Saved Locations
   bool _isLoading = false;
   String? _error;
+  int? _focusedTaskId; // NEW: Track focused task for timer visibility
 
   GrowthProvider({
     required FirestoreGrowthRepository repository,
@@ -39,6 +40,7 @@ class GrowthProvider with ChangeNotifier {
   List<UserLocation> get savedLocations => _savedLocations; // NEW
   bool get isLoading => _isLoading;
   String? get error => _error;
+  int? get focusedTaskId => _focusedTaskId; // NEW
   
   // Helper to get all tasks flat
   List<GoalTask> get allTasks => _tasksByGoal.values.expand((l) => l).toList();
@@ -413,6 +415,7 @@ class GrowthProvider with ChangeNotifier {
     }
 
     if (deletedTask != null) {
+      if (_focusedTaskId == taskId) _focusedTaskId = null; // Clear focus if deleted
       notifyListeners(); // Trigger UI rebuild immediately
     } else {
       debugPrint('⚠️ Task ID $taskId not found in local state!');
@@ -471,6 +474,11 @@ class GrowthProvider with ChangeNotifier {
       }
 
       SoundService().playSuccess();
+
+      // Clear focus on completion
+      if (_focusedTaskId == taskId) {
+        _focusedTaskId = null;
+      }
 
       await _repository.completeTask(taskId);
       
@@ -722,21 +730,28 @@ class GrowthProvider with ChangeNotifier {
         // Start
         final updated = task.copyWith(startedAt: DateTime.now());
         await updateTask(updated);
+        _focusedTaskId = taskId; // Set focus
         soundService.playStart();
       } else {
         // Stop
         final now = DateTime.now();
         final sessionDuration = now.difference(task.startedAt!);
-        final currentActual = task.actualMinutes ?? 0;
+        
+        // Calculate new total duration in seconds
+        final currentActualSeconds = task.actualSeconds ?? ((task.actualMinutes ?? 0) * 60);
+        final newTotalSeconds = currentActualSeconds + sessionDuration.inSeconds;
+        
         final updated = task.copyWith(
           clearStartedAt: true, // Clear active session
-          actualMinutes: currentActual + sessionDuration.inMinutes,
+          actualMinutes: (newTotalSeconds / 60).floor(), // Update minutes for display compatibility
+          actualSeconds: newTotalSeconds, // Store precise seconds
         );
         
         // Use repository directly to avoid full reload if fast toggle
         await _repository.updateTask(updated);
         // We do want to reload to update UI
         await loadGrowthData();
+        // Do NOT clear _focusedTaskId here, so it stays visible
         soundService.playStop();
       }
     } catch (e) {
@@ -751,10 +766,15 @@ class GrowthProvider with ChangeNotifier {
       final taskList = _tasksByGoal.values.expand((l) => l);
       final task = taskList.firstWhere((t) => t.id == taskId);
       
-      // Reset actual minutes and clear start time
+      // If running, restart from 0 but keep running. If paused, reset to 0 and stay paused.
+      final wasRunning = task.startedAt != null;
+      
       final updated = task.copyWith(
-        clearStartedAt: true,
+        // If running, set new start time. If paused, ensure it's cleared.
+        startedAt: wasRunning ? DateTime.now() : null,
+        clearStartedAt: !wasRunning, // Only use clear flag if we are Paused
         actualMinutes: 0,
+        actualSeconds: 0,
       );
       
       await updateTask(updated);
@@ -795,5 +815,19 @@ class GrowthProvider with ChangeNotifier {
     _savedLocations.removeWhere((l) => l.id == id);
     notifyListeners();
     await _persistSavedLocations();
+  }
+
+  /// Explicitly close the active task view
+  Future<void> closeActiveTask() async {
+    if (_focusedTaskId != null) {
+      try {
+        final task = allTasks.firstWhere((t) => t.id == _focusedTaskId);
+        if (task.startedAt != null) {
+           await toggleTaskTimer(task.id);
+        }
+      } catch (_) {}
+    }
+    _focusedTaskId = null;
+    notifyListeners();
   }
 }

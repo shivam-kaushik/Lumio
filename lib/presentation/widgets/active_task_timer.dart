@@ -38,16 +38,30 @@ class _ActiveTaskTimerState extends State<ActiveTaskTimer> with SingleTickerProv
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateDuration());
   }
 
+  @override
+  void didUpdateWidget(ActiveTaskTimer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.task != widget.task) {
+      _updateDuration();
+    }
+  }
+
   void _updateDuration() {
     if (widget.task.startedAt == null) {
         if (_animController.isAnimating) _animController.stop();
+        // Just show accumulated time
+        if (mounted) {
+           final seconds = widget.task.actualSeconds ?? ((widget.task.actualMinutes ?? 0) * 60);
+           setState(() => _currentDuration = Duration(seconds: seconds));
+        }
         return;
     }
     
     if (!_animController.isAnimating) _animController.repeat();
 
     final sessionDuration = DateTime.now().difference(widget.task.startedAt!);
-    final totalDuration = Duration(minutes: widget.task.actualMinutes ?? 0) + sessionDuration;
+    final baseSeconds = widget.task.actualSeconds ?? ((widget.task.actualMinutes ?? 0) * 60);
+    final totalDuration = Duration(seconds: baseSeconds) + sessionDuration;
     
     if (mounted) {
       setState(() => _currentDuration = totalDuration);
@@ -63,7 +77,8 @@ class _ActiveTaskTimerState extends State<ActiveTaskTimer> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    if (widget.task.startedAt == null) return const SizedBox.shrink();
+    // Removed auto-hide check to allow "Focused but Paused" state
+    // if (widget.task.startedAt == null) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -96,52 +111,69 @@ class _ActiveTaskTimerState extends State<ActiveTaskTimer> with SingleTickerProv
         children: [
             // Header
             Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start, // Align to top
                 children: [
-                    Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                            Text(
-                                "CURRENTLY FOCUSING ON",
-                                style: TextStyle(
-                                    color: AppTheme.primaryColor,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 10,
-                                    letterSpacing: 1.2
-                                ),
-                            ),
-                            const SizedBox(height: 4),
-                            SizedBox(
-                                width: 200,
-                                child: Text(
-                                    widget.task.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                    ),
-                                ),
-                            ),
-                        ],
+                    Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                              Text(
+                                  "CURRENTLY FOCUSING ON",
+                                  style: TextStyle(
+                                      color: AppTheme.primaryColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                      letterSpacing: 1.2
+                                  ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                  widget.task.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                  ),
+                              ),
+                          ],
+                      ),
                     ),
+                    const SizedBox(width: 8), 
+                    // Efficiency Badge
                     Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                             color: isDark ? Colors.black26 : Colors.grey[100],
                             borderRadius: BorderRadius.circular(20)
                         ),
                         child: Row(
                             children: [
-                                const Icon(Icons.bolt_rounded, size: 16, color: Colors.amber),
+                                const Icon(Icons.bolt_rounded, size: 14, color: Colors.amber),
                                 const SizedBox(width: 4),
                                 Text(
-                                    "${widget.task.efficiencyScore}% Eff.",
+                                    "${widget.task.efficiencyScore}%",
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                 )
                             ],
                         ),
-                    )
+                    ),
+                    const SizedBox(width: 8),
+                    // Close Button
+                    InkWell(
+                        onTap: () {
+                           context.read<GrowthProvider>().closeActiveTask();
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                           padding: const EdgeInsets.all(4),
+                           decoration: BoxDecoration(
+                               color: isDark ? Colors.black12 : Colors.grey[200],
+                               shape: BoxShape.circle,
+                           ),
+                           child: Icon(Icons.close, size: 18, color: Colors.grey),
+                        ),
+                    ),
                 ],
             ),
 
@@ -221,14 +253,16 @@ class _ActiveTaskTimerState extends State<ActiveTaskTimer> with SingleTickerProv
                          },
                      ),
                      const SizedBox(width: 24),
-                     // Pause
+                     // Play / Pause Toggle
                      _ControlButton(
-                         icon: Icons.pause_rounded,
-                         color: Colors.orangeAccent,
-                         label: "Pause",
+                         icon: widget.task.startedAt != null ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                         color: widget.task.startedAt != null ? Colors.orangeAccent : Colors.green,
+                         label: widget.task.startedAt != null ? "Pause" : "Resume",
                          onTap: () {
                              context.read<GrowthProvider>().toggleTaskTimer(widget.task.id);
-                             widget.onStop?.call();
+                             if (widget.task.startedAt != null) {
+                                widget.onStop?.call();
+                             }
                          },
                      ),
                      const SizedBox(width: 24),
@@ -238,13 +272,17 @@ class _ActiveTaskTimerState extends State<ActiveTaskTimer> with SingleTickerProv
                          color: Colors.green,
                          label: "Done",
                          isLarge: true,
-                         onTap: () {
-                             context.read<GrowthProvider>().toggleTaskTimer(widget.task.id).then((_) {
-                                 if (context.mounted) {
-                                     context.read<GrowthProvider>().completeTask(widget.task.id);
-                                     widget.onComplete?.call();
-                                 }
-                             });
+                         onTap: () async {
+                             final provider = context.read<GrowthProvider>();
+                             // Clean stop if running
+                             if (widget.task.startedAt != null) {
+                                await provider.toggleTaskTimer(widget.task.id);
+                             }
+                             
+                             if (context.mounted) {
+                                 await provider.completeTask(widget.task.id);
+                                 widget.onComplete?.call();
+                             }
                          },
                      ),
                 ],

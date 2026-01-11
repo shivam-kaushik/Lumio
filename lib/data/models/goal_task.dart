@@ -8,7 +8,8 @@ class GoalTask {
   final String description;
   final double? estimatedHours;
   final int? estimatedMinutes; // For Day Planner
-  final int? actualMinutes;    // For Day Planner Tracking
+  final int? actualMinutes;    // For Day Planner Tracking (Legacy/Display)
+  final int? actualSeconds;    // For Precise Tracking
   final DateTime? startedAt;   // For Live Tracking
   final String priority; // 'high', 'medium', 'low'
   final String frequency; // 'daily', 'weekly', 'monthly', 'one-time'
@@ -33,6 +34,7 @@ class GoalTask {
     this.estimatedHours,
     this.estimatedMinutes,
     this.actualMinutes,
+    this.actualSeconds,
     this.startedAt,
     this.priority = 'medium',
     this.frequency = 'one-time',
@@ -52,11 +54,17 @@ class GoalTask {
 
   /// Computed efficiency score
   int get efficiencyScore {
-    if (actualMinutes == null || actualMinutes == 0) return 0;
+    // Prefer seconds for precision
+    int actualMins = actualMinutes ?? 0;
+    if (actualSeconds != null && actualSeconds! > 0) {
+        actualMins = (actualSeconds! / 60).round();
+    }
+    
+    if (actualMins == 0) return 0;
     // Use estimatedMinutes if available, else convert estimatedHours
     final est = estimatedMinutes ?? ((estimatedHours ?? 0) * 60).round();
     if (est == 0) return 0;
-    return (est / actualMinutes! * 100).toInt();
+    return (est / actualMins * 100).toInt();
   }
 
   /// Create GoalTask from database map
@@ -69,6 +77,7 @@ class GoalTask {
       estimatedHours: (map['estimated_hours'] as num?)?.toDouble(),
       estimatedMinutes: (map['estimated_minutes'] as num?)?.toInt(),
       actualMinutes: (map['actual_minutes'] as num?)?.toInt(),
+      actualSeconds: (map['actual_seconds'] as num?)?.toInt(),
       startedAt: map['started_at'] != null ? DateTime.tryParse(map['started_at'] as String) : null,
       priority: map['priority'] as String? ?? 'medium',
       frequency: map['frequency'] as String? ?? 'one-time',
@@ -104,6 +113,7 @@ class GoalTask {
       'estimated_hours': estimatedHours,
       'estimated_minutes': estimatedMinutes,
       'actual_minutes': actualMinutes,
+      'actual_seconds': actualSeconds,
       'started_at': startedAt?.toIso8601String(),
       'priority': priority,
       'frequency': frequency,
@@ -131,6 +141,7 @@ class GoalTask {
       'estimated_hours': estimatedHours,
       'estimated_minutes': estimatedMinutes,
       'actual_minutes': actualMinutes,
+      'actual_seconds': actualSeconds,
       'started_at': startedAt?.toIso8601String(),
       'priority': priority,
       'frequency': frequency,
@@ -157,6 +168,7 @@ class GoalTask {
     double? estimatedHours,
     int? estimatedMinutes,
     int? actualMinutes,
+    int? actualSeconds,
     DateTime? startedAt,
     bool clearStartedAt = false,
     String? priority,
@@ -182,6 +194,7 @@ class GoalTask {
       estimatedHours: estimatedHours ?? this.estimatedHours,
       estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
       actualMinutes: actualMinutes ?? this.actualMinutes,
+      actualSeconds: actualSeconds ?? this.actualSeconds,
       startedAt: clearStartedAt ? null : (startedAt ?? this.startedAt),
       priority: priority ?? this.priority,
       frequency: frequency ?? this.frequency,
@@ -234,6 +247,7 @@ class GoalTask {
       estimatedHours: (data['estimatedHours'] as num?)?.toDouble() ?? (data['estimated_hours'] as num?)?.toDouble(),
       estimatedMinutes: (data['estimatedMinutes'] as num?)?.toInt() ?? (data['estimated_minutes'] as num?)?.toInt(),
       actualMinutes: (data['actualMinutes'] as num?)?.toInt() ?? (data['actual_minutes'] as num?)?.toInt(),
+      actualSeconds: (data['actualSeconds'] as num?)?.toInt() ?? (data['actual_seconds'] as num?)?.toInt(),
       startedAt: data['startedAt'] != null || data['started_at'] != null
           ? ((data['startedAt'] ?? data['started_at']) is Timestamp
               ? ((data['startedAt'] ?? data['started_at']) as Timestamp).toDate()
@@ -280,6 +294,7 @@ class GoalTask {
       'estimatedHours': estimatedHours,
       'estimatedMinutes': estimatedMinutes,
       'actualMinutes': actualMinutes,
+      'actualSeconds': actualSeconds,
       'startedAt': startedAt != null ? Timestamp.fromDate(startedAt!) : null,
       'priority': priority,
       'frequency': frequency,

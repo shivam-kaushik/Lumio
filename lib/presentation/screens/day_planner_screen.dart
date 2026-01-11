@@ -409,11 +409,33 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
         if (hasPlan && _generatedPlan == null) {
           // MODE B: DASHBOARD (Plan Exists)
           
-          // Find active task for Timer
+          // Find active task for Timer (Prioritize Focused ID, then Started Task)
           GoalTask? activeTask;
-          try {
-             activeTask = tasks.firstWhere((t) => t.startedAt != null);
-          } catch (_) {}
+          
+          if (provider.focusedTaskId != null) {
+              try {
+                  activeTask = tasks.firstWhere((t) => t.id == provider.focusedTaskId);
+              } catch (_) {
+                  // Focused task might be in another goal or hidden, try finding in all tasks
+                  try {
+                       activeTask = provider.allTasks.firstWhere((t) => t.id == provider.focusedTaskId);
+                  } catch (e) {
+                       // Task might be deleted
+                  }
+              }
+          }
+          
+          // Fallback: If no focus but something is running (e.g. app restart), show that
+          if (activeTask == null) {
+              try {
+                 activeTask = tasks.firstWhere((t) => t.startedAt != null);
+              } catch (_) {
+                  try {
+                      // Check globally if not in today's view
+                      activeTask = provider.allTasks.firstWhere((t) => t.startedAt != null);
+                  } catch (_) {}
+              }
+          }
 
           // Sort tasks for timeline
           tasks.sort((a, b) {
@@ -425,22 +447,24 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
           return Scaffold(
             backgroundColor: theme.scaffoldBackgroundColor,
             body: SafeArea(
-              child: Column(
-                children: [
+              child: CustomScrollView(
+                slivers: [
                   // 1. Header & Date Strip
-                  _buildDateHeader(theme, textColor, subtleColor),
-                  
-                  // 2. Active Timer (Floating at top if active)
-                  if (activeTask != null)
-                      Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: ActiveTaskTimer(task: activeTask),
-                      ),
-
-                  // 3. Timeline Content
-                  Expanded(
-                    child: _buildTimelineList(context, provider, tasks, activeTask?.id, isDark, textColor, subtleColor),
+                  SliverToBoxAdapter(
+                    child: _buildDateHeader(theme, textColor, subtleColor),
                   ),
+
+                  // 2. Active Timer (Floating at top if Focus is active)
+                  if (activeTask != null)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: ActiveTaskTimer(task: activeTask),
+                      ),
+                    ),
+
+                  // 3. Timeline Content (Converted to Slivers)
+                  _buildTimelineSliver(context, provider, tasks, activeTask?.id, isDark, textColor, subtleColor),
                 ],
               ),
             ),
@@ -665,71 +689,73 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     );
   }
 
-  Widget _buildTimelineList(BuildContext context, GrowthProvider provider, List<GoalTask> tasks, int? activeTaskId, bool isDark, Color textColor, Color subtleColor) {
-     return ListView(
+  Widget _buildTimelineSliver(BuildContext context, GrowthProvider provider, List<GoalTask> tasks, int? activeTaskId, bool isDark, Color textColor, Color subtleColor) {
+     return SliverPadding(
        padding: const EdgeInsets.only(left: 24, right: 24, bottom: 100),
-       children: [
-         // 1. Rise and Shine Anchor
-         _buildTimelineAnchor(
-           icon: Icons.wb_sunny_rounded,
-           time: _wakeUpTime.format(context),
-           title: _wakeUpTitle,
-           color: AppTheme.primaryColor,
-           isStart: true,
-           isDark: isDark,
-           textColor: textColor,
-           subtleColor: subtleColor,
-           onTap: () => _showEditAnchorDialog(true),
-         ),
-         
-         // 2. Task List
-         if (tasks.isEmpty)
-           Padding(
-             padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 40),
-             child: Text(
-               "No tasks scheduled yet. Tap + to add one!", 
-               style: TextStyle(color: subtleColor.withOpacity(0.5)),
-               textAlign: TextAlign.center,
-             ),
-           )
-         else
-           ...tasks.asMap().entries.map((entry) {
-             final index = entry.key;
-             final task = entry.value;
-             return TimelineTaskTile(
-               task: task,
-               isFirst: index == 0,
-               isLast: index == tasks.length - 1,
-               isPast: task.isCompleted, // Simplify "past" logic for now
-               onTap: () => _showEditTask(task, provider),
-               onDelete: () {
-                 setState(() {});
-                 provider.deleteTask(task.id);
-               },
-               onToggle: (val) {
-                 if (val == true) {
-                    provider.completeTask(task.id);
-                 } else {
-                    provider.uncompleteTask(task.id);
-                 }
-               },
-               onToggleTimer: () => provider.toggleTaskTimer(task.id),
-             );
-           }),
+       sliver: SliverList(
+         delegate: SliverChildListDelegate([
+           // 1. Rise and Shine Anchor
+           _buildTimelineAnchor(
+             icon: Icons.wb_sunny_rounded,
+             time: _wakeUpTime.format(context),
+             title: _wakeUpTitle,
+             color: AppTheme.primaryColor,
+             isStart: true,
+             isDark: isDark,
+             textColor: textColor,
+             subtleColor: subtleColor,
+             onTap: () => _showEditAnchorDialog(true),
+           ),
+           
+           // 2. Task List
+           if (tasks.isEmpty)
+             Padding(
+               padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 40),
+               child: Text(
+                 "No tasks scheduled yet. Tap + to add one!", 
+                 style: TextStyle(color: subtleColor.withOpacity(0.5)),
+                 textAlign: TextAlign.center,
+               ),
+             )
+           else
+             ...tasks.asMap().entries.map((entry) {
+               final index = entry.key;
+               final task = entry.value;
+               return TimelineTaskTile(
+                 task: task,
+                 isFirst: index == 0,
+                 isLast: index == tasks.length - 1,
+                 isPast: task.isCompleted, 
+                 onTap: () => _showEditTask(task, provider),
+                 onDelete: () {
+                   setState(() {});
+                   provider.deleteTask(task.id);
+                 },
+                 onToggle: (val) {
+                   if (val == true) {
+                      provider.completeTask(task.id);
+                   } else {
+                      provider.uncompleteTask(task.id);
+                   }
+                 },
+                 onToggleTimer: () => provider.toggleTaskTimer(task.id),
+               );
+             }),
 
-         // 3. Wind Down Anchor
-         _buildTimelineAnchor(
-           icon: Icons.nights_stay_rounded,
-           time: _bedTime.format(context),
-           title: _bedTimeTitle,
-           color: const Color(0xFF6C757D), 
-           isStart: false,
-           isDark: isDark,
-           textColor: textColor,
-           subtleColor: subtleColor,
-           onTap: () => _showEditAnchorDialog(false),
-         ),
-       ],
+           // 3. Wind Down Anchor
+           _buildTimelineAnchor(
+             icon: Icons.nights_stay_rounded,
+             time: _bedTime.format(context),
+             title: _bedTimeTitle,
+             color: const Color(0xFF6C757D), 
+             isStart: false,
+             isDark: isDark,
+             textColor: textColor,
+             subtleColor: subtleColor,
+             onTap: () => _showEditAnchorDialog(false),
+           ),
+         ]),
+       ),
      );
   }
 
