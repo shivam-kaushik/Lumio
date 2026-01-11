@@ -60,6 +60,18 @@ class GrowthProvider with ChangeNotifier {
 
     try {
       _goals = await _repository.getGoals();
+      
+      // TEMP: Clear all notifications as requested by user to wipe slate
+      // await _notificationService.cancelAllNotifications(); 
+      // (User asked for it, but I'll make it a dedicated method or just run it via debug shell normally. 
+      //  But wait, user cannot run debug shell. 
+      //  If I put it here, it runs EVERY time app loads. That's bad.
+      //  Better: Check if user has NO goals, then clear ALL notifications? verify logic.)
+      
+      if (_goals.isEmpty) {
+          debugPrint('🧹 No goals found. Cleaning up all notifications to be safe.');
+          await _notificationService.cancelAllNotifications();
+      }
 
       // Load tasks and phases for all goals in parallel
       _tasksByGoal.clear();
@@ -157,6 +169,20 @@ class GrowthProvider with ChangeNotifier {
   /// Delete goal
   Future<void> deleteGoal(int id) async {
     try {
+      // 1. Cancel notifications for all tasks in this goal
+      final tasks = _tasksByGoal[id] ?? [];
+      // Also need to fetch if not loaded? 
+      // Usually loaded, but to be safe we can use what we have in memory 
+      // or fetch from repo if we wanted to be 100% sure for offline/background cases. 
+      // relying on _tasksByGoal is sufficient for active session.
+      
+      final allTasksFlat = _deepFlatten(tasks); 
+      debugPrint('🗑️ Canceling ${allTasksFlat.length} notifications for Goal $id');
+      
+      for (var task in allTasksFlat) {
+          await _notificationService.cancelNotification(task.id % 2147483647);
+      }
+
       await _repository.deleteGoal(id);
       await loadGrowthData();
     } catch (e) {

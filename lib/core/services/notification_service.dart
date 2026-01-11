@@ -634,6 +634,8 @@ class NotificationService {
         summaryText: null, // Keeps it clean
       ),
       actions: actions,
+      groupKey: 'com.awarely.tasks', // Group notifications
+      setAsGroupSummary: false, // Individual notifications
     );
 
     // iOS notification details (actions require separate registration, simplified for now)

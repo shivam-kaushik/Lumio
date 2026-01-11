@@ -444,11 +444,14 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                 ],
               ),
             ),
-            floatingActionButton: FloatingActionButton(
+            floatingActionButton: Padding(
+              padding: const EdgeInsets.only(bottom: 100.0), // Clear nav bar
+              child: FloatingActionButton(
                 heroTag: "day_planner_fab_mode_b",
                 onPressed: () => _showQuickAdd(context, provider),
                 backgroundColor: AppTheme.primaryColor,
                 child: const Icon(Icons.add, color: Colors.white),
+              ),
             ),
           );
         }
