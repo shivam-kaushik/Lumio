@@ -364,4 +364,58 @@ class TemplateEngine {
     ];
     return templates[Random().nextInt(templates.length)];
   }
+
+  // --- NEW: Tone-Specific Templates ---
+
+  static String getFunnyTitle(String taskTitle) {
+    final templates = [
+      "Knock knock! It's '$taskTitle' 🤡",
+      "Hey lazybones! '$taskTitle' time 🐢",
+      "Alert: '$taskTitle' incoming! 🚨",
+      "Don't ghost '$taskTitle' 👻",
+      "Your destiny awaits: '$taskTitle' 🔮",
+    ];
+    return templates[Random().nextInt(templates.length)];
+  }
+
+  static String getFunnyBody(String taskTitle) {
+    final templates = [
+      "It won't do itself. Unless you have magic powers? ✨",
+      "The world needs you to do this. Or at least I do.",
+      "Just do it, then go back to napping.",
+      "I promise it won't hurt (much).",
+      "Future you will thank present you. Maybe.",
+    ];
+    return templates[Random().nextInt(templates.length)];
+  }
+
+  static String getSevereTitle(String taskTitle) {
+    final templates = [
+      "Action Required: '$taskTitle'",
+      "CRITICAL: '$taskTitle' Due",
+      "Do Not Ignore: '$taskTitle'",
+      "Execute: '$taskTitle'",
+      "Immediate Attention: '$taskTitle'",
+    ];
+    return templates[Random().nextInt(templates.length)];
+  }
+
+  static String getSevereBody(String taskTitle) {
+    final templates = [
+      "Delay is the enemy of success. Act now.",
+      "Excuses don't get results. Execution does.",
+      "You set this goal. Respect it.",
+      "Discipline is doing what needs to be done.",
+      "Suffer the pain of discipline or the pain of regret.",
+    ];
+    return templates[Random().nextInt(templates.length)];
+  }
+
+  static String getQuotesTitle(String taskTitle) {
+    return "Wisdom for '$taskTitle' 💡";
+  }
+
+  static String getQuotesBody(String taskTitle) {
+     return "${getRandomQuote()}\nTask: $taskTitle";
+  }
 }

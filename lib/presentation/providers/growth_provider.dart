@@ -285,10 +285,11 @@ class GrowthProvider with ChangeNotifier {
           if (shouldSchedule) {
             final notificationId = currentTask.id % 2147483647;
             String body = _getNotificationBody(currentTask, goal, settings);
+            String title = _getNotificationTitle(currentTask, settings); // NEW: Dynamic Title
             
             await _notificationService.scheduleNotification(
               id: notificationId,
-              title: "Time for: ${currentTask.title}",
+              title: title,
               body: body,
               scheduledTime: triggerTime,
               matchDateTimeComponents: matchComponents,
@@ -310,19 +311,35 @@ class GrowthProvider with ChangeNotifier {
     await scheduleRecursive(task);
   }
 
+  String _getNotificationTitle(GoalTask task, GoalSettings? settings) {
+    if (settings == null) return "Time for: ${task.title}";
+
+    switch (settings.tone) {
+      case NotificationTone.funny:
+         return TemplateEngine.getFunnyTitle(task.title);
+      case NotificationTone.severe:
+         return TemplateEngine.getSevereTitle(task.title);
+      case NotificationTone.quotes:
+         return TemplateEngine.getQuotesTitle(task.title);
+      case NotificationTone.motivational:
+      default:
+         return "Time for: ${task.title}";
+    }
+  }
+
   String _getNotificationBody(GoalTask task, Goal goal, GoalSettings? settings) {
     if (settings == null) return TemplateEngine.getTaskReminder(task.title, goal.name);
 
     switch (settings.tone) {
       case NotificationTone.funny:
-         return "Hey! '${task.title}' isn't going to do itself. The world needs you! 🌍";
+         return TemplateEngine.getFunnyBody(task.title);
       case NotificationTone.severe:
-         return "ACT NOW: ${task.title}. Delay is the enemy of success.";
+         return TemplateEngine.getSevereBody(task.title);
       case NotificationTone.quotes:
-         return '"Action is the foundational key to all success."\nTask: ${task.title}';
+         return TemplateEngine.getQuotesBody(task.title);
       case NotificationTone.motivational:
       default:
-         return "Time to make progress on '${goal.name}'! Tackle '${task.title}' now.";
+         return TemplateEngine.getTaskReminder(task.title, goal.name);
     }
   }
 
