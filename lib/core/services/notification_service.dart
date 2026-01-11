@@ -2,13 +2,16 @@ import 'dart:convert';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:flutter/widgets.dart';
 import '../../core/constants/app_constants.dart';
 import '../../data/repositories/firestore_reminder_repository.dart';
 import '../../data/repositories/firestore_growth_repository.dart';
 import '../../core/services/firestore_service.dart';
 import '../../data/models/context_event.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show FieldValue;
-import '../../data/models/context_event.dart';
+import 'package:firebase_core/firebase_core.dart';
+import '../../firebase_options.dart';
 
 /// Notification service for managing local notifications
 class NotificationService {
@@ -101,215 +104,187 @@ class NotificationService {
   @pragma('vm:entry-point')
   static void _onBackgroundNotificationTapped(
       NotificationResponse response,) async {
-    final payload = response.payload;
-    final actionId = response.actionId;
-    
-    debugPrint('Notification tapped (background): $payload, actionId: $actionId');
-
-    if (payload != null) {
-      if (actionId == 'complete_action' && response.id != null) {
-        // Handle complete action
-        await _handleCompleteAction(payload, response.id!);
-      } else if (actionId == 'snooze_action' && response.id != null) {
-        // Handle snooze action
-        await _handleSnoozeAction(payload, response.id!);
-      } else if (actionId == 'quick_log_action' && response.id != null) {
-        // Handle quick log action
-        await _handleQuickLogAction(payload, response.id!);
-      } else {
-        await _recordNotificationInteraction(payload, 'seen');
+    // 0. Global Safety Try-Catch
+    try {
+      // CRITICAL: Initialize Flutter Binding & Timezones for Background Isolate
+      WidgetsFlutterBinding.ensureInitialized();
+      try {
+        tz_data.initializeTimeZones();
+      } catch (e) {
+        debugPrint('⚠️ Timezone init failed/already done: $e');
       }
+
+      final payload = response.payload;
+      final actionId = response.actionId;
+      
+      debugPrint('🔔 Notification tapped (background): $payload, actionId: $actionId');
+
+      if (payload != null) {
+        if (actionId == 'complete_action' && response.id != null) {
+          await _handleCompleteAction(payload, response.id!);
+        } else if (actionId == 'snooze_action' && response.id != null) {
+          await _handleSnoozeAction(payload, response.id!);
+        } else if (actionId == 'quick_log_action' && response.id != null) {
+          await _handleQuickLogAction(payload, response.id!);
+        } else {
+          try {
+             await _recordNotificationInteraction(payload, 'seen');
+          } catch(e) {
+             debugPrint('⚠️ context log failed: $e');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('CRITICAL: Background notification handler crashed: $e');
     }
   }
 
-  /// Handle snooze action from notification (reschedule for 1 hour later)
+  /// Handle snooze action from notification
   static Future<void> _handleSnoozeAction(String payload, int notificationId) async {
-    debugPrint('⏰ Handling snooze action for payload: $payload, notification $notificationId');
+    debugPrint('⏰ Handling snooze action for notification $notificationId');
     
+    final newScheduledTime = DateTime.now().add(const Duration(minutes: 15));
+    
+    // ============================================================
+    // 1. IMMEDIATE UI RESPONSE (Cancel & Reschedule Local)
+    // ============================================================
     try {
-      // 1. Parse payload
-      String? reminderId;
-      int? goalTaskId;
-      String? title;
-      String? body;
+      final notificationService = NotificationService();
       
+      // Cancel old
+      await notificationService.cancelNotification(notificationId);
+      
+      // Parse basic data for display (safe parse)
+      String title = "Snoozed Task";
+      String body = "Snoozed for 15 minutes.";
       try {
         final data = jsonDecode(payload);
         if (data is Map<String, dynamic>) {
-           if (data.containsKey('reminder_id')) reminderId = data['reminder_id'] as String;
-           if (data.containsKey('task_id')) goalTaskId = data['task_id'] as int?; // New: support integer ID
-           title = data['title'] as String?;
-           body = data['body'] as String?;
+           if (data.containsKey('title')) title = data['title'] as String;
+           if (data.containsKey('body')) body = data['body'] as String;
+           // Append (Snoozed) if not present? Maybe not needed for clean UI.
         }
-      } catch (e) {
-        reminderId = payload; // Legacy fallback
-      }
-      
-      // Calculate new time (1 hour from now)
-      final newScheduledTime = DateTime.now().add(const Duration(hours: 1));
-      
-      // 2. Handle GoalTask specific persistence
-      if (goalTaskId != null || (reminderId != null && reminderId.startsWith('task_'))) {
-          // It's a GoalTask
-          final id = goalTaskId ?? int.tryParse(reminderId!.replaceFirst('task_', ''));
-          if (id != null) {
-              debugPrint('💤 Snoozing GoalTask $id until $newScheduledTime');
-              final growthRepo = FirestoreGrowthRepository();
-              // Using existing 'updateTask' is complex because we need the whole object.
-              // Instead, using a dedicated 'updateTaskField' would be ideal, but for now we fetch-update-save.
-              // Since NotificationService is static/isolated, we do this manually or via repository helper.
-              // Repository usually requires full object. 
-              // Let's implement a direct update for just the date if possible, OR fetch-modify-save.
-              // Given constraints, we'll try to fetch the task first.
-              
-              // We don't have direct access to 'GrowthProvider' state here easily as it's static.
-              // But we can use _repository.
-              
-              // Note: Ideally FirestoreGrowthRepository should have 'updateTaskDate(id, date)'
-              // Assuming updateTask works, we need to fetch it first. 
-              // BUT 'getTask(id)' might not exist in Repo API.
-              // Let's rely on standard 'updateTask' assuming we can construct a partial update OR
-              // if we can't fetch, we might skip persistence and just schedule local?
-              // The user REQUESTED persistence. 
-              
-              // Workaround: We will use a firestore merge update directly here?
-              // No, better to keep architecture clean.
-              // Let's assume we can just schedule the local notification for now, 
-              // AND try to update firestore if we can.
-              
-              // Since I can't easily fetch the task without context/repo lookup:
-              // I will use direct FirestoreService for this specific patch to ensure speed/reliability.
-              final firestore = FirestoreService();
-              final uid = firestore.currentUserId; // Fix: use currentUserId
-              if (uid != null) {
-                 // We don't know which goal... task is in subcollection 'tasks'.
-                 // We need to query collectionGroup or find the path.
-                 // This is tricky without parent goalId.
-                 // Wait! The payload HAS goal_id!
-                 
-                 int? goalId; 
-                 try {
-                     final d = jsonDecode(payload);
-                     goalId = d['goal_id'];
-                 } catch(_){}
+      } catch (_) {}
 
-                 if (goalId != null) {
-                    final tasksCollection = firestore.getTasksCollection(goalId.toString());
-                    if (tasksCollection != null) {
-                        await tasksCollection
-                            .doc(id.toString())
-                            .update({
-                                'scheduledDate': newScheduledTime.toIso8601String(),
-                                // Also update snake_case just in case
-                                'scheduled_date': newScheduledTime.toIso8601String(),
-                            });
-                        debugPrint('✅ Persisted snooze to Firestore for task $id');
-                    }
-                 }
-              }
-          }
-      } else if (reminderId != null) {
-         // Existing Logic for standard Reminders
-         final reminderRepository = FirestoreReminderRepository();
-         final reminder = await reminderRepository.getReminder(reminderId);
-         if (reminder != null) {
-             // Create context event (existing logic)
-              await reminderRepository.createContextEvent(
-                ContextEvent(
-                  reminderId: reminderId,
-                  contextType: 'notification_action',
-                  outcome: 'snoozed',
-                  metadata: {
-                    'snoozed_until': newScheduledTime.toIso8601String(),
-                    'original_notification_id': notificationId,
-                  },
-                ),
-              );
-              if (title == null) title = reminder.text;
-         }
-      }
-
-      // 3. Reschedule Local Notification
-      final notificationService = NotificationService();
-      await notificationService.cancelNotification(notificationId);
-      
-      final notificationTitle = title ?? "Snoozed Task";
-      final notificationBody = body ?? "Reminder snoozed for 1 hour.";
-      
-      // Generate new notification ID
+      // Schedule new
       final newNotificationId = DateTime.now().millisecondsSinceEpoch % 2147483647;
       
       await notificationService.scheduleNotification(
         id: newNotificationId,
-        title: notificationTitle,
-        body: notificationBody,
+        title: title,
+        body: body,
         scheduledTime: newScheduledTime,
         payload: payload, 
       );
-      
-      debugPrint('✅ Successfully snoozed notification $notificationId');
+      debugPrint('✅ UI Updated: Snoozed notification $notificationId');
     } catch (e) {
-      debugPrint('❌ Error handling snooze action: $e');
+      debugPrint('CRITICAL: Failed to update UI for snooze: $e');
+      // If UI fails, we can't do much.
+    }
+
+    // ============================================================
+    // 2. PERSISTENCE and LOGIC (Async/Background - Best Effort)
+    // ============================================================
+    try {
+      // Parse detailed payload
+      String? reminderId;
+      int? goalTaskId;
+      try {
+        final data = jsonDecode(payload);
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('reminder_id')) reminderId = data['reminder_id'] as String;
+          if (data.containsKey('task_id')) goalTaskId = data['task_id'] as int?; 
+        }
+      } catch (_) {
+        reminderId = payload; 
+      }
+      
+      // Check Firebase
+      if (Firebase.apps.isEmpty) {
+          try {
+            await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+          } catch(e) {
+            debugPrint('⚠️ Firebase Init failed in background: $e');
+            return; // Exit if firebase fails, to avoid crashes
+          }
+      }
+
+      // Update Firestore
+      if (goalTaskId != null || (reminderId != null && reminderId.startsWith('task_'))) {
+          final id = goalTaskId ?? int.tryParse(reminderId!.replaceFirst('task_', ''));
+          if (id != null) {
+             final firestore = FirestoreService();
+             // Just update, assume auth is okay or handle error
+             int? goalId;
+             try { final d = jsonDecode(payload); goalId = d['goal_id']; } catch(_){}
+             
+             if (goalId != null) {
+                 final tasksCollection = firestore.getTasksCollection(goalId.toString());
+                 if (tasksCollection != null) {
+                    tasksCollection.doc(id.toString()).update({
+                        'scheduledDate': newScheduledTime.toIso8601String(),
+                        'scheduled_date': newScheduledTime.toIso8601String(),
+                    }).catchError((e) => debugPrint('⚠️ Persistence update failed: $e'));
+                 }
+             }
+          }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Logic/Persistence error in snooze: $e');
     }
   }
 
   /// Handle complete action from notification
   static Future<void> _handleCompleteAction(String payload, int notificationId) async {
-    debugPrint('✅ Handling complete action for payload: $payload, notification $notificationId');
+    debugPrint('✅ Handling complete action for notification $notificationId');
     
+    // ============================================================
+    // 1. IMMEDIATE UI RESPONSE (Cancel Local)
+    // ============================================================
     try {
-      // Parse payload (can be reminder ID string or JSON)
+      final notificationService = NotificationService();
+      await notificationService.cancelNotification(notificationId);
+      debugPrint('✅ UI Updated: Cancelled notification $notificationId');
+    } catch (e) {
+      debugPrint('CRITICAL: Failed to cancel notification: $e');
+    }
+    
+    // ============================================================
+    // 2. PERSISTENCE and LOGIC (Async/Background - Best Effort)
+    // ============================================================
+    try {
+      // Check Firebase
+      if (Firebase.apps.isEmpty) {
+          try {
+            await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+          } catch(e) {
+            debugPrint('⚠️ Firebase Init failed in background: $e');
+            return;
+          }
+      }
+
+      // Complete logic
       String reminderId;
-      int? skillId;
-      String? notes;
-      String action = 'complete';
-      
       try {
-        // Try to parse as JSON
         final data = jsonDecode(payload);
-        action = data['action'] as String? ?? 'complete';
         reminderId = data['reminder_id'] as String;
-        skillId = data['skill_id'] as int?;
-        notes = data['notes'] as String?;
       } catch (e) {
-        // Fallback: treat as simple reminder ID
         reminderId = payload;
       }
       
-      final reminderRepository = FirestoreReminderRepository();
-      
       if (reminderId.startsWith('task_')) {
-        // It's a GoalTask
-        final taskIdStr = reminderId.replaceFirst('task_', '');
-        final taskId = int.tryParse(taskIdStr);
+        final taskId = int.tryParse(reminderId.replaceFirst('task_', ''));
         if (taskId != null) {
           final growthRepo = FirestoreGrowthRepository();
           await growthRepo.completeTask(taskId);
-          debugPrint('✅ Successfully completed GoalTask $taskId');
+          debugPrint('✅ Completed GoalTask $taskId (Firestore)');
         }
       } else {
-         // Legacy: Mark occurrence as completed by notification ID
+         final reminderRepository = FirestoreReminderRepository();
          await reminderRepository.completeOccurrenceByNotificationId(notificationId);
       }
-      
-      // Create context event for completion
-      await reminderRepository.createContextEvent(
-        ContextEvent(
-          reminderId: reminderId,
-          contextType: 'notification_action',
-          outcome: AppConstants.outcomeCompleted,
-        ),
-      );
-      
-      // Skills/reps removed - no longer logging reps
-      
-      // Cancel the notification
-      final notificationService = NotificationService();
-      await notificationService.cancelNotification(notificationId);
-      
-      debugPrint('✅ Successfully completed reminder $reminderId from notification');
     } catch (e) {
-      debugPrint('❌ Error handling complete action: $e');
+      debugPrint('⚠️ Logic/Persistence error in complete: $e');
     }
   }
 
