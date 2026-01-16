@@ -8,6 +8,7 @@ import '../../core/services/privacy_gpt_service.dart';
 import '../../core/services/motivational_engine.dart';
 import '../../core/services/sound_service.dart';
 import '../../core/services/notification_service.dart'; // NEW
+import '../../core/services/gamification_service.dart'; // NEW
 import '../../data/models/user_location.dart'; 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' show DateTimeComponents;
 import 'package:shared_preferences/shared_preferences.dart'; 
@@ -16,13 +17,16 @@ import 'dart:convert';
 /// Growth state management provider for goals and tasks
 class GrowthProvider with ChangeNotifier {
   final FirestoreGrowthRepository _repository;
+
   final NotificationService _notificationService;
+  final GamificationService _gamificationService;
 
   // State
   List<Goal> _goals = [];
   Map<int, List<GoalTask>> _tasksByGoal = {}; // goalId -> tasks
   Map<int, List<GoalPhase>> _phasesByGoal = {}; // goalId -> phases
   List<UserLocation> _savedLocations = []; // NEW: Saved Locations
+  UserStats? _userStats; // NEW: Gamification Stats
   bool _isLoading = false;
   String? _error;
   int? _focusedTaskId; // NEW: Track focused task for timer visibility
@@ -30,14 +34,17 @@ class GrowthProvider with ChangeNotifier {
   GrowthProvider({
     required FirestoreGrowthRepository repository,
     NotificationService? notificationService,
+    GamificationService? gamificationService,
   })  : _repository = repository,
-        _notificationService = notificationService ?? NotificationService();
+        _notificationService = notificationService ?? NotificationService(),
+        _gamificationService = gamificationService ?? GamificationService();
 
   // Getters
   List<Goal> get goals => _goals;
   Map<int, List<GoalTask>> get tasksByGoal => _tasksByGoal;
   Map<int, List<GoalPhase>> get phasesByGoal => _phasesByGoal;
   List<UserLocation> get savedLocations => _savedLocations; // NEW
+  UserStats? get userStats => _userStats; // NEW
   bool get isLoading => _isLoading;
   String? get error => _error;
   int? get focusedTaskId => _focusedTaskId; // NEW
@@ -91,6 +98,9 @@ class GrowthProvider with ChangeNotifier {
 
       // Load Saved Locations
       await _loadSavedLocations();
+
+      // Load Gamification Stats
+      _userStats = await _gamificationService.loadStats();
 
       _isLoading = false;
       notifyListeners();
@@ -484,6 +494,20 @@ class GrowthProvider with ChangeNotifier {
       
       // Cancel Notification
       await _notificationService.cancelNotification(taskId % 2147483647);
+
+      // --- Gamification Logic ---
+      final xpAmount = 10; // Base XP for task completion
+      _userStats = await _gamificationService.addXP(xpAmount);
+      
+      // Update Streak if it acts as a "Daily Goal" or just general activity
+      // For MVP, any task completion counts towards streak
+      final newStreak = await _gamificationService.updateStreak();
+      _userStats = UserStats(
+        xp: _userStats!.xp, 
+        level: _userStats!.level, 
+        streak: newStreak
+      );
+      notifyListeners();
 
       // --- Recurrence Logic ---
       if (task.frequency != 'one-time' && task.scheduledDate != null) {

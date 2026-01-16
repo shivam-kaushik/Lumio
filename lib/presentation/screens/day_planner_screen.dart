@@ -17,6 +17,8 @@ import '../widgets/timeline_task_tile.dart';
 import '../utils/analytics_helper.dart'; 
 import 'package:intl/intl.dart'; 
 import 'package:shared_preferences/shared_preferences.dart'; // Added
+import 'package:confetti/confetti.dart'; // Gamification
+import '../widgets/streak_counter.dart'; // Gamification
 
 class DayPlannerScreen extends StatefulWidget {
   final DateTime? initialDate;
@@ -38,6 +40,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
   Timer? _rolloverTimer;
   bool _isViewingToday = true;
   late DateTime _selectedDate; 
+  late ConfettiController _confettiController; // Gamification 
 
   // Schedule Settings
   TimeOfDay _wakeUpTime = const TimeOfDay(hour: 8, minute: 0);
@@ -57,6 +60,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     _initSpeech();
     _startRolloverCheck();
     _loadScheduleSettings(); // Load saved custom schedule
+    
+    _confettiController = ConfettiController(duration: const Duration(seconds: 2));
   }
 
   Future<void> _loadScheduleSettings() async {
@@ -161,6 +166,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _rolloverTimer?.cancel();
+    _confettiController.dispose();
     super.dispose();
   }
 
@@ -446,27 +452,43 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
 
           return Scaffold(
             backgroundColor: theme.scaffoldBackgroundColor,
-            body: SafeArea(
-              child: CustomScrollView(
-                slivers: [
-                  // 1. Header & Date Strip
-                  SliverToBoxAdapter(
-                    child: _buildDateHeader(theme, textColor, subtleColor),
-                  ),
-
-                  // 2. Active Timer (Floating at top if Focus is active)
-                  if (activeTask != null)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: ActiveTaskTimer(task: activeTask),
+            body: Stack(
+              children: [
+                SafeArea(
+                  child: CustomScrollView(
+                    slivers: [
+                      // 1. Header & Date Strip
+                      SliverToBoxAdapter(
+                        child: _buildDateHeader(theme, textColor, subtleColor),
                       ),
-                    ),
 
-                  // 3. Timeline Content (Converted to Slivers)
-                  _buildTimelineSliver(context, provider, tasks, activeTask?.id, isDark, textColor, subtleColor),
-                ],
-              ),
+                      // 2. Active Timer (Floating at top if Focus is active)
+                      if (activeTask != null)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: ActiveTaskTimer(task: activeTask),
+                          ),
+                        ),
+
+                      // 3. Timeline Content (Converted to Slivers)
+                      _buildTimelineSliver(context, provider, tasks, activeTask?.id, isDark, textColor, subtleColor),
+                    ],
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: ConfettiWidget(
+                    confettiController: _confettiController,
+                    blastDirectionality: BlastDirectionality.explosive,
+                    shouldLoop: false,
+                    displayTarget: false,
+                    gravity: 0.3,
+                    numberOfParticles: 20,
+                    colors: const [Colors.green, Colors.blue, Colors.pink, Colors.orange, Colors.purple], 
+                  ),
+                ),
+              ],
             ),
             floatingActionButton: Padding(
               padding: const EdgeInsets.only(bottom: 100.0), // Clear nav bar
@@ -626,9 +648,15 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                     fontWeight: FontWeight.bold
                   ),
                 ),
-                IconButton(
-                  onPressed: _pickDate,
-                  icon: const Icon(Icons.calendar_month, color: AppTheme.primaryColor),
+                Row(
+                  children: [
+                    const StreakCounter(),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _pickDate,
+                      icon: const Icon(Icons.calendar_month, color: AppTheme.primaryColor),
+                    ),
+                  ],
                 )
               ],
             ),
