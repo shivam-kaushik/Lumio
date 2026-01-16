@@ -1,7 +1,7 @@
 name: lumio
 description: "Lumio - The Context-Aware Reminder Assistant. Turning goals into actions."
 publish_to: 'none'
-version: 1.0.4+8
+version: 1.0.4+9
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -87,6 +87,7 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/animations/
+    - assets/sounds/
     - .env
 
 flutter_launcher_icons:
