@@ -5,6 +5,7 @@ import '../../core/services/permission_service.dart';
 import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/modern_smart_card.dart';
+import '../widgets/persona_selection_widget.dart'; // NEW
 
 /// Settings screen with app preferences and permissions
 class SettingsScreen extends StatefulWidget {
@@ -138,6 +139,23 @@ class _SettingsScreenState extends State<SettingsScreen>
                 120, // keep above bottom nav bar
               ),
               children: [
+                // Appearance Settings
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+                  child: Text(
+                    'AI Coach',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isDark 
+                          ? AppTheme.darkTextPrimary 
+                          : AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingSM),
+                const PersonaSelectionWidget(),
+                const SizedBox(height: AppTheme.spacingLG),
+
                 // Appearance Settings
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),

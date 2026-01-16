@@ -617,6 +617,7 @@ Return ONLY valid JSON in this format:
     int streakCount = 0, // Deprecated, kept for compatibility
     int totalReps = 0, // Deprecated, kept for compatibility
     String? motivationAnchor,
+    String? personaPrompt, // NEW: Persona System Prompt
   }) async {
     try {
       // Check premium status first
@@ -670,7 +671,7 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
           'messages': [
             {
               'role': 'system',
-              'content': 'You are a motivational assistant for entrepreneurs. Generate short, encouraging messages that help users stay motivated. Be empathetic and practical.',
+              'content': personaPrompt ?? 'You are a motivational assistant for entrepreneurs. Generate short, encouraging messages that help users stay motivated. Be empathetic and practical.',
             },
             {
               'role': 'user',
@@ -691,6 +692,7 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
           goalName: goalName,
           taskDescription: taskDescription,
           motivationAnchor: motivationAnchor,
+          personaPrompt: personaPrompt,
         );
       }
     } catch (e) {
@@ -699,6 +701,7 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
         goalName: goalName,
         taskDescription: taskDescription,
         motivationAnchor: motivationAnchor,
+        personaPrompt: personaPrompt,
       );
     }
   }
@@ -753,6 +756,7 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
     required String goalName,
     required String taskDescription,
     String? motivationAnchor,
+    String? personaPrompt,
   }) {
     final parts = <String>[];
     

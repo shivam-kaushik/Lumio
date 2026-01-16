@@ -19,6 +19,8 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Added
 import 'package:confetti/confetti.dart'; // Gamification
 import '../widgets/streak_counter.dart'; // Gamification
+import '../widgets/level_up_overlay.dart'; // Gamification
+import 'dart:async'; // StreamSubscription
 
 class DayPlannerScreen extends StatefulWidget {
   final DateTime? initialDate;
@@ -41,6 +43,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
   bool _isViewingToday = true;
   late DateTime _selectedDate; 
   late ConfettiController _confettiController; // Gamification 
+  StreamSubscription? _levelSubscription; // Level Up Listener 
 
   // Schedule Settings
   TimeOfDay _wakeUpTime = const TimeOfDay(hour: 8, minute: 0);
@@ -58,6 +61,23 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     _isViewingToday = AnalyticsHelper.isSameDay(_selectedDate, DateTime.now());
     
     _initSpeech();
+    
+    // Listen for Level Up
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<GrowthProvider>();
+      _levelSubscription = provider.levelUpStream.listen((newLevel) {
+         if (mounted) {
+           showDialog(
+             context: context,
+             barrierDismissible: false, // Force them to celebrate!
+             builder: (_) => LevelUpOverlay(
+               newLevel: newLevel,
+               onDismiss: () => Navigator.of(context).pop(),
+             ),
+           );
+         }
+      });
+    });
     _startRolloverCheck();
     _loadScheduleSettings(); // Load saved custom schedule
     
@@ -167,6 +187,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     WidgetsBinding.instance.removeObserver(this);
     _rolloverTimer?.cancel();
     _confettiController.dispose();
+    _levelSubscription?.cancel();
     super.dispose();
   }
 

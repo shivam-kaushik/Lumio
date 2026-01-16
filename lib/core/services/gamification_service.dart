@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../data/models/goal_task.dart'; // Added
+
 
 class GamificationService {
   static const String _keyXp = 'user_xp';
@@ -19,56 +21,79 @@ class GamificationService {
     );
   }
 
-  Future<UserStats> addXP(int amount) async {
+  // Returns (New Stats, Did Level Up)
+  Future<({UserStats stats, bool didLevelUp})> addXP(int amount) async {
     final prefs = await SharedPreferences.getInstance();
-    int currentXp = prefs.getInt(_keyXp) ?? 0;
-    int newXp = currentXp + amount;
     
-    // Calculate Level
-    // Simple Formula: 100 XP per level for MVP
+    // Load current
+    int currentXp = prefs.getInt(_keyXp) ?? 0;
+    int currentLevel = prefs.getInt(_keyLevel) ?? 1;
+    
+    int newXp = currentXp + amount;
     int newLevel = (newXp / 100).floor() + 1;
+    
+    bool didLevelUp = newLevel > currentLevel;
     
     await prefs.setInt(_keyXp, newXp);
     await prefs.setInt(_keyLevel, newLevel);
 
-    return UserStats(xp: newXp, level: newLevel, streak: prefs.getInt(_keyStreak) ?? 0);
+    final stats = UserStats(xp: newXp, level: newLevel, streak: prefs.getInt(_keyStreak) ?? 0);
+    return (stats: stats, didLevelUp: didLevelUp);
   }
 
-  Future<int> updateStreak() async {
+  // Robust History-Based Streak Calculation
+  Future<int> calculateStreak(List<GoalTask> tasks) async {
     final prefs = await SharedPreferences.getInstance();
-    final lastDateStr = prefs.getString(_keyLastCompletion);
+    
+    // 1. Filter and Sort Dates
+    final completedDates = tasks
+        .where((t) => t.isCompleted && t.completedAt != null)
+        .map((t) {
+            final d = t.completedAt!;
+            return DateTime(d.year, d.month, d.day); // Normalize to midnight
+        })
+        .toSet()
+        .toList();
+        
+    completedDates.sort((a, b) => b.compareTo(a)); // Descending (Newest first)
+    
+    if (completedDates.isEmpty) {
+        await prefs.setInt(_keyStreak, 0);
+        return 0;
+    }
+    
+    // 2. Check current streak
     final now = DateTime.now();
-    final todayStr = "${now.year}-${now.month}-${now.day}";
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
     
-    int currentStreak = prefs.getInt(_keyStreak) ?? 0;
+    // If the most recent completion is before yesterday, streak is broken -> 0
+    if (completedDates.first.isBefore(yesterday)) {
+         await prefs.setInt(_keyStreak, 0);
+         return 0;
+    }
+    
+    int streak = 0;
+    DateTime checkDate = today;
 
-    if (lastDateStr == todayStr) {
-      // Already active for today
-      return currentStreak;
+    // Check if we have a completion for TODAY
+    if (!completedDates.contains(today)) {
+        // If not today, we MUST have yesterday to keep streak alive
+        if (!completedDates.contains(yesterday)) {
+             await prefs.setInt(_keyStreak, 0);
+             return 0;
+        }
+        checkDate = yesterday;
+    }
+    
+    // Count consecutive days
+    while (completedDates.contains(checkDate)) {
+        streak++;
+        checkDate = checkDate.subtract(const Duration(days: 1));
     }
 
-    if (lastDateStr != null) {
-      final lastDate = DateTime.parse(lastDateStr);
-      final difference = DateTime(now.year, now.month, now.day)
-          .difference(DateTime(lastDate.year, lastDate.month, lastDate.day))
-          .inDays;
-
-      if (difference == 1) {
-        // Consecutive day
-        currentStreak++;
-      } else if (difference > 1) {
-        // Streak broken
-        currentStreak = 1;
-      }
-    } else {
-      // First ever task
-      currentStreak = 1;
-    }
-
-    await prefs.setInt(_keyStreak, currentStreak);
-    await prefs.setString(_keyLastCompletion, todayStr);
-    
-    return currentStreak;
+    await prefs.setInt(_keyStreak, streak);
+    return streak;
   }
 }
 

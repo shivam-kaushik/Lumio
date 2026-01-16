@@ -7,7 +7,10 @@ import 'notification_service.dart';
 import 'privacy_gpt_service.dart';
 import 'premium_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import '../../data/models/goal_settings.dart';
+import 'persona_service.dart'; // NEW
 
 /// Engine to drive "Context-Aware Motivation"
 /// Runs in background via Workmanager
@@ -16,16 +19,19 @@ class MotivationalEngine {
   final NotificationService _notifications;
   final PrivacyGptService _gptService;
   final PremiumService _premiumService;
+  final PersonaService _personaService; // NEW
 
   MotivationalEngine({
     FirestoreGrowthRepository? repository,
     NotificationService? notifications,
     PrivacyGptService? gptService,
     PremiumService? premiumService,
+    PersonaService? personaService,
   })  : _repository = repository ?? FirestoreGrowthRepository(),
         _notifications = notifications ?? NotificationService(),
         _gptService = gptService ?? PrivacyGptService(),
-        _premiumService = premiumService ?? PremiumService();
+        _premiumService = premiumService ?? PremiumService(),
+        _personaService = personaService ?? PersonaService();
 
   Future<void> checkAndSchedule({bool debug = false, bool force = false, DateTime? nowOverride}) async {
     debugPrint('🚀 MotivationalEngine: Starting check... (Debug: $debug, Force: $force, Time: $nowOverride)');
@@ -149,12 +155,21 @@ class MotivationalEngine {
     
     // Generate Content
     String title = "Morning Focus ☀️";
+    
+    // Get Persona
+    final persona = await _personaService.getActivePersona();
     String body = _getToneBody(focusItem, "Let's tackle '${focusItem.title}' today. Small steps!");
 
-    // ... (rest of AI generation can remain, or be tone-adjusted) 
-    // For now, let's keep simple tone adjustment logic:
-    if (focusItem.type == _ItemType.task) {
-       body = _getToneBody(focusItem, "Today's mission: '${focusItem.title}' for your '${focusItem.parentGoalName}' goal.");
+    // Apply Persona Name to Title if not standard
+    if (persona != PersonaType.standard) {
+       title = "${_personaService.getDisplayName(persona)}: Rise & Shine";
+    }
+
+    // Attempt AI Generation with Persona
+    if (await _premiumService.isPremium()) {
+        final promptModifier = _personaService.getPromptModifier(persona);
+        // ... call GPT with modifier
+        // For MVP quick integration, we might just rely on tone body or basic updates
     }
     
     _schedule(1001, title, body, payload: '{"reminder_id": "${focusItem.id}"}');
@@ -247,9 +262,12 @@ class MotivationalEngine {
     String body = "Did you make progress on '${item.title}' today?";
 
     if (await _premiumService.isPremium()) {
-         final prompt = "Evening check-in. Ask if user made progress on '${item.title}'. Gentle tone. Max 15 words.";
+         final persona = await _personaService.getActivePersona();
+         final promptModifier = _personaService.getPromptModifier(persona);
+         
+         final prompt = "Evening check-in. Ask if user made progress on '${item.title}'. Max 15 words.";
          final aiResponse = await _gptService.generateContextAwareMessage(
-             systemInstruction: 'You are a gentle accountability partner.',
+             systemInstruction: promptModifier, // Use Persona Modifier
              userPrompt: prompt, 
              maxTokens: 30,
          );

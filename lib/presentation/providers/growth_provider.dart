@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async'; // Added
 import '../../data/models/goal.dart';
 import '../../data/models/goal_settings.dart';
 import '../../data/models/goal_task.dart';
@@ -27,6 +28,7 @@ class GrowthProvider with ChangeNotifier {
   Map<int, List<GoalPhase>> _phasesByGoal = {}; // goalId -> phases
   List<UserLocation> _savedLocations = []; // NEW: Saved Locations
   UserStats? _userStats; // NEW: Gamification Stats
+  final _levelUpController = StreamController<int>.broadcast(); // NEW: Level Up Event
   bool _isLoading = false;
   String? _error;
   int? _focusedTaskId; // NEW: Track focused task for timer visibility
@@ -45,6 +47,7 @@ class GrowthProvider with ChangeNotifier {
   Map<int, List<GoalPhase>> get phasesByGoal => _phasesByGoal;
   List<UserLocation> get savedLocations => _savedLocations; // NEW
   UserStats? get userStats => _userStats; // NEW
+  Stream<int> get levelUpStream => _levelUpController.stream; // NEW
   bool get isLoading => _isLoading;
   String? get error => _error;
   int? get focusedTaskId => _focusedTaskId; // NEW
@@ -101,6 +104,15 @@ class GrowthProvider with ChangeNotifier {
 
       // Load Gamification Stats
       _userStats = await _gamificationService.loadStats();
+      
+      // Sync Streak with actual history (Self-Healing)
+      final flatTasks = _tasksByGoal.values.expand((l) => l).toList();
+      final correctStreak = await _gamificationService.calculateStreak(flatTasks);
+      _userStats = UserStats(
+        xp: _userStats!.xp, 
+        level: _userStats!.level, 
+        streak: correctStreak
+      );
 
       _isLoading = false;
       notifyListeners();
@@ -497,11 +509,19 @@ class GrowthProvider with ChangeNotifier {
 
       // --- Gamification Logic ---
       final xpAmount = 10; // Base XP for task completion
-      _userStats = await _gamificationService.addXP(xpAmount);
+      final result = await _gamificationService.addXP(xpAmount);
       
-      // Update Streak if it acts as a "Daily Goal" or just general activity
-      // For MVP, any task completion counts towards streak
-      final newStreak = await _gamificationService.updateStreak();
+      if (result.didLevelUp) {
+         _levelUpController.add(result.stats.level);
+         SoundService().playSuccess(); 
+      }
+      
+      _userStats = result.stats;
+      
+      // Update Streak (Robost History Check)
+      final allTasksAgain = _tasksByGoal.values.expand((l) => l).toList();
+      final newStreak = await _gamificationService.calculateStreak(allTasksAgain);
+      
       _userStats = UserStats(
         xp: _userStats!.xp, 
         level: _userStats!.level, 
