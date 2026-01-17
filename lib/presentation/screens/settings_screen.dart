@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../core/services/permission_service.dart';
 import '../providers/theme_provider.dart';
+import '../providers/growth_provider.dart'; // NEW
 import '../theme/app_theme.dart';
 import '../widgets/modern_smart_card.dart';
 import '../widgets/persona_selection_widget.dart'; // NEW
+import '../screens/avatar_editor_screen.dart'; // NEW
 
 /// Settings screen with app preferences and permissions
 class SettingsScreen extends StatefulWidget {
@@ -154,6 +156,49 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
                 const SizedBox(height: AppTheme.spacingSM),
                 const PersonaSelectionWidget(),
+                const SizedBox(height: AppTheme.spacingSM),
+                
+                // Profile Picture Setting
+                Consumer<GrowthProvider>(
+                  builder: (context, provider, _) {
+                    return ModernSmartCard(
+                      elevationLevel: 1,
+                      child: Column(
+                        children: [
+                          SwitchListTile(
+                             title: Text(
+                                "Use Avatar as Profile Picture",
+                                 style: TextStyle(
+                                color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                             ),
+                             subtitle: Text(
+                                "Show your customized avatar in the app",
+                                style: TextStyle(
+                                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                                  fontSize: 12,
+                                ),
+                             ),
+                             value: provider.showAvatarInProfile, 
+                             onChanged: (val) => provider.toggleProfileImageSource(val),
+                             activeColor: AppTheme.primaryColor,
+                          ),
+                          if (provider.showAvatarInProfile)
+                              ListTile(
+                                  leading: const Icon(Icons.edit_rounded, color: AppTheme.primaryColor),
+                                  title: const Text("Customize Avatar", style: TextStyle(fontWeight: FontWeight.w600)),
+                                  trailing: const Icon(Icons.chevron_right_rounded),
+                                  onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (c) => const AvatarEditorScreen()),
+                                  ),
+                              ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
                 const SizedBox(height: AppTheme.spacingLG),
 
                 // Appearance Settings

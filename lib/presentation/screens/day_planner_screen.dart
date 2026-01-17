@@ -21,6 +21,8 @@ import 'package:confetti/confetti.dart'; // Gamification
 import '../widgets/streak_counter.dart'; // Gamification
 import '../widgets/level_up_overlay.dart'; // Gamification
 import 'dart:async'; // StreamSubscription
+import '../widgets/avatar_widget.dart'; // Phase 3
+import 'avatar_editor_screen.dart'; // Phase 3
 
 class DayPlannerScreen extends StatefulWidget {
   final DateTime? initialDate;
@@ -661,12 +663,15 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  DateFormat('MMMM yyyy').format(_selectedDate),
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 24, 
-                    fontWeight: FontWeight.bold
+                Expanded(
+                  child: Text(
+                    DateFormat('MMMM yyyy').format(_selectedDate),
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 24, 
+                      fontWeight: FontWeight.bold
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 Row(

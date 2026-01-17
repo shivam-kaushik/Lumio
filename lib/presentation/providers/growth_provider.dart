@@ -10,6 +10,7 @@ import '../../core/services/motivational_engine.dart';
 import '../../core/services/sound_service.dart';
 import '../../core/services/notification_service.dart'; // NEW
 import '../../core/services/gamification_service.dart'; // NEW
+import '../../core/services/avatar_service.dart'; // NEW
 import '../../data/models/user_location.dart'; 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' show DateTimeComponents;
 import 'package:shared_preferences/shared_preferences.dart'; 
@@ -21,6 +22,7 @@ class GrowthProvider with ChangeNotifier {
 
   final NotificationService _notificationService;
   final GamificationService _gamificationService;
+  final AvatarService _avatarService; // NEW
 
   // State
   List<Goal> _goals = [];
@@ -29,6 +31,9 @@ class GrowthProvider with ChangeNotifier {
   List<UserLocation> _savedLocations = []; // NEW: Saved Locations
   UserStats? _userStats; // NEW: Gamification Stats
   final _levelUpController = StreamController<int>.broadcast(); // NEW: Level Up Event
+  Map<String, dynamic> _avatarConfig = {}; // NEW: Avatar Config
+  bool _showAvatarInProfile = false; // NEW: Toggle Profile Image
+  
   bool _isLoading = false;
   String? _error;
   int? _focusedTaskId; // NEW: Track focused task for timer visibility
@@ -37,9 +42,11 @@ class GrowthProvider with ChangeNotifier {
     required FirestoreGrowthRepository repository,
     NotificationService? notificationService,
     GamificationService? gamificationService,
+    AvatarService? avatarService,
   })  : _repository = repository,
         _notificationService = notificationService ?? NotificationService(),
-        _gamificationService = gamificationService ?? GamificationService();
+        _gamificationService = gamificationService ?? GamificationService(),
+        _avatarService = avatarService ?? AvatarService();
 
   // Getters
   List<Goal> get goals => _goals;
@@ -47,6 +54,8 @@ class GrowthProvider with ChangeNotifier {
   Map<int, List<GoalPhase>> get phasesByGoal => _phasesByGoal;
   List<UserLocation> get savedLocations => _savedLocations; // NEW
   UserStats? get userStats => _userStats; // NEW
+  Map<String, dynamic> get avatarConfig => _avatarConfig; // NEW
+  bool get showAvatarInProfile => _showAvatarInProfile; // NEW
   Stream<int> get levelUpStream => _levelUpController.stream; // NEW
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -104,6 +113,13 @@ class GrowthProvider with ChangeNotifier {
 
       // Load Gamification Stats
       _userStats = await _gamificationService.loadStats();
+      
+      // Load Avatar Config
+      _avatarConfig = await _avatarService.loadAvatarConfig();
+      
+      // Load Profile Setting
+      final prefs = await SharedPreferences.getInstance();
+      _showAvatarInProfile = prefs.getBool('show_avatar_in_profile') ?? false; // Default to Google Photo
       
       // Sync Streak with actual history (Self-Healing)
       final flatTasks = _tasksByGoal.values.expand((l) => l).toList();
@@ -872,6 +888,21 @@ class GrowthProvider with ChangeNotifier {
       } catch (_) {}
     }
     _focusedTaskId = null;
+    notifyListeners();
+  }
+
+  // ==================== Avatar ====================
+  Future<void> updateAvatarConfig(Map<String, dynamic> newConfig) async {
+    _avatarConfig = newConfig;
+    await _avatarService.saveAvatarConfig(newConfig);
+    notifyListeners();
+  }
+
+  Future<void> toggleProfileImageSource(bool useAvatar) async {
+    _showAvatarInProfile = useAvatar;
+    // Persist this setting
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('show_avatar_in_profile', useAvatar);
     notifyListeners();
   }
 }

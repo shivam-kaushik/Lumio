@@ -11,6 +11,9 @@ import 'settings_screen.dart';
 import 'login_screen.dart';
 import 'recent_notifications_screen.dart';
 import 'premium_subscription_screen.dart';
+import '../providers/growth_provider.dart'; // NEW
+import '../widgets/avatar_widget.dart'; // NEW
+import 'avatar_editor_screen.dart'; // NEW
 
 /// Account screen showing user profile and settings access
 class AccountScreen extends StatefulWidget {
@@ -124,81 +127,99 @@ class _AccountScreenState extends State<AccountScreen> {
                         children: [
                           const SizedBox(height: AppTheme.spacingMD),
                           // Profile Photo
-                          Stack(
-                            children: [
-                              Container(
-                                width: 100,
-                                height: 100,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      AppTheme.primaryColor,
-                                      AppTheme.primaryLight,
-                                    ],
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppTheme.primaryColor.withOpacity(0.3),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 10),
-                                    ),
-                                  ],
-                                ),
-                                child: user.photoURL != null
-                                    ? ClipOval(
-                                        child: CachedNetworkImage(
-                                          imageUrl: user.photoURL!,
-                                          fit: BoxFit.cover,
-                                          placeholder: (context, url) => Container(
-                                            color: AppTheme.primaryColor.withOpacity(0.1),
-                                            child: const Center(
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            ),
-                                          ),
-                                          errorWidget: (context, url, error) => Icon(
-                                            Icons.person_rounded,
-                                            size: 50,
-                                            color: Colors.white,
-                                          ),
+                          // Profile Photo
+                          Consumer<GrowthProvider>(
+                            builder: (context, growthProvider, _) {
+                              final showAvatar = growthProvider.showAvatarInProfile;
+                              return Stack(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => _showProfilePhotoOptions(context, growthProvider),
+                                    child: Container(
+                                      width: 100,
+                                      height: 100,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            AppTheme.primaryColor,
+                                            AppTheme.primaryLight,
+                                          ],
                                         ),
-                                      )
-                                    : Icon(
-                                        Icons.person_rounded,
-                                        size: 50,
-                                        color: Colors.white,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppTheme.primaryColor.withOpacity(0.3),
+                                            blurRadius: 20,
+                                            offset: const Offset(0, 10),
+                                          ),
+                                        ],
                                       ),
-                              ),
-                              // Verified badge for Google accounts
-                              if (user.providerData.any(
-                                    (info) => info.providerId == 'google.com',
-                                  ))
-                                Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: Container(
-                                    width: 28,
-                                    height: 28,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: AppTheme.primaryColor,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      Icons.check_rounded,
-                                      size: 16,
-                                      color: AppTheme.primaryColor,
+                                      child: showAvatar
+                                          ? AvatarWidget(config: growthProvider.avatarConfig, size: 100)
+                                          : (user.photoURL != null
+                                              ? ClipOval(
+                                                  child: CachedNetworkImage(
+                                                    imageUrl: user.photoURL!,
+                                                    fit: BoxFit.cover,
+                                                    placeholder: (context, url) => Container(
+                                                      color: AppTheme.primaryColor.withOpacity(0.1),
+                                                      child: const Center(
+                                                        child: CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    errorWidget: (context, url, error) => Icon(
+                                                      Icons.person_rounded,
+                                                      size: 50,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                )
+                                              : Icon(
+                                                  Icons.person_rounded,
+                                                  size: 50,
+                                                  color: Colors.white,
+                                                )),
                                     ),
                                   ),
-                                ),
-                            ],
+                                  // Edit Icon Badge
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: GestureDetector(
+                                      onTap: () => _showProfilePhotoOptions(context, growthProvider),
+                                      child: Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).cardColor,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: AppTheme.primaryColor,
+                                            width: 2,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.1),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Icon(
+                                          Icons.edit_rounded,
+                                          size: 18,
+                                          color: AppTheme.primaryColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                           const SizedBox(height: AppTheme.spacingLG),
                           
@@ -585,11 +606,81 @@ class _AccountScreenState extends State<AccountScreen> {
         );
       }
     }
+  // ... existing code ...
+  }
+  
+  void _showProfilePhotoOptions(BuildContext context, GrowthProvider growthProvider) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark 
+              ? AppTheme.darkSurface 
+              : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Profile Picture",
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 24),
+            
+            // Option 1: Use Google Account Photo
+            ListTile(
+              leading: const Icon(Icons.account_circle_rounded, color: Colors.blue),
+              title: const Text("Use Google Account Photo"),
+              trailing: !growthProvider.showAvatarInProfile 
+                  ? const Icon(Icons.check_circle, color: AppTheme.successColor) 
+                  : null,
+              onTap: () {
+                growthProvider.toggleProfileImageSource(false); // Disable avatar
+                Navigator.pop(context);
+              },
+            ),
+            
+            // Option 2: Use App Avatar
+            ListTile(
+              leading: const Icon(Icons.face_rounded, color: Colors.orange),
+              title: const Text("Use Gamified Avatar"),
+              trailing: growthProvider.showAvatarInProfile 
+                  ? const Icon(Icons.check_circle, color: AppTheme.successColor) 
+                  : null,
+              onTap: () {
+                growthProvider.toggleProfileImageSource(true); // Enable avatar
+                Navigator.pop(context);
+              },
+            ),
+            
+            // Option 3: Customize Avatar
+             ListTile(
+              leading: const Icon(Icons.edit, color: Colors.purple),
+              title: const Text("Customize Avatar"),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () {
+                Navigator.pop(context); // Close sheet
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (c) => const AvatarEditorScreen()),
+                );
+              },
+            ),
+             const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
   }
 }
 
 /// Info tile widget for displaying account information
 class _InfoTile extends StatelessWidget {
+// ... existing code ...
   final IconData icon;
   final String label;
   final String value;

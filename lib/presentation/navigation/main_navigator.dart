@@ -17,7 +17,9 @@ import '../../data/models/goal.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../../data/models/goal_task.dart';
 import '../widgets/quick_task_input_sheet.dart';
+import '../widgets/quick_task_input_sheet.dart';
 import '../../data/models/reminder.dart';
+import '../widgets/avatar_widget.dart'; // NEW
 
 /// Main navigation wrapper with bottom tab bar
 /// Provides smooth transitions and consistent navigation structure
@@ -462,11 +464,24 @@ class MainNavigatorState extends State<MainNavigator>
     final tab = _tabs[index];
     final isActive = _currentIndex == index;
     
+    // Check for Avatar override on Account tab (index 3)
+    Widget? overrideChild;
+    if (index == 3) {
+      final provider = Provider.of<GrowthProvider>(context);
+      if (provider.showAvatarInProfile) {
+        overrideChild = AvatarWidget(
+          config: provider.avatarConfig,
+          size: 26,
+        );
+      }
+    }
+
     return _InteractiveTabButton(
       onTap: () => _onTabTapped(index),
       isActive: isActive,
       icon: isActive ? tab.activeIcon : tab.icon,
       label: tab.label,
+      child: overrideChild,
     );
   }
 }
@@ -477,12 +492,14 @@ class _InteractiveTabButton extends StatefulWidget {
   final bool isActive;
   final IconData icon;
   final String label;
+  final Widget? child; // NEW
 
   const _InteractiveTabButton({
     required this.onTap,
     required this.isActive,
     required this.icon,
     required this.label,
+    this.child,
   });
 
   @override
@@ -559,7 +576,7 @@ class _InteractiveTabButtonState extends State<_InteractiveTabButton>
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(AppTheme.radiusSM),
                 ),
-                child: Icon(
+                child: widget.child ?? Icon( // Modified to accept child
                   widget.icon,
                   color: widget.isActive
                       ? AppTheme.primaryColor
