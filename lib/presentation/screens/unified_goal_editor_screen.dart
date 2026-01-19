@@ -48,14 +48,17 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
     if (widget.existingGoal != null) {
       _titleController.text = widget.existingGoal!.name;
       _goalDeadline = widget.existingGoal!.targetDeadline; // Load existing
-      _currentSettings = widget.existingGoal!.settings;
+      _currentSettings = widget.existingGoal!.settings ?? GoalSettings(notificationTime: const TimeOfDay(hour: 9, minute: 0));
       _loadExistingGoal();
     } else if (widget.aiResult != null) {
       _parseAiResult();
+      _currentSettings = GoalSettings(notificationTime: const TimeOfDay(hour: 9, minute: 0));
     } else {
       _titleController.text = ""; // Empty for new
       _goalDeadline = DateTime.now().add(const Duration(days: 30)); // Default 30 days
+      _currentSettings = GoalSettings(notificationTime: const TimeOfDay(hour: 9, minute: 0));
     }
+    debugPrint('🏁 UnifiedGoalEditorScreen Init: _currentSettings is ${_currentSettings?.toMap()}');
   }
 
   void _loadExistingGoal() {
@@ -211,6 +214,7 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
       final growthProvider = context.read<GrowthProvider>();
       
       String goalName = _titleController.text;
+      debugPrint('💾 _savePlan called. Should use Settings: ${_currentSettings?.toMap()}');
 
       // Determine effective ID: Use local ID if we created one, otherwise use existing
       final effectiveGoalId = _localGoalId ?? widget.existingGoal?.id;

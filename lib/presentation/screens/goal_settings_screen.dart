@@ -31,7 +31,10 @@ class _GoalSettingsScreenState extends State<GoalSettingsScreen> {
     _enableNotifications = settings.enableNotifications;
   }
 
-  void _saveCompete() {
+  bool _allowPop = false; // Flag to control pop
+
+  void _saveAndPop() {
+    debugPrint('💾 GoalSettingsScreen: _saveAndPop called (Auto-Save)');
     final newSettings = GoalSettings(
       notificationTime: _notificationTime,
       frequency: _frequency,
@@ -40,7 +43,22 @@ class _GoalSettingsScreenState extends State<GoalSettingsScreen> {
       tone: _tone,
       enableNotifications: _enableNotifications,
     );
-    Navigator.of(context).pop(newSettings);
+    
+    // Set flag to allow the pop to happen
+    setState(() => _allowPop = true);
+    
+    // Wait for the build to complete so PopScope sees canPop: true
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        debugPrint('📤 GoalSettingsScreen: Popping with settings: ${newSettings.toMap()}');
+        Navigator.of(context).pop(newSettings);
+      }
+    });
+  }
+
+  void _saveCompete() {
+    // Manual save button just triggers the shared logic
+    _saveAndPop();
   }
 
   @override
@@ -48,19 +66,35 @@ class _GoalSettingsScreenState extends State<GoalSettingsScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    return Scaffold(
-      backgroundColor: isDark ? Colors.black : Colors.grey[50], // Consistent background
-      appBar: AppBar(
-        title: const Text("Goal Settings"),
-        backgroundColor: Colors.transparent, // match Unified Editor
-        elevation: 0,
-        actions: [
-          TextButton(
-            onPressed: _saveCompete,
-            child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
-          )
-        ],
-      ),
+    return PopScope(
+      canPop: _allowPop,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        // User tried to go back (System Back or AppBar Back)
+        // We intercepted it. Now save and pop manually.
+        _saveAndPop();
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? Colors.black : Colors.grey[50], // Consistent background
+        appBar: AppBar(
+          title: const Text("Goal Settings"),
+          backgroundColor: Colors.transparent, // match Unified Editor
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : Colors.black),
+            onPressed: () {
+              // Handle AppBar back button explicitly to trigger PopScope logic or call save directly
+              // Calling maybePop will trigger PopScope
+              Navigator.of(context).maybePop();
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: _saveCompete,
+              child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+            )
+          ],
+        ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -198,7 +232,8 @@ class _GoalSettingsScreenState extends State<GoalSettingsScreen> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildSectionHeader(String title) {

@@ -181,6 +181,7 @@ class GrowthProvider with ChangeNotifier {
       // 2. Compare Settings
       bool settingsChanged = false;
       if (oldGoal != null) {
+          debugPrint('🔍 Debug Settings Update: OldTime=${oldGoal.settings?.notificationTime} vs NewTime=${goal.settings?.notificationTime}');
           if (oldGoal.settings != goal.settings) { 
               settingsChanged = true;
           }
@@ -249,7 +250,10 @@ class GrowthProvider with ChangeNotifier {
           // 2. Find Goal & Settings
           final goal = _goals.firstWhere(
               (g) => g.id == currentTask.goalId, 
-              orElse: () => Goal(id: 0, name: 'Goal', createdAt: DateTime.now())
+              orElse: () {
+                debugPrint('❌ CRITICAL ERROR: Could not find Goal with ID ${currentTask.goalId} in _goals list! Available IDs: ${_goals.map((g) => g.id).toList()}');
+                return Goal(id: 0, name: 'Goal', createdAt: DateTime.now());
+              }
           );
           final settings = goal.settings;
           
@@ -265,8 +269,10 @@ class GrowthProvider with ChangeNotifier {
           if (settings != null && settings.notificationTime != null) {
               // STRICT: User has a specific "Default Time" in settings (e.g. 9:00 AM)
               final t = settings.notificationTime!;
+              debugPrint('⏰ STRICT OVERRIDE: Using Goal Time ${t.toString()} for task "${currentTask.title}"'); // Debug
               baseTime = DateTime(baseTime.year, baseTime.month, baseTime.day, t.hour, t.minute);
           } else {
+             debugPrint('⚠️ NO OVERRIDE: Using Task Time $baseTime for task "${currentTask.title}". Settings found? ${settings != null}. Time found? ${settings?.notificationTime}');
              // Fallback only if NO settings time provided
               if (baseTime.hour == 0 && baseTime.minute == 0) {
                  int hour = 9; 
