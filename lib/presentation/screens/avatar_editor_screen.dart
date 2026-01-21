@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:fluttermoji/fluttermoji.dart';
 import '../providers/growth_provider.dart';
 import '../widgets/avatar_widget.dart';
 import '../theme/app_theme.dart';
@@ -21,14 +22,20 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
     _currentConfig = Map.from(context.read<GrowthProvider>().avatarConfig);
   }
 
-  void _update(String key, dynamic value) {
+  void _updateBgColor(int colorValue) {
     setState(() {
-      _currentConfig[key] = value;
+      _currentConfig['backgroundColor'] = colorValue;
     });
   }
 
   Future<void> _save() async {
+    // 1. Save the background color and other custom props to our provider
     await context.read<GrowthProvider>().updateAvatarConfig(_currentConfig);
+    
+    // 2. FlutterMoji automatically saves selections to local storage, 
+    // but we can ensure it's synced if needed.
+    // Use FluttermojiFunctions().encodeOptions() if we wanted to save the string to backend.
+    
     if (mounted) Navigator.pop(context);
   }
 
@@ -52,50 +59,46 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       ),
       body: Column(
         children: [
-          const SizedBox(height: 32),
-          // Preview
+          const SizedBox(height: 16),
+          // Preview with Background Color
           Center(
-            child: AvatarWidget(config: _currentConfig, size: 150),
+            child: AvatarWidget(config: _currentConfig, size: 140),
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 24),
           
-          // Controls
+          // Background Color Selector
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                const Text("Background: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 12),
+                _colorOption(0xFFE0F7FA), // Cyan
+                const SizedBox(width: 8),
+                _colorOption(0xFFF3E5F5), // Purple
+                const SizedBox(width: 8),
+                _colorOption(0xFFE8F5E9), // Green
+                const SizedBox(width: 8),
+                _colorOption(0xFFFFF3E0), // Orange
+                const SizedBox(width: 8),
+                _colorOption(0xFFE3F2FD), // Blue
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          const Divider(),
+          
+          // Fluttermoji Customizer
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.darkSurface : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                boxShadow: [
-                  BoxShadow(color: Colors.black12, blurRadius: 20, spreadRadius: 5),
-                ],
-              ),
-              child: ListView(
-                children: [
-                  _buildSection("Skin Tone", [
-                    _colorOption('skinColor', 0xFFFFDFC4), // Light
-                    _colorOption('skinColor', 0xFFF0C0A0), // Tan
-                    _colorOption('skinColor', 0xFF8D5524), // Dark
-                    _colorOption('skinColor', 0xFFC68642), // Medium
-                  ]),
-                  
-                  const SizedBox(height: 24),
-                  
-                  _buildSection("Shirt", [
-                    _iconOption('shirt', 'tshirt_blue', Icons.checkroom, Colors.blue),
-                    _iconOption('shirt', 'tshirt_red', Icons.checkroom, Colors.red),
-                    _iconOption('shirt', 'hoodie_grey', Icons.hiking, Colors.grey),
-                  ]),
-
-                  const SizedBox(height: 24),
-                  
-                  _buildSection("Accessories", [
-                    _iconOption('accessory', 'none', Icons.close, Colors.grey),
-                    _iconOption('accessory', 'glasses', Icons.remove_red_eye_rounded, Colors.indigo),
-                    _iconOption('accessory', 'hat', Icons.school, Colors.black),
-                    _iconOption('accessory', 'headphones', Icons.headphones, Colors.blueGrey),
-                  ]),
-                ],
+            child: FluttermojiCustomizer(
+              autosave: false,
+              theme: FluttermojiThemeData(
+                boxDecoration: const BoxDecoration(boxShadow: [BoxShadow()]), // minimal shadow
+                primaryBgColor: isDark ? AppTheme.darkSurface : Colors.white,
+                secondaryBgColor: isDark ? Colors.black12 : Colors.grey.shade100,
+                labelTextStyle: theme.textTheme.bodySmall!,
               ),
             ),
           ),
@@ -104,47 +107,20 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
     );
   }
 
-  Widget _buildSection(String title, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        Wrap(spacing: 12, runSpacing: 12, children: children),
-      ],
-    );
-  }
-
-  Widget _colorOption(String key, int colorValue) {
-    final isSelected = _currentConfig[key] == colorValue;
+  Widget _colorOption(int colorValue) {
+    final isSelected = (_currentConfig['backgroundColor'] ?? 0xFFE0F7FA) == colorValue;
     return GestureDetector(
-      onTap: () => _update(key, colorValue),
+      onTap: () => _updateBgColor(colorValue),
       child: Container(
-        width: 48,
-        height: 48,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: Color(colorValue),
           shape: BoxShape.circle,
-          border: isSelected ? Border.all(color: Colors.blue, width: 3) : null,
+          border: isSelected ? Border.all(color: AppTheme.primaryColor, width: 2) : Border.all(color: Colors.black12),
         ),
-      ),
-    );
-  }
-
-  Widget _iconOption(String key, String value, IconData icon, Color color) {
-    final isSelected = _currentConfig[key] == value;
-    return GestureDetector(
-      onTap: () => _update(key, value),
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: color, width: 2) : null,
-        ),
-        child: Icon(icon, color: color),
       ),
     );
   }
 }
+
