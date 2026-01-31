@@ -1,7 +1,7 @@
 name: lumio
 description: "Lumio - The Context-Aware Reminder Assistant. Turning goals into actions."
 publish_to: 'none'
-version: 1.0.5+10
+version: 1.0.5+11
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
