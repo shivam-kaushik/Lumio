@@ -7,7 +7,7 @@ class AppConstants {
 
   // Database
   static const String dbName = 'lumio.db';
-  static const int dbVersion = 13; // Added phases table and phase_id to tasks
+  static const int dbVersion = 14; // Added image_url to goals table
 
   // Tables
   static const String remindersTable = 'reminders';
