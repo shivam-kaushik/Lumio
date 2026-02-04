@@ -1092,27 +1092,87 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
   ) {
     final theme = Theme.of(context);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: task.isCompleted
-              ? Colors.grey.shade200
-              : AppTheme.primaryColor.withOpacity(0.3),
-          width: 2,
+    return Dismissible(
+      key: Key('task_${task.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.errorColor,
+          borderRadius: BorderRadius.circular(16),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(
+          Icons.delete_rounded,
+          color: Colors.white,
+          size: 28,
+        ),
       ),
-      child: Column(
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text('Delete Task?'),
+            content: Text('Delete "${task.title}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.errorColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
+      onDismissed: (direction) async {
+        await growthProvider.deleteTask(task.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Task deleted'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: task.isCompleted
+                ? Colors.grey.shade200
+                : AppTheme.primaryColor.withOpacity(0.3),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -1388,44 +1448,81 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
             ],
           ),
 
-          // ALL Subtasks - properly indented and editable
-          if (task.subtasks.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.subdirectory_arrow_right,
-                        size: 16,
+          // Subtasks section with add button
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.subdirectory_arrow_right,
+                      size: 16,
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      task.subtasks.isEmpty
+                          ? 'Subtasks'
+                          : '${task.subtasks.length} Subtasks',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                         color: AppTheme.primaryColor,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${task.subtasks.length} Subtasks',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.primaryColor,
+                    ),
+                    const Spacer(),
+                    // Add Subtask Button
+                    GestureDetector(
+                      onTap: () => _showAddSubtaskDialog(task, growthProvider),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppTheme.primaryColor.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.add_rounded,
+                              size: 16,
+                              color: AppTheme.primaryColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Add',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
+                if (task.subtasks.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   // Show ALL subtasks
                   ...task.subtasks.map((subtask) => _buildSubtaskItem(subtask, task, growthProvider)),
                 ],
-              ),
+              ],
             ),
-          ],
+          ),
         ],
+        ),
       ),
     )
         .animate()
@@ -1434,108 +1531,175 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
   }
 
   Widget _buildSubtaskItem(GoalTask subtask, GoalTask parentTask, GrowthProvider growthProvider) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: subtask.isCompleted
-              ? Colors.grey.shade200
-              : AppTheme.primaryColor.withOpacity(0.2),
-          width: 1.5,
+    return Dismissible(
+      key: Key('subtask_${subtask.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.errorColor,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16),
+        child: const Icon(
+          Icons.delete_rounded,
+          color: Colors.white,
+          size: 22,
         ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Subtask Checkbox
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: GestureDetector(
-              onTap: () async {
-                HapticFeedback.lightImpact();
-                // Toggle subtask completion
-                final updatedSubtask = subtask.copyWith(isCompleted: !subtask.isCompleted);
-                final updatedSubtasks = parentTask.subtasks.map((st) {
-                  return st.id == subtask.id ? updatedSubtask : st;
-                }).toList();
-                final updatedParentTask = parentTask.copyWith(subtasks: updatedSubtasks);
-                await growthProvider.updateTask(updatedParentTask);
-              },
-              child: Icon(
-                subtask.isCompleted
-                    ? Icons.check_circle
-                    : Icons.circle_outlined,
-                size: 20,
-                color: subtask.isCompleted
-                    ? AppTheme.successColor
-                    : Colors.grey.shade400,
-              ),
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-          ),
-          const SizedBox(width: 10),
-          // Subtask Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Subtask Title - Tap to edit
-                GestureDetector(
-                  onTap: () => _showSubtaskEditDialog(subtask, parentTask, growthProvider),
-                  child: Text(
-                    subtask.title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: subtask.isCompleted
-                          ? Colors.grey.shade500
-                          : Colors.grey.shade800,
-                      decoration: subtask.isCompleted
-                          ? TextDecoration.lineThrough
-                          : null,
-                    ),
+            title: const Text('Delete Subtask?'),
+            content: Text('Delete "${subtask.title}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.errorColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
+      onDismissed: (direction) async {
+        // Remove subtask from parent task
+        final updatedSubtasks = parentTask.subtasks
+            .where((st) => st.id != subtask.id)
+            .toList();
+        final updatedParentTask = parentTask.copyWith(subtasks: updatedSubtasks);
+        await growthProvider.updateTask(updatedParentTask);
 
-                // Subtask Date - Tap to edit
-                if (subtask.scheduledDate != null) ...[
-                  const SizedBox(height: 6),
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Subtask deleted'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: subtask.isCompleted
+                ? Colors.grey.shade200
+                : AppTheme.primaryColor.withOpacity(0.2),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Subtask Checkbox
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: GestureDetector(
+                onTap: () async {
+                  HapticFeedback.lightImpact();
+                  // Toggle subtask completion
+                  final updatedSubtask = subtask.copyWith(isCompleted: !subtask.isCompleted);
+                  final updatedSubtasks = parentTask.subtasks.map((st) {
+                    return st.id == subtask.id ? updatedSubtask : st;
+                  }).toList();
+                  final updatedParentTask = parentTask.copyWith(subtasks: updatedSubtasks);
+                  await growthProvider.updateTask(updatedParentTask);
+                },
+                child: Icon(
+                  subtask.isCompleted
+                      ? Icons.check_circle
+                      : Icons.circle_outlined,
+                  size: 20,
+                  color: subtask.isCompleted
+                      ? AppTheme.successColor
+                      : Colors.grey.shade400,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Subtask Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Subtask Title - Tap to edit
                   GestureDetector(
                     onTap: () => _showSubtaskEditDialog(subtask, parentTask, growthProvider),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.calendar_today,
-                            size: 10,
-                            color: Colors.blue.shade700,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormat('MMM d, y').format(subtask.scheduledDate!),
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.blue.shade700,
-                            ),
-                          ),
-                        ],
+                    child: Text(
+                      subtask.title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: subtask.isCompleted
+                            ? Colors.grey.shade500
+                            : Colors.grey.shade800,
+                        decoration: subtask.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
                       ),
                     ),
                   ),
+
+                  // Subtask Date - Tap to edit
+                  if (subtask.scheduledDate != null) ...[
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: () => _showSubtaskEditDialog(subtask, parentTask, growthProvider),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              size: 10,
+                              color: Colors.blue.shade700,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              DateFormat('MMM d, y').format(subtask.scheduledDate!),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blue.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1670,6 +1834,167 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('✓ Subtask updated'),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showAddSubtaskDialog(
+    GoalTask parentTask,
+    GrowthProvider growthProvider,
+  ) async {
+    final titleController = TextEditingController();
+    DateTime? selectedDate;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.add_task_rounded, color: AppTheme.primaryColor),
+                const SizedBox(width: 8),
+                const Text('Add Subtask', style: TextStyle(fontWeight: FontWeight.w700)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  TextField(
+                    controller: titleController,
+                    decoration: InputDecoration(
+                      labelText: 'Subtask Title',
+                      hintText: 'e.g., Research competitors',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Date picker
+                  InkWell(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate ?? DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (date != null) {
+                        setState(() => selectedDate = date);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppTheme.borderColor),
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.grey.shade50,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_today, size: 20, color: AppTheme.primaryColor),
+                          const SizedBox(width: 8),
+                          Text(
+                            selectedDate != null
+                                ? DateFormat('MMM d, y').format(selectedDate!)
+                                : 'Set date (optional)',
+                            style: TextStyle(
+                              color: selectedDate != null ? Colors.black87 : Colors.grey.shade600,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (selectedDate != null)
+                            IconButton(
+                              icon: Icon(Icons.clear, size: 18, color: Colors.grey.shade600),
+                              onPressed: () => setState(() => selectedDate = null),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (titleController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Please enter a subtask title'),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.pop(context, {
+                    'title': titleController.text.trim(),
+                    'date': selectedDate,
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Add'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (result != null && mounted) {
+      // Create new subtask
+      final newSubtask = GoalTask(
+        id: DateTime.now().millisecondsSinceEpoch,
+        goalId: parentTask.goalId,
+        title: result['title'] as String,
+        description: '',
+        scheduledDate: result['date'] as DateTime?,
+        createdAt: DateTime.now(),
+        priority: parentTask.priority,
+      );
+
+      // Add to parent task's subtasks
+      final updatedSubtasks = [...parentTask.subtasks, newSubtask];
+      final updatedParentTask = parentTask.copyWith(subtasks: updatedSubtasks);
+      await growthProvider.updateTask(updatedParentTask);
+
+      if (mounted) {
+        HapticFeedback.mediumImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✓ Subtask added'),
             duration: const Duration(seconds: 1),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
