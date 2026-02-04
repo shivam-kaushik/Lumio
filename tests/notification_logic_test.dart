@@ -112,7 +112,7 @@ class MockGrowthRepository implements FirestoreGrowthRepository {
 
   // Missing Stubs
   @override
-  Future<int> createGoal(String name, {DateTime? targetDeadline, double? hoursPerDay, int? totalEstimatedHours, GoalSettings? settings}) async => 0;
+  Future<int> createGoal(String name, {DateTime? targetDeadline, double? hoursPerDay, int? totalEstimatedHours, GoalSettings? settings, String? imageUrl}) async => 0;
   @override
   Future<Goal?> getGoal(int id) async => null;
   @override
