@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -647,6 +648,14 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
               },
             ),
             ListTile(
+              leading: Icon(Icons.add_task, color: AppTheme.primaryColor),
+              title: const Text('Add Subtask'),
+              onTap: () {
+                Navigator.pop(context);
+                _showAddSubtaskDialog(task, context.read<GrowthProvider>());
+              },
+            ),
+            ListTile(
               leading: Icon(Icons.delete_rounded, color: AppTheme.errorColor),
               title: const Text('Delete Task'),
               onTap: () async {
@@ -734,23 +743,17 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
             icon: const Icon(Icons.settings_outlined),
             onPressed: _openGoalSettings,
             tooltip: 'Goal Settings',
-          )
-              .animate()
-              .scale(delay: 100.ms, duration: 500.ms, curve: Curves.elasticOut),
+          ),
           IconButton(
             icon: const Icon(Icons.edit_rounded),
             onPressed: () => _editGoal(context),
             tooltip: 'Edit Goal',
-          )
-              .animate()
-              .scale(delay: 200.ms, duration: 500.ms, curve: Curves.elasticOut),
+          ),
           IconButton(
             icon: const Icon(Icons.delete_outline_rounded),
             onPressed: _deleteGoal,
             tooltip: 'Delete Goal',
-          )
-              .animate()
-              .scale(delay: 300.ms, duration: 500.ms, curve: Curves.elasticOut),
+          ),
         ],
       ),
       body: Consumer<GrowthProvider>(
@@ -767,271 +770,567 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
 
           final progress = totalTasksCount > 0 ? completedTasksCount / totalTasksCount : 0.0;
 
-          return SingleChildScrollView(
-            controller: _scrollController,
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Hero Image
-                CachedNetworkImage(
-                  imageUrl: goal.imageUrl ?? generateGoalImageUrl(goal.name),
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    height: 200,
-                    color: AppTheme.primaryColor.withOpacity(0.1),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    height: 200,
-                    color: AppTheme.primaryColor.withOpacity(0.2),
-                    child: Center(
-                      child: Icon(
-                        Icons.flag_rounded,
-                        size: 64,
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                  ),
-                )
-                    .animate()
-                    .fadeIn(duration: 600.ms)
-                    .shimmer(delay: 600.ms, duration: 2000.ms, color: Colors.white.withOpacity(0.3)),
-
-                // Content
-                Padding(
-                  padding: const EdgeInsets.all(AppTheme.spacingMD),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Progress Section with Gradient
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
+          return ReorderableListView(
+            proxyDecorator: (child, index, animation) {
+              return AnimatedBuilder(
+                animation: animation,
+                builder: (BuildContext context, Widget? child) {
+                  final double animValue = Curves.easeInOut.transform(animation.value);
+                  final double elevation = lerpDouble(0, 6, animValue)!;
+                  return Material(
+                    elevation: elevation,
+                    color: Colors.transparent,
+                    shadowColor: Colors.black.withOpacity(0.2),
+                    child: child,
+                  );
+                },
+                child: child,
+              );
+            },
+            onReorder: (oldIndex, newIndex) {
+              // Adjust index because of the header item (index 0)
+              if (oldIndex == 0 || newIndex == 0) return; // Cannot move header
+              
+              // Map list logic considering header is index 0
+              int taskOldIndex = oldIndex - 1;
+              int taskNewIndex = newIndex - 1;
+              
+              if (taskOldIndex < taskNewIndex) {
+                // taskNewIndex -= 1; // Handled by provider logic usually, but keep standard reorder logic
+              }
+              
+              growthProvider.reorderTasks(widget.goalId, taskOldIndex, taskNewIndex);
+            },
+            header: Padding(
+              padding: const EdgeInsets.all(AppTheme.spacingMD),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   // Hero Image
+                    CachedNetworkImage(
+                      imageUrl: goal.imageUrl ?? generateGoalImageUrl(goal.name),
+                      height: 200,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      imageBuilder: (context, imageProvider) => Container(
+                        height: 200,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              _getProgressColor(progress).withOpacity(0.15),
-                              _getProgressColor(progress).withOpacity(0.05),
-                            ],
-                          ),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: _getProgressColor(progress).withOpacity(0.3),
-                            width: 2,
-                          ),
+                          image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: _getProgressColor(progress),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    progress >= 0.9
-                                        ? Icons.celebration_rounded
-                                        : Icons.trending_up_rounded,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Progress: ${(progress * 100).toInt()}% ${_getProgressStatus(progress, goal.targetDeadline)}',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          color: _getProgressColor(progress),
-                                        ),
-                                      ),
-                                      if (goal.targetDeadline != null) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Due: ${DateFormat('MMM d, y').format(goal.targetDeadline!)}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            AnimatedProgressBar(
-                              progress: progress,
-                              height: 8,
-                              backgroundColor: Colors.grey.shade200,
-                              progressColor: _getProgressColor(progress),
-                              showPercentage: false,
-                            ),
+                      ),
+                      placeholder: (context, url) => Container(
+                        height: 200,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: AppTheme.primaryColor.withOpacity(0.1),
+                        ),
+                        child: Center(
+                            child: CircularProgressIndicator(color: AppTheme.primaryColor)),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        height: 200,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: AppTheme.primaryColor.withOpacity(0.2),
+                        ),
+                        child: Center(
+                            child: Icon(Icons.flag_rounded, size: 64, color: AppTheme.primaryColor)),
+                      ),
+                    )
+                        .animate()
+                        .fadeIn(duration: 600.ms)
+                        .shimmer(delay: 600.ms, duration: 2000.ms, color: Colors.white.withOpacity(0.3)),
+
+                    const SizedBox(height: 16),
+                    // Progress Section with Gradient
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            _getProgressColor(progress).withOpacity(0.15),
+                            _getProgressColor(progress).withOpacity(0.05),
                           ],
                         ),
-                      )
-                          .animate()
-                          .fadeIn(delay: 200.ms, duration: 500.ms)
-                          .slideX(begin: -0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
-
-                      const SizedBox(height: AppTheme.spacingLG),
-
-                      // Action Buttons
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _generateTasksWithAI,
-                              icon: const Icon(Icons.auto_awesome),
-                              label: const Text('AI Generate'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 2,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _startAddingTask,
-                              icon: const Icon(Icons.add_circle_outline),
-                              label: const Text('Add Task'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppTheme.primaryColor,
-                                side: BorderSide(color: AppTheme.primaryColor, width: 2),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _getProgressColor(progress).withOpacity(0.3),
+                          width: 2,
+                        ),
                       ),
-
-                      const SizedBox(height: AppTheme.spacingLG),
-
-                      // Tasks Section Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Tasks',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              '$completedTasksCount / $totalTasksCount',
-                              style: TextStyle(
-                                color: AppTheme.primaryColor,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppTheme.spacingMD),
-
-                      // Tasks List
-                      if (tasks.isEmpty)
-                        Container(
-                          padding: const EdgeInsets.all(40),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.grey.shade200,
-                              width: 2,
-                            ),
-                          ),
-                          child: Column(
+                          Row(
                             children: [
-                              Icon(
-                                Icons.task_alt_rounded,
-                                size: 64,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No tasks yet',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: _getProgressColor(progress),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  progress >= 0.9 ? Icons.celebration_rounded : Icons.trending_up_rounded,
+                                  color: Colors.white,
+                                  size: 20,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Add tasks manually or generate with AI',
-                                style: TextStyle(
-                                  color: Colors.grey.shade500,
-                                  fontSize: 14,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Progress: ${(progress * 100).toInt()}% ${_getProgressStatus(progress, goal.targetDeadline)}',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: _getProgressColor(progress),
+                                      ),
+                                    ),
+                                    if (goal.targetDeadline != null) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Due: ${DateFormat('MMM d, y').format(goal.targetDeadline!)}',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
-                        )
-                      else
-                        Column(
-                          children: tasks.asMap().entries.map((entry) {
-                            final index = entry.key;
-                            final task = entry.value;
-                            return _buildTaskCard(context, task, index, growthProvider);
-                          }).toList(),
+                          const SizedBox(height: 16),
+                          AnimatedProgressBar(
+                            progress: progress,
+                            height: 8,
+                            backgroundColor: Colors.grey.shade200,
+                            progressColor: _getProgressColor(progress),
+                            showPercentage: false,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: AppTheme.spacingLG),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _generateTasksWithAI,
+                            icon: const Icon(Icons.auto_awesome),
+                            label: const Text('AI Generate'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
                         ),
-
-                      // Inline Add Task Form
-                      if (_isAddingTask) ...[
-                        const SizedBox(height: 16),
-                        _buildInlineTaskForm(),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _startAddingTask,
+                            icon: const Icon(Icons.add_circle_outline),
+                            label: const Text('Add Task'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.primaryColor,
+                              side: BorderSide(color: AppTheme.primaryColor, width: 2),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
                       ],
-
-                      // Bottom padding
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                    const SizedBox(height: AppTheme.spacingLG),
+                    Text(
+                      'Tasks',
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: AppTheme.spacingMD),
+                    
+                    if (_isAddingTask)
+                        _buildInlineTaskForm(),
+                ],
+              ),
             ),
+            children: [
+              for (int i = 0; i < tasks.length; i++)
+                _buildTimelineTaskCard(context, tasks[i], i, growthProvider, isLast: i == tasks.length - 1)
+            ],
           );
         },
       ),
     );
   }
+
+  Widget _buildTimelineTaskCard(
+    BuildContext context,
+    GoalTask task,
+    int index,
+    GrowthProvider growthProvider, {
+    bool isLast = false,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return IntrinsicHeight(
+      key: ValueKey('task_${task.id}'),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 1. Timeline Column
+          SizedBox(
+            width: 50,
+            child: Stack(
+              alignment: Alignment.topCenter,
+              children: [
+                // Vertical Line
+                if (!isLast)
+                  Positioned(
+                    top: 24,
+                    bottom: 0,
+                    child: Container(
+                      width: 2,
+                      color: theme.dividerColor,
+                    ),
+                  ),
+
+                // Status Node (Checkmark or Circle)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: GestureDetector(
+                    onTap: () async {
+                      HapticFeedback.mediumImpact();
+                      if (task.isCompleted) {
+                          await growthProvider.uncompleteTask(task.id);
+                      } else {
+                          await growthProvider.completeTask(task.id);
+                      }
+                    },
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: task.isCompleted ? AppTheme.successColor : Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: task.isCompleted 
+                              ? AppTheme.successColor 
+                              : (task.isMilestone ? AppTheme.primaryColor : theme.dividerColor),
+                          width: 2,
+                        ),
+                      ),
+                      child: task.isCompleted
+                          ? const Icon(Icons.check, size: 16, color: Colors.white)
+                          : (task.isMilestone 
+                              ? Center(child: Container(width: 8, height: 8, decoration: BoxDecoration(color: AppTheme.primaryColor, shape: BoxShape.circle)))
+                              : null),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 2. Card Content
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Dismissible(
+                key: Key('dismiss_task_${task.id}'),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.delete_rounded, color: Colors.white),
+                ),
+                confirmDismiss: (direction) async {
+                   return await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                         title: const Text("Delete Task?"),
+                         content: Text('Are you sure you want to delete "${task.title}"?'),
+                         actions: [
+                           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+                           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Delete", style: TextStyle(color: Colors.red))),
+                         ],
+                      )
+                   );
+                },
+                onDismissed: (direction) {
+                   growthProvider.deleteTask(task.id);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+                    boxShadow: [
+                      if (!isDark)
+                        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header: Icon + Title + Menu
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Leading Icon
+                             if (task.isMilestone)
+                                Container(
+                                  margin: const EdgeInsets.only(right: 12),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white10 : Colors.orange.shade50,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.flag_outlined, size: 20, color: AppTheme.primaryColor),
+                                ),
+                            
+                            Expanded(
+                              child: _editingTaskId == task.id
+                                  ? Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        TextField(
+                                          controller: _editTitleControllers[task.id],
+                                          decoration: InputDecoration(
+                                            labelText: 'Title',
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                            filled: true,
+                                            fillColor: Colors.grey.shade50,
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          ),
+                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                          autofocus: true,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        TextField(
+                                          controller: _editDescControllers[task.id],
+                                          decoration: InputDecoration(
+                                            labelText: 'Description (optional)',
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                            filled: true,
+                                            fillColor: Colors.grey.shade50,
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          ),
+                                          maxLines: 2,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        // Save/Cancel buttons
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: OutlinedButton(
+                                                onPressed: () => _cancelEditingTask(task.id),
+                                                child: const Text('Cancel', style: TextStyle(fontSize: 12)),
+                                                style: OutlinedButton.styleFrom(
+                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                onPressed: () => _saveEditedTask(task, growthProvider),
+                                                child: const Text('Save', style: TextStyle(fontSize: 12)),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppTheme.primaryColor,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    )
+                                  : GestureDetector(
+                                      onTap: () => _startEditingTask(task),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            task.title,
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                                              color: isDark ? Colors.white : Colors.black87,
+                                            ),
+                                          ),
+                                          if (task.description.isNotEmpty) ...[
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              task.description,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: isDark ? Colors.white60 : Colors.black54,
+                                              ),
+                                            ),
+                                          ]
+                                        ],
+                                      ),
+                                    ),
+                            ),
+                            
+                            // Menu Icon (Draggable Handle implicit in ReorderableListView, but we add menu for actions)
+                            IconButton(
+                                icon: Icon(Icons.more_horiz, color: isDark ? Colors.white54 : Colors.grey),
+                                onPressed: () => _showTaskMenu(task),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 8),
+
+                      // SUBTASKS (Inline, no Add button here)
+                      if (task.subtasks.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Column(
+                              children: task.subtasks.map((sub) => _buildInlineSubtask(context, sub, task, growthProvider)).toList(),
+                            ),
+                          ),
+
+                      const SizedBox(height: 16),
+
+                      // Footer: Meta info
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.black12 : Colors.grey.shade50,
+                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                          border: task.isMilestone 
+                              ? const Border(bottom: BorderSide(color: AppTheme.primaryColor, width: 3))
+                              : null, 
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              (task.frequency != 'one-time' && task.frequency != null)
+                                  ? Icons.repeat_rounded
+                                  : Icons.arrow_forward_rounded,
+                              size: 16,
+                              color: isDark ? Colors.white38 : Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            if (task.scheduledDate != null)
+                               Text(
+                                  DateFormat('MMM d').format(task.scheduledDate!),
+                                  style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.grey),
+                               ),
+                            const Spacer(),
+                            if (task.subtasks.isNotEmpty)
+                               Text(
+                                  '${task.subtasks.where((s) => s.isCompleted).length}/${task.subtasks.length} subtasks',
+                                  style: TextStyle(fontSize: 12, color: AppTheme.primaryColor),
+                               ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          // Padding right for aesthetics
+          const SizedBox(width: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInlineSubtask(BuildContext context, GoalTask subtask, GoalTask parentTask, GrowthProvider provider) {
+     final theme = Theme.of(context);
+     final isDark = theme.brightness == Brightness.dark;
+     
+     return Padding(
+       padding: const EdgeInsets.only(bottom: 8.0, left: 4),
+       child: Row(
+         children: [
+            InkWell(
+               onTap: () async {
+                  // Toggle subtask completion
+                  // Logic requires updating parent task manually or adding subtask completion logic to provider
+                  final updatedSubtasks = parentTask.subtasks.map((s) {
+                     if (s.id == subtask.id) {
+                        return s.copyWith(isCompleted: !s.isCompleted);
+                     }
+                     return s;
+                  }).toList();
+                  provider.updateTask(parentTask.copyWith(subtasks: updatedSubtasks));
+               },
+               child: Icon(
+                  subtask.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
+                  size: 18,
+                  color: subtask.isCompleted ? AppTheme.successColor : Colors.grey.shade400,
+               ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+               child: GestureDetector(
+                 onTap: () => _showSubtaskEditDialog(subtask, parentTask, provider),
+                 child: Text(
+                    subtask.title,
+                    style: TextStyle(
+                       fontSize: 14,
+                       decoration: subtask.isCompleted ? TextDecoration.lineThrough : null,
+                       color: isDark ? Colors.white70 : Colors.black87,
+                    ),
+                 ),
+               ),
+            ),
+         ],
+       ),
+     );
+  }
+
+  // Helper to build inline form (simplified)
+  Widget _buildInlineTaskForm() {
+      return Padding(
+          padding: const EdgeInsets.only(bottom: 16, left: 50, right: 16), // Align with cards
+          child: Column(
+             children: [
+                 TextField(
+                     controller: _newTaskTitleController,
+                     decoration: InputDecoration(
+                        hintText: "Enter task name...",
+                        filled: true,
+                        fillColor: Theme.of(context).cardColor,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                     ),
+                 ),
+                 const SizedBox(height: 8),
+                 Row(
+                    children: [
+                       ElevatedButton(onPressed: _saveNewTask, child: const Text("Save")),
+                       TextButton(onPressed: _cancelAddingTask, child: const Text("Cancel")),
+                    ],
+                 )
+             ],
+          ),
+      );
+  }
+
 
   Widget _buildStatusBadge(GoalTask task) {
     String status;
@@ -2006,172 +2305,10 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
     }
   }
 
-  Widget _buildInlineTaskForm() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.primaryColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.primaryColor.withOpacity(0.3),
-          width: 2,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.add_task_rounded, color: AppTheme.primaryColor),
-              const SizedBox(width: 8),
-              Text(
-                'New Task',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.primaryColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
 
-          // Title Field
-          TextField(
-            controller: _newTaskTitleController,
-            decoration: InputDecoration(
-              labelText: 'Task Title',
-              hintText: 'e.g., Market Research',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-              fillColor: Colors.white,
-            ),
-            autofocus: true,
-          ),
-          const SizedBox(height: 12),
 
-          // Description Field
-          TextField(
-            controller: _newTaskDescController,
-            decoration: InputDecoration(
-              labelText: 'Description (optional)',
-              hintText: 'Add more details...',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-              fillColor: Colors.white,
-            ),
-            maxLines: 3,
-          ),
-          const SizedBox(height: 12),
 
-          // Date Picker
-          InkWell(
-            onTap: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now(),
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 365)),
-              );
-              if (date != null) {
-                setState(() => _newTaskDate = date);
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppTheme.borderColor),
-                borderRadius: BorderRadius.circular(12),
-                color: Colors.white,
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 20, color: AppTheme.primaryColor),
-                  const SizedBox(width: 8),
-                  Text(
-                    _newTaskDate != null
-                        ? DateFormat('MMM d, y').format(_newTaskDate!)
-                        : 'Select date (optional)',
-                    style: TextStyle(
-                      color: _newTaskDate != null ? Colors.black87 : Colors.grey.shade600,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (_newTaskDate != null)
-                    IconButton(
-                      icon: Icon(Icons.clear, size: 18, color: Colors.grey.shade600),
-                      onPressed: () => setState(() => _newTaskDate = null),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
 
-          // Priority Chips
-          const Text('Priority', style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Row(
-            children: ['low', 'medium', 'high'].map((p) {
-              final isSelected = _newTaskPriority == p;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(p.toUpperCase()),
-                  selected: isSelected,
-                  onSelected: (_) => setState(() => _newTaskPriority = p),
-                  selectedColor: AppTheme.primaryColor,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black87,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
+  // Helper to build inline form (simplified)
 
-          // Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _cancelAddingTask,
-                  child: const Text('Cancel'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _saveNewTask,
-                  child: const Text('Add Task'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }

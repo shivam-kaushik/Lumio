@@ -696,6 +696,27 @@ class GrowthProvider with ChangeNotifier {
     }
   }
 
+  /// Reorder tasks for a goal
+  Future<void> reorderTasks(int goalId, int oldIndex, int newIndex) async {
+    final tasks = _tasksByGoal[goalId];
+    if (tasks == null) return;
+
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+    
+    final task = tasks.removeAt(oldIndex);
+    tasks.insert(newIndex, task);
+    
+    notifyListeners(); 
+    
+    try {
+      await _repository.replaceTasksForGoal(goalId, tasks);
+    } catch (e) {
+      debugPrint("Error persisting reorder: $e");
+    }
+  }
+
   // Recursive helper to flatten tasks
   List<GoalTask> _deepFlatten(List<GoalTask> tasks) {
     List<GoalTask> result = [];

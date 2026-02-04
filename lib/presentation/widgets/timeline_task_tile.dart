@@ -143,8 +143,8 @@ class TimelineTaskTile extends StatelessWidget {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isRunning 
-                          ? (isDark ? const Color(0xFF2C2C30) : Colors.blue.shade50)
-                          : (isDark ? const Color(0xFF1E1E20) : Colors.white),
+                          ? (isDark ? AppTheme.darkSurfaceElevated : AppTheme.primaryColor.withOpacity(0.1))
+                          : (isDark ? AppTheme.darkSurface : Colors.white),
                       borderRadius: BorderRadius.circular(12),
                       border: isRunning ? Border.all(color: AppTheme.primaryColor.withOpacity(0.5)) : null,
                       boxShadow: [

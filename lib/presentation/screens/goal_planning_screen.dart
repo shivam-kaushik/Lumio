@@ -1032,8 +1032,13 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
       itemCount: _tasks.length,
       itemBuilder: (context, index) {
         final task = _tasks[index];
-        // Find scheduled date for this task
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        
+        // Find scheduled date and completion status for this task
         DateTime? scheduledDate;
+        bool isCompleted = false;
+        
         for (var entry in _scheduledTasks.entries) {
           final found = entry.value.firstWhere(
             (t) => t.title == task.title && t.description == task.description,
@@ -1047,316 +1052,199 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           );
           if (found.title.isNotEmpty) {
             scheduledDate = found.scheduledDate;
+            isCompleted = found.isCompleted;
             break;
           }
         }
         
-        return Dismissible(
-          key: Key('task_${task.title}_$index'),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(AppTheme.radiusMD),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: const [
-                Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                  ),
-                ),
-                SizedBox(width: 8),
-                Icon(
-                  Icons.delete_rounded,
-                  color: Colors.white,
-                  size: 32,
-                ),
-              ],
-            ),
-          ),
-          confirmDismiss: (direction) async {
-            return await showDialog<bool>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Delete Task'),
-                content: Text('Are you sure you want to delete "${task.title}"?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                    child: const Text('Delete'),
-                  ),
-                ],
-              ),
-            ) ?? false;
-          },
-          onDismissed: (direction) {
-            _deleteTask(index);
-          },
-          child: ModernSmartCard(
-            margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
-            padding: const EdgeInsets.all(AppTheme.spacingMD),
-            child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        // Determine styling flags
+        final isLast = index == _tasks.length - 1;
+        final showCheckmark = isCompleted;
+        
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppTheme.primaryColor,
-                          AppTheme.primaryLight,
-                        ],
+              // 1. Timeline Column
+              SizedBox(
+                width: 50,
+                child: Stack(
+                  alignment: Alignment.topCenter,
+                  children: [
+                    // Vertical Line
+                    if (!isLast)
+                      Positioned(
+                        top: 24,
+                        bottom: 0,
+                        child: Container(
+                          width: 2,
+                          color: theme.dividerColor,
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                    
+                    // Status Indicator (Checkmark or Dot or Nothing)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: showCheckmark 
+                              ? (isDark ? Colors.white24 : Colors.black12) 
+                              : Colors.transparent,
+                          shape: BoxShape.circle,
+                          border: showCheckmark 
+                              ? null 
+                              : Border.all(color: Colors.transparent), // Hidden for non-completed
+                        ),
+                        child: showCheckmark
+                            ? Icon(Icons.check_rounded, size: 16, color: isDark ? Colors.white : Colors.black54)
+                            : null, // Only show checkmark if done
+                      ),
                     ),
-                    child: Center(
-                      child: Text(
-                        '${index + 1}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppTheme.spacingMD),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          task.title,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.textPrimary,
-                              ),
-                        ),
-                        if (task.description.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            task.description,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppTheme.textSecondary,
-                                ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert_rounded, size: 20),
-                    onSelected: (value) {
-                      // Defer action until after popup menu closes
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (value == 'edit') {
-                          _editTask(index);
-                        } else if (value == 'time') {
-                          _editTaskTime(index);
-                        } else if (value == 'delete') {
-                          _deleteTask(index);
-                        }
-                      });
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_rounded, size: 18),
-                            SizedBox(width: 8),
-                            Text('Edit'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'time',
-                        child: Row(
-                          children: [
-                            Icon(Icons.access_time_rounded, size: 18),
-                            SizedBox(width: 8),
-                            Text('Edit Time'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_rounded, size: 18, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const SizedBox(height: AppTheme.spacingMD),
-              Wrap(
-                spacing: AppTheme.spacingSM,
-                runSpacing: AppTheme.spacingSM,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppTheme.spacingSM,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-                      border: Border.all(
-                        color: AppTheme.primaryColor.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.flag_rounded,
-                          size: 14,
-                          color: AppTheme.primaryColor,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          task.priority,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (task.estimatedHours != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTheme.spacingSM,
-                        vertical: 6,
-                      ),
+
+              // 2. Card Content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Dismissible(
+                    key: Key('task_${task.title}_$index'),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-                        border: Border.all(
-                          color: AppTheme.primaryColor.withOpacity(0.3),
-                          width: 1,
-                        ),
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMD),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.timer_rounded,
-                            size: 14,
-                            color: AppTheme.primaryColor,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${task.estimatedHours!.toStringAsFixed(1)}h',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.primaryColor,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: const Icon(Icons.delete_rounded, color: Colors.white),
                     ),
-                  if (scheduledDate != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTheme.spacingSM,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusSM),
-                        border: Border.all(
-                          color: AppTheme.primaryColor.withOpacity(0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.calendar_today_rounded,
-                            size: 14,
-                            color: AppTheme.primaryColor,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormat('MMM d, y').format(scheduledDate),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.primaryColor,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (task.isMilestone)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTheme.spacingSM,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppTheme.primaryColor,
-                            AppTheme.primaryLight,
+                    confirmDismiss: (direction) async {
+                      return await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Task'),
+                          content: Text('Delete "${task.title}"?'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                            ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Delete')),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                      ) ?? false;
+                    },
+                    onDismissed: (_) => _deleteTask(index),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+                        boxShadow: [
+                          if (!isDark)
+                            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                        ],
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(
-                            Icons.star_rounded,
-                            size: 14,
-                            color: Colors.white,
+                          // Header: Icon + Title + Menu
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Leading Icon (Flag for Milestone, else hidden/small)
+                                if (task.isMilestone)
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 12),
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? Colors.white10 : Colors.orange.shade50,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.flag_outlined, size: 20, color: AppTheme.primaryColor),
+                                  ),
+                                
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        task.title,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                          decoration: isCompleted ? TextDecoration.lineThrough : null,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                // Menu Icon
+                                GestureDetector(
+                                  onTap: () {
+                                     // Show options... reuse edit logic?
+                                     _editTask(index);
+                                  },
+                                  child: Icon(Icons.more_horiz, color: isDark ? Colors.white54 : Colors.grey),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Milestone',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
+
+                          // Description
+                          if (task.description.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: Text(
+                                task.description,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark ? Colors.white60 : Colors.black54,
+                                  height: 1.4,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+
+                          const SizedBox(height: 16),
+
+                          // Footer: Action Icon (Loop, Arrow) + Bottom Decor
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.black12 : Colors.grey.shade50,
+                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                              border: task.isMilestone 
+                                  ? const Border(bottom: BorderSide(color: AppTheme.primaryColor, width: 3))
+                                  : null, 
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  (task.frequency != 'one-time' && task.frequency != null)
+                                      ? Icons.cached_rounded // Loop icon
+                                      : Icons.arrow_right_alt_rounded, // Arrow icon
+                                  size: 18,
+                                  color: isDark ? Colors.white38 : Colors.grey,
+                                ),
+                                const Spacer(),
+                                // Can add more footer info here if needed
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                ],
+                  ),
+                ),
               ),
             ],
-          ),
           ),
         )
           .animate()

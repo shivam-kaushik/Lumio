@@ -533,18 +533,17 @@ class _GoalRoadmapScreenState extends State<GoalRoadmapScreen> {
                   ),
                   child: Center(
                     child: task.isMilestone
-                        ? Icon(
+                        ? const Icon(
                             Icons.flag_rounded,
                             color: Colors.white,
                             size: 18,
                           )
-                        : Text(
-                            '$index',
-                            style: TextStyle(
-                              color: AppTheme.primaryColor,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
+                        : Icon(
+                            (task.frequency != 'one-time' && task.frequency != null)
+                                ? Icons.repeat_rounded
+                                : Icons.circle_outlined,
+                            color: AppTheme.primaryColor,
+                            size: 18,
                           ),
                   ),
                 ),
