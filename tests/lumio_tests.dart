@@ -23,7 +23,7 @@ class FakeGrowthRepository extends Fake implements FirestoreGrowthRepository {
   
   // Goals
   @override
-  Future<int> createGoal(String name, {DateTime? targetDeadline, double? hoursPerDay, int? totalEstimatedHours, GoalSettings? settings}) async {
+  Future<int> createGoal(String name, {DateTime? targetDeadline, double? hoursPerDay, int? totalEstimatedHours, GoalSettings? settings, String? imageUrl}) async {
     final id = _goals.length + 1;
     _goals.add(Goal(
       id: id,
@@ -31,6 +31,7 @@ class FakeGrowthRepository extends Fake implements FirestoreGrowthRepository {
       createdAt: DateTime.now(),
       targetDeadline: targetDeadline,
       settings: settings,
+      imageUrl: imageUrl,
     ));
     return id;
   }
