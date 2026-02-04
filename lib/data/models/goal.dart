@@ -10,6 +10,7 @@ class Goal {
   final double? hoursPerDay;
   final int? totalEstimatedHours;
   final GoalSettings? settings;
+  final String? imageUrl;
 
   Goal({
     required this.id,
@@ -19,6 +20,7 @@ class Goal {
     this.hoursPerDay,
     this.totalEstimatedHours,
     this.settings,
+    this.imageUrl,
   });
 
   /// Create Goal from database map
@@ -36,9 +38,10 @@ class Goal {
               : (map['hours_per_day'] as num).toDouble())
           : null,
       totalEstimatedHours: map['total_estimated_hours'] as int?,
-      settings: map['settings'] != null 
+      settings: map['settings'] != null
           ? GoalSettings.fromMap(Map<String, dynamic>.from(map['settings'] as Map))
           : null,
+      imageUrl: map['image_url'] as String?,
     );
   }
 
@@ -52,6 +55,7 @@ class Goal {
       'hours_per_day': hoursPerDay,
       'total_estimated_hours': totalEstimatedHours,
       'settings': settings?.toMap(),
+      'image_url': imageUrl,
     };
   }
 
@@ -64,6 +68,7 @@ class Goal {
       'hours_per_day': hoursPerDay,
       'total_estimated_hours': totalEstimatedHours,
       'settings': settings?.toMap(),
+      'image_url': imageUrl,
     };
   }
 
@@ -76,6 +81,7 @@ class Goal {
     double? hoursPerDay,
     int? totalEstimatedHours,
     GoalSettings? settings,
+    String? imageUrl,
   }) {
     return Goal(
       id: id ?? this.id,
@@ -85,6 +91,7 @@ class Goal {
       hoursPerDay: hoursPerDay ?? this.hoursPerDay,
       totalEstimatedHours: totalEstimatedHours ?? this.totalEstimatedHours,
       settings: settings ?? this.settings,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 
@@ -106,9 +113,10 @@ class Goal {
           : null,
       hoursPerDay: (data['hoursPerDay'] as num?)?.toDouble(),
       totalEstimatedHours: data['totalEstimatedHours'] as int?,
-      settings: data['settings'] != null 
+      settings: data['settings'] != null
           ? GoalSettings.fromMap(Map<String, dynamic>.from(data['settings'] as Map))
           : null,
+      imageUrl: data['imageUrl'] as String?,
     );
   }
 
@@ -121,8 +129,15 @@ class Goal {
       'hoursPerDay': hoursPerDay,
       'totalEstimatedHours': totalEstimatedHours,
       'settings': settings?.toMap(),
+      'imageUrl': imageUrl,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
+}
+
+/// Helper function to generate image URL from goal name
+String generateGoalImageUrl(String goalName) {
+  final encodedName = Uri.encodeComponent(goalName);
+  return 'https://image.pollinations.ai/prompt/$encodedName?width=800&height=600&nologo=true';
 }
 

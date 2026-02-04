@@ -731,7 +731,7 @@ class DatabaseHelper {
         ''');
 
         await db.execute('''
-          CREATE INDEX IF NOT EXISTS idx_phases_goal 
+          CREATE INDEX IF NOT EXISTS idx_phases_goal
           ON ${AppConstants.phasesTable} (goal_id)
         ''');
 
@@ -739,13 +739,13 @@ class DatabaseHelper {
         // SQLite doesn't support ALTER TABLE ADD COLUMN IF NOT EXISTS, so we check first
         final tableInfo = await db.rawQuery('PRAGMA table_info(${AppConstants.tasksTable})');
         final hasPhaseId = tableInfo.any((col) => col['name'] == 'phase_id');
-        
+
         if (!hasPhaseId) {
           await db.execute(
             'ALTER TABLE ${AppConstants.tasksTable} ADD COLUMN phase_id INTEGER',
           );
           await db.execute('''
-            CREATE INDEX IF NOT EXISTS idx_tasks_phase 
+            CREATE INDEX IF NOT EXISTS idx_tasks_phase
             ON ${AppConstants.tasksTable} (phase_id)
           ''');
         }
@@ -753,6 +753,18 @@ class DatabaseHelper {
         print('✅ Migration to version 13 completed');
       } catch (e) {
         print('⚠️ Error in version 13 migration: $e');
+      }
+    }
+
+    // Migration to version 14: Add image_url to goals table
+    if (oldVersion < 14) {
+      try {
+        await db.execute(
+          'ALTER TABLE ${AppConstants.goalsTable} ADD COLUMN image_url TEXT',
+        );
+        print('✅ Added image_url column to goals table (version 14)');
+      } catch (e) {
+        print('⚠️ image_url column already exists or error: $e');
       }
     }
   }

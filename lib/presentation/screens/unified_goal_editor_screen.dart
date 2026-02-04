@@ -223,10 +223,13 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
       int goalId;
       if (effectiveGoalId == null) {
          // Create New Goal (Auto-create)
+         // Auto-generate imageUrl if not provided
+         final imageUrl = generateGoalImageUrl(goalName);
          goalId = await growthProvider.createGoal(
             goalName,
-            targetDeadline: _goalDeadline ?? DateTime.now().add(const Duration(days: 30)), 
+            targetDeadline: _goalDeadline ?? DateTime.now().add(const Duration(days: 30)),
             settings: _currentSettings, // SAVE FIX
+            imageUrl: imageUrl,
          );
          _localGoalId = goalId; // Store for future updates
       } else {
@@ -234,7 +237,7 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
          goalId = effectiveGoalId;
          // We need the original goal object to update safely
          // If we have widget.existingGoal, use it. If not (it was local), fetch or construct minimal.
-         final baseGoal = widget.existingGoal ?? 
+         final baseGoal = widget.existingGoal ??
              Goal(id: goalId, name: goalName, createdAt: DateTime.now()); // Minimal fallback
 
          await growthProvider.updateGoal(baseGoal.copyWith(

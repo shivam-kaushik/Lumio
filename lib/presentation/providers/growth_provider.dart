@@ -147,6 +147,7 @@ class GrowthProvider with ChangeNotifier {
     double? hoursPerDay,
     int? totalEstimatedHours,
     GoalSettings? settings,
+    String? imageUrl,
   }) async {
     try {
       final id = await _repository.createGoal(
@@ -155,6 +156,7 @@ class GrowthProvider with ChangeNotifier {
         hoursPerDay: hoursPerDay,
         totalEstimatedHours: totalEstimatedHours,
         settings: settings,
+        imageUrl: imageUrl,
       );
       await loadGrowthData(); // Reload to get updated list
       return id;
@@ -584,19 +586,10 @@ class GrowthProvider with ChangeNotifier {
         }
       }
       
-      loadGrowthData(); 
-      
-      final privacyGpt = PrivacyGptService();
-      final message = await privacyGpt.generateMotivationalMessage(
-        goalName: goal.name,
-        taskDescription: task.description,
-        skillName: null, 
-        streakCount: 0, 
-        totalReps: 0, 
-        motivationAnchor: task.motivationAnchor,
-      );
-      
-      return message;
+      loadGrowthData();
+
+      // No motivational message on task completion
+      return null;
     } catch (e) {
       _error = e.toString();
       notifyListeners();

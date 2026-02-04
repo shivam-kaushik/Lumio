@@ -20,11 +20,15 @@ class FirestoreGrowthRepository {
     double? hoursPerDay,
     int? totalEstimatedHours,
     GoalSettings? settings,
+    String? imageUrl,
   }) async {
     final collection = _firestoreService.goalsCollection;
     if (collection == null) {
       throw Exception('User not authenticated');
     }
+
+    // Auto-generate imageUrl if not provided
+    final finalImageUrl = imageUrl ?? generateGoalImageUrl(name);
 
     final goal = Goal(
       id: 0, // Will be converted from Firestore ID
@@ -34,6 +38,7 @@ class FirestoreGrowthRepository {
       hoursPerDay: hoursPerDay,
       totalEstimatedHours: totalEstimatedHours,
       settings: settings,
+      imageUrl: finalImageUrl,
     );
 
     // Generate a unique ID (using timestamp-based approach)
@@ -69,6 +74,7 @@ class FirestoreGrowthRepository {
           hoursPerDay: goal.hoursPerDay,
           totalEstimatedHours: goal.totalEstimatedHours,
           settings: goal.settings,
+          imageUrl: goal.imageUrl,
         );
       } catch (e) {
         // If parsing fails, use hash of string ID
@@ -81,6 +87,7 @@ class FirestoreGrowthRepository {
           hoursPerDay: goal.hoursPerDay,
           totalEstimatedHours: goal.totalEstimatedHours,
           settings: goal.settings,
+          imageUrl: goal.imageUrl,
         );
       }
     }).toList();
@@ -102,6 +109,8 @@ class FirestoreGrowthRepository {
         targetDeadline: goal.targetDeadline,
         hoursPerDay: goal.hoursPerDay,
         totalEstimatedHours: goal.totalEstimatedHours,
+        settings: goal.settings,
+        imageUrl: goal.imageUrl,
       );
     }
 
@@ -118,6 +127,7 @@ class FirestoreGrowthRepository {
           hoursPerDay: goal.hoursPerDay,
           totalEstimatedHours: goal.totalEstimatedHours,
           settings: goal.settings,
+          imageUrl: goal.imageUrl,
         );
       }
     }

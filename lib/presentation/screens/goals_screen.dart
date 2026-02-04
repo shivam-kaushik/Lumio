@@ -11,6 +11,8 @@ import '../widgets/animated_progress_bar.dart';
 import '../../core/services/permission_service.dart';
 import '../../core/services/premium_service.dart';
 import 'unified_goal_editor_screen.dart'; // Unified Editor
+import 'goal_details_screen.dart'; // Goal Details Screen
+import 'animated_goal_creation_screen.dart'; // Animated Goal Creation
 import '../../data/models/goal.dart';
 import '../../data/models/goal_task.dart'; // Import GoalTask
 import '../../core/services/privacy_gpt_service.dart';
@@ -117,7 +119,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (context) => const UnifiedGoalEditorScreen(isNew: true),
+                          builder: (context) => const AnimatedGoalCreationScreen(),
+                          fullscreenDialog: true,
                         ),
                       );
                     },
@@ -265,7 +268,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => const UnifiedGoalEditorScreen(isNew: true),
+                    builder: (context) => const AnimatedGoalCreationScreen(),
+                    fullscreenDialog: true,
                   ),
                 );
               },
@@ -333,13 +337,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
     return ModernSmartCard(
       onTap: () {
-        // Navigate to Unified Editor
+        // Navigate to Goal Details Screen
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => UnifiedGoalEditorScreen(
-              isNew: false,
-              existingGoal: goal,
-              initialTasks: tasks, // Pass actual tasks
+            builder: (context) => GoalDetailsScreen(
+              goalId: goal.id,
             ),
           ),
         );
