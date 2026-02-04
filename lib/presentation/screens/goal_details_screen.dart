@@ -37,7 +37,13 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
 
   final Map<int, TextEditingController> _editTitleControllers = {};
   final Map<int, TextEditingController> _editDescControllers = {};
+
   final Map<int, DateTime?> _editDates = {};
+
+  // Inline Subtask State
+  int? _addingSubtaskParentId;
+  int? _editingSubtaskId;
+  final TextEditingController _inlineSubtaskController = TextEditingController();
 
   @override
   void initState() {
@@ -59,6 +65,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
     for (var controller in _editDescControllers.values) {
       controller.dispose();
     }
+    _inlineSubtaskController.dispose();
     super.dispose();
   }
 
@@ -652,13 +659,17 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
               title: const Text('Add Subtask'),
               onTap: () {
                 Navigator.pop(context);
-                _showAddSubtaskDialog(task, context.read<GrowthProvider>());
+                setState(() {
+                  _addingSubtaskParentId = task.id;
+                  _inlineSubtaskController.clear();
+                });
               },
             ),
             ListTile(
               leading: Icon(Icons.delete_rounded, color: AppTheme.errorColor),
               title: const Text('Delete Task'),
               onTap: () async {
+                final provider = context.read<GrowthProvider>(); // Capture context safely
                 Navigator.pop(context);
                 final confirmed = await showDialog<bool>(
                   context: context,
@@ -686,8 +697,8 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                     ],
                   ),
                 );
-                if (confirmed == true && mounted) {
-                  await context.read<GrowthProvider>().deleteTask(task.id);
+                if (confirmed == true) {
+                  await provider.deleteTask(task.id);
                 }
               },
             ),
@@ -1201,11 +1212,84 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                       const SizedBox(height: 8),
 
                       // SUBTASKS (Inline, no Add button here)
-                      if (task.subtasks.isNotEmpty)
+                      if (task.subtasks.isNotEmpty || _addingSubtaskParentId == task.id)
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: Column(
-                              children: task.subtasks.map((sub) => _buildInlineSubtask(context, sub, task, growthProvider)).toList(),
+                              children: [
+                                ...task.subtasks.map((sub) => _buildInlineSubtask(context, sub, task, growthProvider)).toList(),
+                                
+                                // Inline Add Subtask Input
+                                if (_addingSubtaskParentId == task.id)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8, left: 28),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextField(
+                                            controller: _inlineSubtaskController,
+                                            autofocus: true,
+                                            decoration: InputDecoration(
+                                              hintText: 'Enter subtask name...',
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                              filled: true,
+                                              fillColor: isDark ? Colors.grey.shade900 : Colors.white,
+                                            ),
+                                            onSubmitted: (_) async {
+                                               if (_inlineSubtaskController.text.trim().isNotEmpty) {
+                                                  final newSub = GoalTask(
+                                                     id: DateTime.now().millisecondsSinceEpoch,
+                                                     goalId: widget.goalId,
+                                                     title: _inlineSubtaskController.text.trim(),
+                                                     description: '',
+                                                     estimatedHours: 0.5,
+                                                     priority: task.priority,
+                                                     createdAt: DateTime.now(),
+                                                  );
+                                                  final updatedSubtasks = [...task.subtasks, newSub];
+                                                  await growthProvider.updateTask(task.copyWith(subtasks: updatedSubtasks));
+                                                  _inlineSubtaskController.clear();
+                                                  // Keep focus to add another? Or close? User request implies "fill in it", usually allowing repetitive entry is good.
+                                                  // But for now let's keep it open until cancelled or "done"? 
+                                                  // Actually standard pattern is keep adding until tap away or cancel.
+                                                  // I'll keep it open.
+                                               }
+                                            },
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.check_circle, color: AppTheme.successColor),
+                                          onPressed: () async {
+                                               if (_inlineSubtaskController.text.trim().isNotEmpty) {
+                                                  final newSub = GoalTask(
+                                                     id: DateTime.now().millisecondsSinceEpoch,
+                                                     goalId: widget.goalId,
+                                                     title: _inlineSubtaskController.text.trim(),
+                                                     description: '',
+                                                     estimatedHours: 0.5,
+                                                     priority: task.priority,
+                                                     createdAt: DateTime.now(),
+                                                  );
+                                                  final updatedSubtasks = [...task.subtasks, newSub];
+                                                  await growthProvider.updateTask(task.copyWith(subtasks: updatedSubtasks));
+                                                  _inlineSubtaskController.clear();
+                                               }
+                                          },
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.cancel, color: Colors.grey),
+                                          onPressed: () {
+                                            setState(() {
+                                              _addingSubtaskParentId = null;
+                                              _inlineSubtaskController.clear();
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
 
@@ -1263,8 +1347,34 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
      final theme = Theme.of(context);
      final isDark = theme.brightness == Brightness.dark;
      
-     return Padding(
-       padding: const EdgeInsets.only(bottom: 8.0, left: 4),
+     return Dismissible(
+       key: ValueKey('subtask_${subtask.id}'),
+       direction: DismissDirection.endToStart,
+       background: Container(
+         alignment: Alignment.centerRight,
+         padding: const EdgeInsets.only(right: 16),
+         color: AppTheme.errorColor.withOpacity(0.1),
+         child: const Icon(Icons.delete_rounded, color: AppTheme.errorColor, size: 20),
+       ),
+       confirmDismiss: (direction) async {
+          return await showDialog<bool>(
+             context: context,
+             builder: (ctx) => AlertDialog(
+                title: const Text("Delete Subtask?"),
+                content: Text('Delete "${subtask.title}"?'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+                  TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Delete", style: TextStyle(color: Colors.red))),
+                ],
+             )
+          );
+       },
+       onDismissed: (direction) async {
+          final updatedSubtasks = parentTask.subtasks.where((st) => st.id != subtask.id).toList();
+          await provider.updateTask(parentTask.copyWith(subtasks: updatedSubtasks));
+       },
+       child: Padding(
+         padding: const EdgeInsets.only(bottom: 8.0, left: 4),
        child: Row(
          children: [
             InkWell(
@@ -1287,19 +1397,73 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
             ),
             const SizedBox(width: 8),
             Expanded(
-               child: GestureDetector(
-                 onTap: () => _showSubtaskEditDialog(subtask, parentTask, provider),
-                 child: Text(
-                    subtask.title,
-                    style: TextStyle(
-                       fontSize: 14,
-                       decoration: subtask.isCompleted ? TextDecoration.lineThrough : null,
-                       color: isDark ? Colors.white70 : Colors.black87,
-                    ),
-                 ),
-               ),
+               child: _editingSubtaskId == subtask.id
+                   ? Row(
+                       children: [
+                         Expanded(
+                           child: TextField(
+                             controller: _inlineSubtaskController,
+                             autofocus: true,
+                             decoration: const InputDecoration(
+                               isDense: true,
+                               contentPadding: EdgeInsets.symmetric(vertical: 4),
+                               border: InputBorder.none,
+                             ),
+                             onSubmitted: (value) async {
+                               if (value.trim().isNotEmpty) {
+                                 final updatedSubtasks = parentTask.subtasks.map((s) {
+                                    if (s.id == subtask.id) return s.copyWith(title: value.trim());
+                                    return s;
+                                 }).toList();
+                                 await provider.updateTask(parentTask.copyWith(subtasks: updatedSubtasks));
+                                 setState(() => _editingSubtaskId = null);
+                                 _inlineSubtaskController.clear();
+                               }
+                             },
+                           ),
+                         ),
+                         IconButton(
+                           icon: const Icon(Icons.check, size: 18, color: AppTheme.successColor),
+                           onPressed: () async {
+                               if (_inlineSubtaskController.text.trim().isNotEmpty) {
+                                 final updatedSubtasks = parentTask.subtasks.map((s) {
+                                    if (s.id == subtask.id) return s.copyWith(title: _inlineSubtaskController.text.trim());
+                                    return s;
+                                 }).toList();
+                                 await provider.updateTask(parentTask.copyWith(subtasks: updatedSubtasks));
+                                 setState(() => _editingSubtaskId = null);
+                                 _inlineSubtaskController.clear();
+                               }
+                           },
+                         ),
+                         IconButton(
+                           icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                           onPressed: () {
+                              setState(() => _editingSubtaskId = null);
+                              _inlineSubtaskController.clear();
+                           },
+                         ),
+                       ],
+                     )
+                   : GestureDetector(
+                       onTap: () {
+                         setState(() {
+                           _editingSubtaskId = subtask.id;
+                           _inlineSubtaskController.text = subtask.title;
+                         });
+                       },
+                       child: Text(
+                          subtask.title,
+                          style: TextStyle(
+                             fontSize: 14,
+                             decoration: subtask.isCompleted ? TextDecoration.lineThrough : null,
+                             color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                       ),
+                     ),
             ),
          ],
+       ),
        ),
      );
   }
