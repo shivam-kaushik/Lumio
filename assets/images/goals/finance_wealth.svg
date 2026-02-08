@@ -1,0 +1,15 @@
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#141e30;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#243b55;stop-opacity:1" />
+    </linearGradient>
+    <filter id="blur">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="20" />
+    </filter>
+  </defs>
+  <rect width="800" height="600" fill="url(#grad)" />
+  <rect x="200" y="100" width="400" height="400" transform="rotate(45 400 300)" fill="#f1c40f" fill-opacity="0.1" />
+  <circle cx="700" cy="100" r="200" fill="#ffd700" fill-opacity="0.1" filter="url(#blur)" />
+  <path d="M0,600 L800,400 L800,600 Z" fill="#f1c40f" fill-opacity="0.05" />
+</svg>
