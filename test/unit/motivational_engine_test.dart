@@ -119,7 +119,7 @@ void main() {
     // 1. Generic Nudge Logic (Deadlines) - Uses nowOverride to hit standard notification block
     test('1. Schedules generic nudge for Urgent task (< 24h) without settings', () async {
       final goal = Goal(id: 1, name: 'Goal 1', createdAt: now);
-      final task = createTask(id: 101, goalId: 1, scheduledDate: now.add(const Duration(hours: 1)));
+      final task = createTask(id: 101, goalId: 1, scheduledDate: testTime2PM.add(const Duration(hours: 1)));
       
       when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
       when(mockRepo.getTasksForGoal(1)).thenAnswer((_) async => [task]);
@@ -136,22 +136,22 @@ void main() {
 
     test('2. Schedules generic nudge for Upcoming task (1-2 days) without settings', () async {
       final goal = Goal(id: 2, name: 'Goal 2', createdAt: now);
-      final task = createTask(id: 201, goalId: 2, scheduledDate: now.add(const Duration(hours: 30)));
-      
+      final task = createTask(id: 201, goalId: 2, scheduledDate: testTime2PM.add(const Duration(hours: 30)));
+
       when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
       when(mockRepo.getTasksForGoal(2)).thenAnswer((_) async => [task]);
 
       await engine.checkAndSchedule(nowOverride: testTime2PM);
 
       verify(mockNotifications.showNotification(
-        body: argThat(contains('in 1 days'), named: 'body'),
-        id: anyNamed('id'), title: anyNamed('title'), payload: anyNamed('payload')
+        title: argThat(contains('Due Tomorrow'), named: 'title'),
+        id: anyNamed('id'), body: anyNamed('body'), payload: anyNamed('payload')
       )).called(1);
     });
 
     test('3. Does NOT schedule generic nudge for Far Future task (> 2 days)', () async {
       final goal = Goal(id: 3, name: 'Goal 3', createdAt: now);
-      final task = createTask(id: 301, goalId: 3, scheduledDate: now.add(const Duration(days: 4)));
+      final task = createTask(id: 301, goalId: 3, scheduledDate: testTime2PM.add(const Duration(days: 4)));
       
       when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
       when(mockRepo.getTasksForGoal(3)).thenAnswer((_) async => [task]);
@@ -167,7 +167,7 @@ void main() {
     test('4. Should NOT schedule generic nudge if notifications disabled in Settings', () async {
       final settings = GoalSettings(enableNotifications: false);
       final goal = Goal(id: 4, name: 'Quiet Goal', createdAt: now, settings: settings);
-      final task = createTask(id: 401, goalId: 4, scheduledDate: now.add(const Duration(hours: 2)));
+      final task = createTask(id: 401, goalId: 4, scheduledDate: testTime2PM.add(const Duration(hours: 2)));
 
       when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
       when(mockRepo.getTasksForGoal(4)).thenAnswer((_) async => [task]);
@@ -187,7 +187,7 @@ void main() {
     test('5. Should CANCEL generic nudge if custom settings exist (Duplicate Prevention)', () async {
       final settings = GoalSettings(enableNotifications: true, frequency: NotificationFrequency.daily);
       final goal = Goal(id: 5, name: 'Custom Goal', createdAt: now, settings: settings);
-      final task = createTask(id: 501, goalId: 5, scheduledDate: now.add(const Duration(days: 1)));
+      final task = createTask(id: 501, goalId: 5, scheduledDate: testTime2PM.add(const Duration(days: 1)));
 
       when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
       when(mockRepo.getTasksForGoal(5)).thenAnswer((_) async => [task]);
@@ -201,10 +201,10 @@ void main() {
 
     test('6. Mixed Scenario: Custom Goal cancels, Generic Goal schedules', () async {
       final customGoal = Goal(id: 6, name: 'Custom', createdAt: now, settings: GoalSettings(enableNotifications: true));
-      final customTask = createTask(id: 601, goalId: 6, scheduledDate: now.add(Duration(hours: 1)));
+      final customTask = createTask(id: 601, goalId: 6, scheduledDate: testTime2PM.add(Duration(hours: 1)));
 
       final genericGoal = Goal(id: 7, name: 'Generic', createdAt: now);
-      final genericTask = createTask(id: 701, goalId: 7, scheduledDate: now.add(Duration(hours: 1)));
+      final genericTask = createTask(id: 701, goalId: 7, scheduledDate: testTime2PM.add(Duration(hours: 1)));
 
       when(mockRepo.getGoals()).thenAnswer((_) async => [customGoal, genericGoal]);
       when(mockRepo.getTasksForGoal(6)).thenAnswer((_) async => [customTask]);
@@ -415,7 +415,7 @@ void main() {
       
       final settings = GoalSettings(enableNotifications: true); // Custom settings trigger cancellation
       final goal = Goal(id: 21, name: 'Error', createdAt: now, settings: settings);
-      final task = createTask(id: 2101, goalId: 21, scheduledDate: now.add(Duration(days: 1)));
+      final task = createTask(id: 2101, goalId: 21, scheduledDate: testTime2PM.add(Duration(days: 1)));
 
       when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
       when(mockRepo.getTasksForGoal(21)).thenAnswer((_) async => [task]);
@@ -451,7 +451,7 @@ void main() {
 
     test('24. Null Settings in task inheritance checks (Deadline)', () async {
        final goal = Goal(id: 24, name: 'NullSet', createdAt: now); // settings null
-       final task = createTask(id: 2401, goalId: 24, scheduledDate: now.add(Duration(hours: 1)));
+       final task = createTask(id: 2401, goalId: 24, scheduledDate: testTime2PM.add(Duration(hours: 1)));
        
        when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
        when(mockRepo.getTasksForGoal(24)).thenAnswer((_) async => [task]);
@@ -462,7 +462,7 @@ void main() {
 
     test('25. Empty Task Title fallback', () async {
        final goal = Goal(id: 25, name: 'EmptyTitle', createdAt: now);
-       final task = createTask(id: 2501, goalId: 25, title: '', scheduledDate: now.add(Duration(hours: 1)));
+       final task = createTask(id: 2501, goalId: 25, title: '', scheduledDate: testTime2PM.add(Duration(hours: 1)));
        
        when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
        when(mockRepo.getTasksForGoal(25)).thenAnswer((_) async => [task]);
@@ -477,7 +477,7 @@ void main() {
     test('26. Very long Task Title truncation (Implicit)', () async {
        String longTitle = 'A' * 200;
        final goal = Goal(id: 26, name: 'Long', createdAt: now);
-       final task = createTask(id: 2601, goalId: 26, title: longTitle, scheduledDate: now.add(Duration(hours: 1)));
+       final task = createTask(id: 2601, goalId: 26, title: longTitle, scheduledDate: testTime2PM.add(Duration(hours: 1)));
        
        when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
        when(mockRepo.getTasksForGoal(26)).thenAnswer((_) async => [task]);
@@ -487,7 +487,7 @@ void main() {
 
     test('27. Future Deadline (>48h) ignores generic nudge', () async {
        final goal = Goal(id: 27, name: 'Far', createdAt: now);
-       final task = createTask(id: 2701, goalId: 27, scheduledDate: now.add(Duration(hours: 49)));
+       final task = createTask(id: 2701, goalId: 27, scheduledDate: testTime2PM.add(Duration(hours: 49)));
        
        when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
        when(mockRepo.getTasksForGoal(27)).thenAnswer((_) async => [task]);
@@ -499,22 +499,22 @@ void main() {
 
     test('28. Exact 24h Deadline (Boundary check)', () async {
        final goal = Goal(id: 28, name: 'Boundary', createdAt: now);
-       final task = createTask(id: 2801, goalId: 28, scheduledDate: now.add(Duration(hours: 24)));
-       
+       final task = createTask(id: 2801, goalId: 28, scheduledDate: testTime2PM.add(Duration(hours: 24)));
+
        when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
        when(mockRepo.getTasksForGoal(28)).thenAnswer((_) async => [task]);
 
        await engine.checkAndSchedule(nowOverride: testTime2PM);
-       
+
        verify(mockNotifications.showNotification(
-          title: argThat(contains("Coming Up"), named: 'title'),
+          title: argThat(contains("Due Tomorrow"), named: 'title'),
           id: anyNamed('id'), body: anyNamed('body'), payload: anyNamed('payload')
        )).called(1);
     });
 
     test('29. Past Deadline (Overdue)', () async {
        final goal = Goal(id: 29, name: 'Overdue', createdAt: now);
-       final task = createTask(id: 2901, goalId: 29, scheduledDate: now.subtract(Duration(hours: 1)));
+       final task = createTask(id: 2901, goalId: 29, scheduledDate: testTime2PM.subtract(Duration(hours: 1)));
        
        when(mockRepo.getGoals()).thenAnswer((_) async => [goal]);
        when(mockRepo.getTasksForGoal(29)).thenAnswer((_) async => [task]);
