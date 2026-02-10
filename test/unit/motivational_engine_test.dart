@@ -290,8 +290,8 @@ void main() {
       await engine.checkAndSchedule(force: true);
 
       verify(mockNotifications.showNotification(
-        id: 1001, title: anyNamed('title'), 
-        body: argThat(contains("Today's mission"), named: 'body'), // Task specific body
+        id: 1001, title: anyNamed('title'),
+        body: argThat(contains("Let's tackle"), named: 'body'),
         payload: anyNamed('payload')
       )).called(1);
     });

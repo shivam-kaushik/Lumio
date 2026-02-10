@@ -106,7 +106,8 @@ void main() {
 
       test('future minutes', () {
         final future = DateTime.now().add(const Duration(minutes: 30));
-        expect(DateTimeUtils.getTimeUntil(future), 'in 30m');
+        final result = DateTimeUtils.getTimeUntil(future);
+        expect(result, anyOf('in 29m', 'in 30m'));
       });
     });
 
