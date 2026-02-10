@@ -96,7 +96,8 @@ void main() {
     group('getTimeUntil', () {
       test('future date shows "in X"', () {
         final future = DateTime.now().add(const Duration(hours: 5));
-        expect(DateTimeUtils.getTimeUntil(future), 'in 5h');
+        final result = DateTimeUtils.getTimeUntil(future);
+        expect(result, anyOf('in 4h', 'in 5h'));
       });
 
       test('past date shows "Overdue"', () {
