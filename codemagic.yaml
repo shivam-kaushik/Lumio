@@ -1,0 +1,109 @@
+workflows:
+  ios-release:
+    name: iOS Release Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        - app_credentials  # Create this group in Codemagic dashboard
+      vars:
+        BUNDLE_ID: "com.example.lumio"
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: com.example.lumio
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: updated-homescreen
+          include: true
+
+    scripts:
+      - name: Set up local properties
+        script: |
+          echo "OPENAI_API_KEY=$OPENAI_API_KEY" > .env
+          echo "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> .env
+
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios
+          pod install
+
+      - name: Flutter analyze
+        script: flutter analyze --no-fatal-infos
+        ignore_failure: true
+
+      - name: Build iOS IPA
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com  # TODO: Change this to your email
+        notify:
+          success: true
+          failure: true
+
+      # Uncomment below after setting up App Store Connect API key in Codemagic
+      # app_store_connect:
+      #   auth: integration
+      #   submit_to_testflight: true
+
+  # Android build workflow (bonus)
+  android-release:
+    name: Android Release Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      groups:
+        - app_credentials
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+
+    scripts:
+      - name: Set up local properties
+        script: |
+          echo "OPENAI_API_KEY=$OPENAI_API_KEY" > .env
+          echo "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> .env
+
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Build APK
+        script: flutter build apk --release
+
+      - name: Build App Bundle
+        script: flutter build appbundle --release
+
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+      - build/app/outputs/bundle/**/*.aab
+
+    publishing:
+      email:
+        recipients:
+          - shivamkaushik2205@gmail.com  # TODO: Change this to your email
