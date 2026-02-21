@@ -14,7 +14,7 @@ workflows:
       groups:
         - app_credentials
       ios_signing:
-        distribution_type: app_store
+        distribution_type: development
         bundle_identifier: com.example.lumio
 
     triggering:
@@ -64,9 +64,9 @@ workflows:
           success: true
           failure: true
 
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
+      # app_store_connect:
+      #   auth: integration
+      #   submit_to_testflight: true
 
   # Android build workflow (bonus)
   android-release:
