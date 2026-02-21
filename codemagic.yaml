@@ -9,7 +9,7 @@ workflows:
 
     environment:
       flutter: stable
-      xcode: latest
+      xcode: 15.4
       cocoapods: default
       groups:
         - app_credentials
