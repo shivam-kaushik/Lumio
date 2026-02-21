@@ -15,7 +15,7 @@ workflows:
         - app_credentials
       ios_signing:
         distribution_type: development
-        bundle_identifier: com.example.lumio
+        bundle_identifier: com.shivamkaushik.lumio
 
     triggering:
       events:
