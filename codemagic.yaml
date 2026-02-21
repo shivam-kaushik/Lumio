@@ -13,7 +13,7 @@ workflows:
       vars:
         BUNDLE_ID: "com.example.lumio"
       ios_signing:
-        distribution_type: development
+        distribution_type: app_store
         bundle_identifier: com.example.lumio
 
     triggering:
@@ -39,14 +39,16 @@ workflows:
           cd ios
           pod install
 
+      - name: Set up code signing
+        script: xcode-project use-profiles
+
       - name: Flutter analyze
         script: flutter analyze --no-fatal-infos
         ignore_failure: true
 
       - name: Build iOS IPA
         script: |
-          flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist
+          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
       - build/ios/ipa/*.ipa
@@ -56,15 +58,14 @@ workflows:
     publishing:
       email:
         recipients:
-          - your-email@example.com  # TODO: Change this to your email
+          - shivamkaushik2205@gmail.com
         notify:
           success: true
           failure: true
 
-      # Uncomment below after setting up App Store Connect API key in Codemagic
-      # app_store_connect:
-      #   auth: integration
-      #   submit_to_testflight: true
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
 
   # Android build workflow (bonus)
   android-release:
