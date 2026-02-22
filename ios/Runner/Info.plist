@@ -57,6 +57,8 @@
 	<string>We need speech recognition to convert your voice input into text for creating reminders and goals.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>We need background location access for location-based reminders when the app is closed.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>We use motion data to detect your activity for context-aware reminders.</string>
 	<key>GMSApiKey</key>
 	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>UIBackgroundModes</key>
