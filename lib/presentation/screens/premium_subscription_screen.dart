@@ -3,7 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../../core/services/premium_service.dart';
 import '../../core/services/iap_service.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 
 /// Screen to display premium features and handle subscription
 class PremiumSubscriptionScreen extends StatefulWidget {
