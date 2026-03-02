@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/models/reminder.dart';
 import '../providers/reminder_provider.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../../core/services/home_detection_service.dart';
 import '../../core/services/places_service.dart';
 import '../../core/utils/reminder_context_status.dart';
