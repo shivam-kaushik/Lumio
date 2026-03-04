@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/services/voice_flow_controller.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import 'unified_goal_editor_screen.dart';
 
 class HandsFreeScreen extends StatefulWidget {
