@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../providers/growth_provider.dart';
 import '../../data/models/goal_task.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../utils/analytics_helper.dart';
 
 enum TimeRange { day, week, month, all }
