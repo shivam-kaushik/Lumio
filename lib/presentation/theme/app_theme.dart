@@ -1,8 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+// Export new Lumio theme system for easy access
+export 'lumio_colors.dart';
+export 'lumio_typography.dart';
+export 'lumio_spacing.dart';
+export 'lumio_shadows.dart';
+export 'lumio_radius.dart';
+export 'lumio_theme.dart';
+
 /// Application theme configuration using Material 3
 /// Premium, minimal design system with modern aesthetics
+///
+/// NOTE: This class is maintained for backwards compatibility.
+/// For new code, prefer using [LumioTheme], [LumioColors],
+/// [LumioTypography], etc. from the new Lumio design system.
+///
+/// Migration guide:
+/// - AppTheme.primaryColor → LumioColors.primary
+/// - AppTheme.lightTheme → LumioTheme.light
+/// - AppTheme.darkTheme → LumioTheme.dark
+/// - AppTheme.textPrimary → LumioColors.textPrimaryLight
+/// - AppTheme.backgroundColor → LumioColors.backgroundLight
+@Deprecated('Use LumioTheme for new code. This class is maintained for backwards compatibility.')
 class AppTheme {
   // Brand Colors - Orange and White theme
   static const Color primaryColor = Color(0xFFFF6B35); // Vibrant Orange

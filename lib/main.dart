@@ -225,8 +225,8 @@ class _LumioAppState extends State<LumioApp> {
           final app = MaterialApp(
             title: 'Lumio',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
+            theme: LumioTheme.light,
+            darkTheme: LumioTheme.dark,
             themeMode: themeProvider.themeMode,
             home: const SplashScreen(),
             routes: {

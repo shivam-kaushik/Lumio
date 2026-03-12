@@ -1,24 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:intl/intl.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/growth_provider.dart';
-import '../theme/app_theme.dart';
-import '../widgets/modern_smart_card.dart';
+import '../theme/theme.dart';
 import '../widgets/animated_progress_bar.dart';
-import '../../core/services/permission_service.dart';
-import '../../core/services/premium_service.dart';
-import 'unified_goal_editor_screen.dart'; // Unified Editor
-import 'goal_details_screen.dart'; // Goal Details Screen
-import 'animated_goal_creation_screen.dart'; // Animated Goal Creation
+import 'animated_goal_creation_screen.dart';
+import 'goal_details_screen.dart';
 import '../../data/models/goal.dart';
-import '../../data/models/goal_task.dart'; // Import GoalTask
-import '../../core/services/privacy_gpt_service.dart';
-import '../../data/models/subtask.dart' show Task;
+import '../../data/models/goal_task.dart';
 
-/// Goals screen showing all business goals with modern, interactive UI
+/// Goals screen with Stitch AI styling
+/// Features: Goal cards in grid layout, progress tracking, quick actions
 class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
 
@@ -48,17 +41,17 @@ class _GoalsScreenState extends State<GoalsScreen> {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'Completed':
-        return AppTheme.successColor;
+        return LumioColors.success;
       case 'Almost There':
-        return AppTheme.primaryColor;
+        return LumioColors.primary;
       case 'In Progress':
-        return AppTheme.primaryLight;
+        return LumioColors.info;
       case 'Getting Started':
-        return AppTheme.secondaryColor;
+        return LumioColors.warning;
       case 'Just Started':
-        return AppTheme.textSecondary;
+        return LumioColors.categoryPersonal;
       default:
-        return AppTheme.textTertiary;
+        return LumioColors.primary;
     }
   }
 
@@ -76,64 +69,14 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
     return Scaffold(
-      backgroundColor: isDark ? Colors.black : AppTheme.backgroundColor,
+      backgroundColor: LumioColors.background(context),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // Modern App Bar with large title
-          SliverAppBar(
-            expandedHeight: 120,
-            floating: false,
-            pinned: true,
-            backgroundColor: isDark ? const Color(0xFF0F0F0F) : AppTheme.backgroundColor,
-            scrolledUnderElevation: 0,
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                'My Goals',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
-                  letterSpacing: -0.5,
-                ),
-              )
-                .animate()
-                .fadeIn(duration: 500.ms)
-                .slideX(begin: -0.2, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
-              titlePadding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMD, vertical: AppTheme.spacingMD),
-              centerTitle: false,
-            ),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: AppTheme.spacingMD),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const AnimatedGoalCreationScreen(),
-                          fullscreenDialog: true,
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.add_rounded, color: AppTheme.primaryColor),
-                    tooltip: 'Add Goal',
-                  ),
-                )
-                  .animate()
-                  .scale(delay: 200.ms, duration: 500.ms, curve: Curves.elasticOut),
-              ),
-            ],
-          ),
-          
+          // Stitch-style App Bar
+          _buildStickyHeader(context),
+
           // Content
           Consumer<GrowthProvider>(
             builder: (context, growthProvider, child) {
@@ -141,7 +84,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 return SliverFillRemaining(
                   child: Center(
                     child: CircularProgressIndicator(
-                      color: AppTheme.primaryColor,
+                      color: LumioColors.primary,
                     ),
                   ),
                 );
@@ -149,10 +92,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
               final allGoals = growthProvider.goals;
               // Filter out system goals (Inbox, Daily Plans)
-              final goals = allGoals.where((g) => 
-                  g.name != 'Inbox' && 
-                  !g.name.startsWith('Daily Plan')
-              ).toList();
+              final goals = allGoals
+                  .where((g) => g.name != 'Inbox' && !g.name.startsWith('Daily Plan'))
+                  .toList();
 
               if (goals.isEmpty) {
                 return SliverFillRemaining(
@@ -161,32 +103,32 @@ class _GoalsScreenState extends State<GoalsScreen> {
               }
 
               return SliverPadding(
-                padding: const EdgeInsets.all(AppTheme.spacingMD),
+                padding: EdgeInsets.all(LumioSpacing.screenHorizontal),
                 sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    crossAxisSpacing: AppTheme.spacingMD,
-                    mainAxisSpacing: AppTheme.spacingMD,
-                    childAspectRatio: 0.70, // Shorter cards to reduce empty space
+                    crossAxisSpacing: LumioSpacing.md,
+                    mainAxisSpacing: LumioSpacing.md,
+                    childAspectRatio: 0.72,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final goal = goals[index];
                       final tasks = growthProvider.getTasksForGoal(goal.id);
-                      
+
                       int totalTasks = 0;
                       int completedCount = 0;
-                      
+
                       void countRecursive(List<GoalTask> list) {
-                          for (var t in list) {
-                              totalTasks++;
-                              if (t.isCompleted) completedCount++;
-                              if (t.subtasks.isNotEmpty) countRecursive(t.subtasks);
-                          }
+                        for (var t in list) {
+                          totalTasks++;
+                          if (t.isCompleted) completedCount++;
+                          if (t.subtasks.isNotEmpty) countRecursive(t.subtasks);
+                        }
                       }
+
                       countRecursive(tasks);
 
-                      // Staggered animation for grid items
                       return _buildGoalCard(
                         context,
                         goal,
@@ -195,9 +137,14 @@ class _GoalsScreenState extends State<GoalsScreen> {
                         index,
                         tasks,
                       )
-                        .animate()
-                        .fadeIn(duration: 400.ms, delay: (50 * index).ms)
-                        .scale(begin: const Offset(0.9, 0.9), delay: (50 * index).ms, duration: 400.ms, curve: Curves.easeOutCubic);
+                          .animate()
+                          .fadeIn(duration: 400.ms, delay: (50 * index).ms)
+                          .scale(
+                            begin: const Offset(0.95, 0.95),
+                            delay: (50 * index).ms,
+                            duration: 400.ms,
+                            curve: Curves.easeOutCubic,
+                          );
                     },
                     childCount: goals.length,
                   ),
@@ -205,67 +152,51 @@ class _GoalsScreenState extends State<GoalsScreen> {
               );
             },
           ),
-          // Bottom padding
-          const SliverPadding(
-            padding: EdgeInsets.only(bottom: 100),
-          ),
+
+          // Bottom padding for nav bar
+          SliverPadding(padding: EdgeInsets.only(bottom: 120)),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.spacingXL),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(AppTheme.spacingXL),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark ? AppTheme.darkSurfaceElevated : AppTheme.surfaceColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.15),
-                    blurRadius: 20,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.flag_rounded,
-                size: 64,
-                color: AppTheme.primaryColor,
-              ),
-            )
-              .animate()
-              .scale(delay: 200.ms, duration: 600.ms, curve: Curves.elasticOut)
-              .shimmer(delay: 800.ms, duration: 2000.ms, color: AppTheme.primaryColor.withOpacity(0.3)),
-            const SizedBox(height: AppTheme.spacingXL),
-            Text(
-              'No goals, just dreams',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
-              ),
+  Widget _buildStickyHeader(BuildContext context) {
+    return SliverAppBar(
+      pinned: true,
+      backgroundColor: LumioColors.background(context).withOpacity(0.9),
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      expandedHeight: 100,
+      automaticallyImplyLeading: false,
+      flexibleSpace: FlexibleSpaceBar(
+        title: Text(
+          'Goals',
+          style: LumioTypography.headlineMedium.copyWith(
+            color: LumioColors.textPrimary(context),
+          ),
+        )
+            .animate()
+            .fadeIn(duration: 500.ms)
+            .slideX(begin: -0.1, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
+        titlePadding: EdgeInsets.only(
+          left: LumioSpacing.screenHorizontal,
+          bottom: LumioSpacing.md,
+        ),
+        centerTitle: false,
+      ),
+      actions: [
+        Padding(
+          padding: EdgeInsets.only(right: LumioSpacing.screenHorizontal),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: LumioColors.primaryLight,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: AppTheme.spacingSM),
-            Text(
-              'Create your first goal to start turning\nyour dreams into reality',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacingXL),
-            ElevatedButton.icon(
+            child: IconButton(
               onPressed: () {
+                HapticFeedback.mediumImpact();
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => const AnimatedGoalCreationScreen(),
@@ -273,17 +204,129 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   ),
                 );
               },
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Start New Goal'),
-              style: ElevatedButton.styleFrom(
-                elevation: 4,
-                shadowColor: AppTheme.primaryColor.withOpacity(0.4),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.spacingXL,
-                  vertical: AppTheme.spacingMD,
+              icon: Icon(Icons.add_rounded, color: LumioColors.primary),
+              tooltip: 'Add Goal',
+            ),
+          )
+              .animate()
+              .scale(delay: 200.ms, duration: 500.ms, curve: Curves.elasticOut),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(LumioSpacing.xl),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon with decorative rings (Stitch style)
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: LumioColors.primary.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
                 ),
+                Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: LumioColors.primary.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: LumioColors.primaryLight,
+                  ),
+                  child: Icon(
+                    Icons.flag_rounded,
+                    size: 40,
+                    color: LumioColors.primary,
+                  ),
+                ),
+              ],
+            )
+                .animate()
+                .scale(delay: 200.ms, duration: 600.ms, curve: Curves.elasticOut),
+
+            SizedBox(height: LumioSpacing.xl),
+
+            Text(
+              'No goals yet',
+              style: LumioTypography.headlineSmall.copyWith(
+                color: LumioColors.textPrimary(context),
               ),
             ),
+
+            SizedBox(height: LumioSpacing.sm),
+
+            Text(
+              'Create your first goal to start\nturning ambition into action',
+              textAlign: TextAlign.center,
+              style: LumioTypography.bodyLarge.copyWith(
+                color: LumioColors.textSecondary(context),
+                height: 1.5,
+              ),
+            ),
+
+            SizedBox(height: LumioSpacing.xl),
+
+            // CTA Button (Stitch style)
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AnimatedGoalCreationScreen(),
+                    fullscreenDialog: true,
+                  ),
+                );
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: LumioSpacing.xl,
+                  vertical: LumioSpacing.md,
+                ),
+                decoration: BoxDecoration(
+                  color: LumioColors.primary,
+                  borderRadius: LumioRadius.radiusFull,
+                  boxShadow: LumioShadows.fab,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                    SizedBox(width: LumioSpacing.sm),
+                    Text(
+                      'Create Goal',
+                      style: LumioTypography.ctaButton.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+                .animate()
+                .fadeIn(delay: 400.ms, duration: 400.ms)
+                .slideY(begin: 0.2, end: 0, delay: 400.ms, duration: 400.ms),
           ],
         ),
       ),
@@ -294,19 +337,37 @@ class _GoalsScreenState extends State<GoalsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Goal?'),
-        content: Text('Are you sure you want to delete "${goal.name}"? This action cannot be undone.'),
+        backgroundColor: LumioColors.surface(context),
+        shape: RoundedRectangleBorder(borderRadius: LumioRadius.radiusXXL),
+        title: Text(
+          'Delete Goal?',
+          style: LumioTypography.titleLarge.copyWith(
+            color: LumioColors.textPrimary(context),
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${goal.name}"? This action cannot be undone.',
+          style: LumioTypography.bodyMedium.copyWith(
+            color: LumioColors.textSecondary(context),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: LumioColors.textSecondary(context)),
+            ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               context.read<GrowthProvider>().deleteGoal(goal.id);
             },
-            style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: LumioColors.error,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -322,168 +383,201 @@ class _GoalsScreenState extends State<GoalsScreen> {
     int index,
     List<GoalTask> tasks,
   ) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final progress = taskCount > 0 ? completedTasks / taskCount : 0.0;
     final status = _getGoalStatus(goal, taskCount, completedTasks);
     final statusColor = _getStatusColor(status);
     final daysRemaining = _getDaysRemaining(goal.targetDeadline);
-    
-    // Get preview tasks (fill space - top 5)
-    final previewTasks = tasks.where((t) => !t.isCompleted).take(5).toList();
+
+    // Get preview tasks (top 4 incomplete, or completed if none)
+    final previewTasks = tasks.where((t) => !t.isCompleted).take(4).toList();
     if (previewTasks.isEmpty && tasks.isNotEmpty) {
-      previewTasks.addAll(tasks.take(5));
+      previewTasks.addAll(tasks.take(4));
     }
 
-    return ModernSmartCard(
+    return GestureDetector(
       onTap: () {
-        // Navigate to Goal Details Screen
+        HapticFeedback.lightImpact();
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => GoalDetailsScreen(
-              goalId: goal.id,
-            ),
+            builder: (context) => GoalDetailsScreen(goalId: goal.id),
           ),
         );
       },
-      padding: EdgeInsets.zero, // We handle padding inside
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(AppTheme.spacingMD),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title + Delete
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        goal.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                        ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: LumioColors.surface(context),
+          borderRadius: LumioRadius.radiusXXL,
+          boxShadow: LumioShadows.getSoft(context),
+          border: Border.all(
+            color: LumioColors.border(context).withOpacity(0.5),
+          ),
+        ),
+        child: Padding(
+          padding: LumioSpacing.paddingMD,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header: Title + Delete
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      goal.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: LumioTypography.titleMedium.copyWith(
+                        color: LumioColors.textPrimary(context),
+                        height: 1.2,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Dustbin (Delete) Icon
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () => _showDeleteConfirmation(context, goal),
-                        child: Container(
-                          padding: const EdgeInsets.all(4), 
-                          alignment: Alignment.topRight,
-                          child: Icon(
-                            Icons.delete_outline_rounded,
-                            size: 18,
-                            color: isDark ? Colors.white38 : Colors.black38,
-                          ),
-                        ),
+                  ),
+                  SizedBox(width: LumioSpacing.xs),
+                  GestureDetector(
+                    onTap: () => _showDeleteConfirmation(context, goal),
+                    child: Container(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.more_horiz_rounded,
+                        size: 18,
+                        color: LumioColors.textTertiary(context),
                       ),
                     ),
-                  ],
+                  ),
+                ],
+              ),
+
+              SizedBox(height: LumioSpacing.sm),
+
+              // Status Badge
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: LumioSpacing.sm,
+                  vertical: LumioSpacing.xs,
                 ),
-                
-                const SizedBox(height: 8),
-                
-                // Content Preview (Mini Task List)
-                Expanded(
-                  child: previewTasks.isEmpty
-                      ? Text(
-                          "No tasks yet",
-                          style: TextStyle(
-                            color: isDark ? Colors.white38 : Colors.black38,
-                            fontSize: 12,
-                          ),
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ...previewTasks.map((t) => Padding(
-                              padding: const EdgeInsets.only(bottom: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.15),
+                  borderRadius: LumioRadius.radiusFull,
+                ),
+                child: Text(
+                  status,
+                  style: LumioTypography.labelSmall.copyWith(
+                    color: statusColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+
+              SizedBox(height: LumioSpacing.md),
+
+              // Task Preview
+              Expanded(
+                child: previewTasks.isEmpty
+                    ? Text(
+                        'No tasks yet',
+                        style: LumioTypography.bodySmall.copyWith(
+                          color: LumioColors.textTertiary(context),
+                        ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ...previewTasks.map(
+                            (t) => Padding(
+                              padding: EdgeInsets.only(bottom: 4),
                               child: Row(
                                 children: [
-                                  Icon(
-                                    t.isCompleted ? Icons.check_circle_outline : Icons.circle_outlined,
-                                    size: 10,
-                                    color: isDark ? Colors.white54 : Colors.black54,
+                                  Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: t.isCompleted
+                                          ? LumioColors.success.withOpacity(0.15)
+                                          : LumioColors.border(context),
+                                    ),
+                                    child: t.isCompleted
+                                        ? Icon(
+                                            Icons.check_rounded,
+                                            size: 10,
+                                            color: LumioColors.success,
+                                          )
+                                        : null,
                                   ),
-                                  const SizedBox(width: 4),
+                                  SizedBox(width: LumioSpacing.sm),
                                   Expanded(
                                     child: Text(
                                       t.title,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: isDark ? Colors.white70 : Colors.black87,
-                                        decoration: t.isCompleted ? TextDecoration.lineThrough : null,
+                                      style: LumioTypography.bodySmall.copyWith(
+                                        color: t.isCompleted
+                                            ? LumioColors.textTertiary(context)
+                                            : LumioColors.textSecondary(context),
+                                        decoration: t.isCompleted
+                                            ? TextDecoration.lineThrough
+                                            : null,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                            )),
-                            if (tasks.length > 5)
-                              Text(
-                                "+ ${tasks.length - 5} more",
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: isDark ? Colors.white38 : Colors.black38,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                          ],
-                        ),
-                ),
-                
-                const SizedBox(height: 12),
-                
-                // Footer: Progress
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${(progress * 100).toInt()}%',
-                          style: TextStyle(
-                            color: statusColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (daysRemaining.isNotEmpty)
-                          Text(
-                            daysRemaining.split(' ').first + (daysRemaining.contains('left') ? ' days' : ''), // Shorten text
-                            style: TextStyle(
-                              color: isDark ? Colors.white38 : Colors.black38,
-                              fontSize: 10,
                             ),
                           ),
-                      ],
+                          if (tasks.length > 4)
+                            Padding(
+                              padding: EdgeInsets.only(top: 4),
+                              child: Text(
+                                '+${tasks.length - 4} more',
+                                style: LumioTypography.labelSmall.copyWith(
+                                  color: LumioColors.textTertiary(context),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+              ),
+
+              // Footer: Progress
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${(progress * 100).toInt()}%',
+                        style: LumioTypography.labelMedium.copyWith(
+                          color: statusColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (daysRemaining.isNotEmpty)
+                        Text(
+                          daysRemaining,
+                          style: LumioTypography.labelSmall.copyWith(
+                            color: daysRemaining == 'Overdue'
+                                ? LumioColors.error
+                                : LumioColors.textTertiary(context),
+                          ),
+                        ),
+                    ],
+                  ),
+                  SizedBox(height: LumioSpacing.xs),
+                  ClipRRect(
+                    borderRadius: LumioRadius.radiusFull,
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: LumioColors.border(context),
+                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                     ),
-                    const SizedBox(height: 4),
-                    AnimatedProgressBar(
-                      progress: progress,
-                      height: 4,
-                      backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0),
-                      progressColor: statusColor,
-                      showPercentage: false, // Disable duplicate percentage
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

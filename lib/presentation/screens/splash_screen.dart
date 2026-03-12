@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
-import '../screens/onboarding_screen.dart';
+import '../screens/welcome_screen.dart';
 import '../screens/login_screen.dart';
 import '../navigation/main_navigator.dart';
 import '../providers/auth_provider.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../../core/services/permission_service.dart';
 
 /// Splash screen shown on app launch
@@ -94,14 +95,16 @@ class _SplashScreenState extends State<SplashScreen>
         ),
       );
     } else {
-      // User is not logged in, go to login screen
-      // Check if this is first launch (simplified - use SharedPreferences in production)
-      const isFirstLaunch = false; // Replace with actual check
-      
-      final nextScreen = isFirstLaunch 
-          ? const OnboardingScreen() 
-          : const LoginScreen();
-      
+      // User is not logged in, check if this is first launch
+      final prefs = await SharedPreferences.getInstance();
+      final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
+
+      if (!mounted) return;
+
+      final nextScreen = onboardingComplete
+          ? const LoginScreen()
+          : const WelcomeScreen();
+
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) => nextScreen,
@@ -158,7 +161,7 @@ class _SplashScreenState extends State<SplashScreen>
                             return const Icon(
                               Icons.notifications_active_rounded,
                               size: 64,
-                              color: AppTheme.primaryColor,
+                              color: LumioColors.primary,
                             );
                           },
                         ),

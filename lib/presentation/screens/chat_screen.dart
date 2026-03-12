@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/services/chat_controller.dart';
 import '../models/chat_message.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../../core/services/premium_service.dart';
 import 'unified_goal_editor_screen.dart';
 import 'premium_subscription_screen.dart';
@@ -64,7 +64,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
 
     if (!_isPremium!) {
       return Scaffold(
-        backgroundColor: AppTheme.surfaceColor,
+        backgroundColor: LumioColors.surfaceLight,
         appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, leading: const BackButton()),
         body: Center(
           child: Padding(
@@ -96,7 +96,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                     ).then((_) => _checkPremium()); // Check premium again
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
+                    backgroundColor: LumioColors.primary,
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   ),
                   child: const Text("Upgrade to Premium"),
@@ -109,10 +109,10 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      backgroundColor: LumioColors.surfaceLight,
       appBar: AppBar(
         title: const Text("Lumio Assistant"),
-        backgroundColor: AppTheme.surfaceColor,
+        backgroundColor: LumioColors.surfaceLight,
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
@@ -156,7 +156,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         decoration: BoxDecoration(
-          color: isUser ? AppTheme.primaryColor : Colors.grey[200],
+          color: isUser ? LumioColors.primary : Colors.grey[200],
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
@@ -222,7 +222,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                       color: Colors.white,
-                      border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                      border: Border.all(color: LumioColors.primary.withOpacity(0.3)),
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                           BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, spreadRadius: 0, offset: const Offset(0, 4)),
@@ -232,7 +232,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                           Row(children: [
-                              const Icon(Icons.rocket_launch, color: AppTheme.primaryColor),
+                              const Icon(Icons.rocket_launch, color: LumioColors.primary),
                               const SizedBox(width: 8),
                               Expanded(child: Text("Plan Ready: ${msg.actionData?['goal'] ?? 'New Goal'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
                           ]),
@@ -243,10 +243,10 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                  color: AppTheme.primaryColor.withOpacity(0.1),
+                                  color: LumioColors.primary.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Text("Tap to Review Plan", style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
+                              child: const Text("Tap to Review Plan", style: TextStyle(color: LumioColors.primary, fontWeight: FontWeight.bold)),
                           ),
                       ],
                   ),
@@ -319,7 +319,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                         },
                         child: CircleAvatar(
                             radius: 24,
-                            backgroundColor: AppTheme.primaryColor,
+                            backgroundColor: LumioColors.primary,
                             child: Icon(
                                 _textController.text.isNotEmpty ? Icons.send : Icons.mic,
                                 color: Colors.white,
@@ -337,7 +337,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
           width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.95),
+              color: LumioColors.primary.withOpacity(0.95),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
               boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 20, offset: const Offset(0, -5))]
           ),
@@ -372,7 +372,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                         child: const CircleAvatar(
                             radius: 30,
                             backgroundColor: Colors.white,
-                            child: Icon(Icons.stop, color: AppTheme.primaryColor, size: 30),
+                            child: Icon(Icons.stop, color: LumioColors.primary, size: 30),
                         ),
                     ),
                 ],

@@ -8,7 +8,7 @@ import '../../core/services/privacy_gpt_service.dart';
 import '../../core/services/sound_service.dart';
 import '../providers/growth_provider.dart';
 import '../../data/models/goal_task.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import 'daily_report_screen.dart';
 import 'day_planner_history_screen.dart'; 
 import '../widgets/active_task_timer.dart';
@@ -399,8 +399,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary;
-    final subtleColor = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+    final textColor = isDark ? LumioColors.textPrimaryDark : LumioColors.textPrimaryLight;
+    final subtleColor = isDark ? LumioColors.textSecondaryDark : LumioColors.textSecondaryLight;
 
     return Consumer<GrowthProvider>(
       builder: (context, provider, _) {
@@ -518,7 +518,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
               child: FloatingActionButton(
                 heroTag: "day_planner_fab_mode_b",
                 onPressed: () => _showQuickAdd(context, provider),
-                backgroundColor: AppTheme.primaryColor,
+                backgroundColor: LumioColors.primary,
                 child: const Icon(Icons.add, color: Colors.white),
               ),
             ),
@@ -536,7 +536,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                 child: FloatingActionButton(
                     heroTag: "day_planner_fab_mode_a",
                     onPressed: () => _showQuickAdd(context, provider),
-                    backgroundColor: AppTheme.primaryColor,
+                    backgroundColor: LumioColors.primary,
                     tooltip: "Add Manual Task",
                     child: const Icon(Icons.add, color: Colors.white),
                 ),
@@ -594,7 +594,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                               padding: const EdgeInsets.all(8.0),
                               child: FloatingActionButton.small(
                                 onPressed: _toggleListening,
-                                backgroundColor: _isListening ? AppTheme.errorColor : AppTheme.primaryColor,
+                                backgroundColor: _isListening ? LumioColors.error : LumioColors.primary,
                                 child: Icon(_isListening ? Icons.stop : Icons.mic, color: Colors.white),
                               ),
                             ),
@@ -607,7 +607,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                           child: ElevatedButton(
                             onPressed: _isConverting ? null : _generatePlan,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryColor,
+                              backgroundColor: LumioColors.primary,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
@@ -680,7 +680,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                     const SizedBox(width: 8),
                     IconButton(
                       onPressed: _pickDate,
-                      icon: const Icon(Icons.calendar_month, color: AppTheme.primaryColor),
+                      icon: const Icon(Icons.calendar_month, color: LumioColors.primary),
                     ),
                   ],
                 )
@@ -709,7 +709,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                         DateFormat('E').format(date), 
                         style: TextStyle(
                           color: isSelected 
-                              ? AppTheme.primaryColor 
+                              ? LumioColors.primary 
                               : (isToday ? textColor : subtleColor),
                           fontWeight: FontWeight.w600
                         )
@@ -719,9 +719,9 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: isSelected ? AppTheme.primaryColor : Colors.transparent,
+                          color: isSelected ? LumioColors.primary : Colors.transparent,
                           shape: BoxShape.circle,
-                          border: isToday && !isSelected ? Border.all(color: AppTheme.primaryColor) : null,
+                          border: isToday && !isSelected ? Border.all(color: LumioColors.primary) : null,
                         ),
                         alignment: Alignment.center,
                         child: Text(
@@ -753,7 +753,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
              icon: Icons.wb_sunny_rounded,
              time: _wakeUpTime.format(context),
              title: _wakeUpTitle,
-             color: AppTheme.primaryColor,
+             color: LumioColors.primary,
              isStart: true,
              isDark: isDark,
              textColor: textColor,

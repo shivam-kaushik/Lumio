@@ -5,21 +5,20 @@ import 'package:provider/provider.dart';
 import '../screens/home_screen.dart';
 import '../screens/goals_screen.dart';
 import '../screens/subtasks_calendar_screen.dart';
-import '../screens/account_screen.dart';
+import '../screens/profile_screen.dart';
 
 import '../screens/goal_planning_screen.dart';
 import '../providers/growth_provider.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../screens/chat_screen.dart';
 import '../providers/reminder_provider.dart';
-import '../screens/day_planner_screen.dart'; // Added
+import '../screens/day_planner_screen.dart';
 import '../../data/models/goal.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../../data/models/goal_task.dart';
 import '../widgets/quick_task_input_sheet.dart';
-import '../widgets/quick_task_input_sheet.dart';
 import '../../data/models/reminder.dart';
-import '../widgets/avatar_widget.dart'; // NEW
+import '../widgets/avatar_widget.dart';
 
 /// Main navigation wrapper with bottom tab bar
 /// Provides smooth transitions and consistent navigation structure
@@ -74,7 +73,7 @@ class MainNavigatorState extends State<MainNavigator>
     const HomeScreen(), // Tasks list
     const GoalsScreen(), // Goals
     const SubtasksCalendarScreen(), // Calendar (showing subtasks)
-    const AccountScreen(), // Account
+    const ProfileScreen(), // Profile (Stitch style)
     const DayPlannerScreen(), // Day Planner
   ];
 
@@ -193,7 +192,7 @@ class MainNavigatorState extends State<MainNavigator>
     final isDark = theme.brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: isDark ? Colors.black : AppTheme.backgroundColor,
+      backgroundColor: LumioColors.background(context),
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
@@ -246,7 +245,7 @@ class MainNavigatorState extends State<MainNavigator>
                     padding: const EdgeInsets.only(bottom: 50.0), // Adjust to be above navbar
                     child: FloatingActionButton(
                       onPressed: () => _showQuickTaskSheet(context),
-                      backgroundColor: AppTheme.primaryColor,
+                      backgroundColor: LumioColors.primary,
                       elevation: 4,
                       shape: const CircleBorder(),
                       child: const Icon(Icons.add, color: Colors.white),
@@ -349,46 +348,28 @@ class MainNavigatorState extends State<MainNavigator>
   }
 
   Widget _buildBottomNavBar(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        gradient: isDark
-            ? LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  const Color(0xFF0F0F0F).withOpacity(0.98),
-                  Colors.black.withOpacity(0.98),
-                ],
-              )
-            : null,
-        color: isDark ? null : Theme.of(context).scaffoldBackgroundColor,
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withOpacity(0.3)
-                : AppTheme.shadowColor,
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
+        color: LumioColors.surface(context),
+        borderRadius: LumioRadius.bottomNav,
+        boxShadow: LumioShadows.getNav(context),
         border: Border(
           top: BorderSide(
-            color: isDark
-                ? const Color(0xFF2A2A2A).withOpacity(0.6)
-                : AppTheme.borderColor,
+            color: LumioColors.border(context).withOpacity(0.5),
             width: 1,
           ),
         ),
       ),
       child: SafeArea(
         top: false,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTheme.spacingSM,
-            vertical: AppTheme.spacingSM,
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: LumioSpacing.md,
+            right: LumioSpacing.md,
+            top: LumioSpacing.sm,
+            bottom: LumioSpacing.sm,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -396,10 +377,10 @@ class MainNavigatorState extends State<MainNavigator>
               // First 2 tabs
               Expanded(child: _buildNavItem(context, 0)),
               Expanded(child: _buildNavItem(context, 1)),
-              
-              // Center record button (Strava-style)
+
+              // Center FAB (elevated above nav bar)
               _buildCenterRecordButton(context),
-              
+
               // Last 2 tabs
               Expanded(child: _buildNavItem(context, 2)),
               Expanded(child: _buildNavItem(context, 3)),
@@ -410,53 +391,45 @@ class MainNavigatorState extends State<MainNavigator>
     );
   }
 
-  /// Build center "Plan Day" button with animations
+  /// Build center FAB button (Stitch style - elevated above nav bar)
   Widget _buildCenterRecordButton(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXS),
-      child: Material(
-        elevation: 8,
-        shadowColor: Colors.amber.withOpacity(0.4),
-        shape: const CircleBorder(),
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.amber, // Sunny color for Day Planning
-                Colors.orangeAccent,
-              ],
-            ),
+    return Transform.translate(
+      offset: const Offset(0, -16), // Elevate above nav bar
+      child: Container(
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: LumioColors.primary,
+          border: Border.all(
+            color: LumioColors.background(context),
+            width: 4,
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                 HapticFeedback.mediumImpact();
-                 // Switch to Day Planner Mode directly
-                 setState(() {
-                   _fadeControllers[_currentIndex].reverse();
-                   _currentIndex = 4; // Index of DayPlannerScreen
-                   _fadeControllers[_currentIndex].forward();
-                 });
-              },
-              customBorder: const CircleBorder(),
-              child: const Icon(
-                Icons.wb_sunny_rounded,
-                color: Colors.white,
-                size: 28, // Slightly smaller icon inside circle
-              ),
+          boxShadow: LumioShadows.fab,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              // Switch to Day Planner Mode directly
+              setState(() {
+                _fadeControllers[_currentIndex].reverse();
+                _currentIndex = 4; // Index of DayPlannerScreen
+                _fadeControllers[_currentIndex].forward();
+              });
+            },
+            customBorder: const CircleBorder(),
+            child: const Icon(
+              Icons.add_rounded,
+              color: Colors.white,
+              size: 32,
             ),
           ),
         ),
       )
-        .animate()
-        .scale(delay: 300.ms, duration: 600.ms, curve: Curves.elasticOut)
-        .shimmer(delay: 900.ms, duration: 1500.ms, color: Colors.white.withOpacity(0.3)),
+          .animate()
+          .scale(delay: 300.ms, duration: 600.ms, curve: Curves.elasticOut),
     );
   }
 
@@ -552,53 +525,44 @@ class _InteractiveTabButtonState extends State<_InteractiveTabButton>
       child: ScaleTransition(
         scale: _scaleAnimation,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingSM),
+          padding: EdgeInsets.symmetric(vertical: LumioSpacing.sm),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Active indicator background (Stitch style)
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeInOutCubic,
-                padding: const EdgeInsets.all(AppTheme.spacingXS),
+                width: 48,
+                height: 32,
                 decoration: BoxDecoration(
-                  gradient: widget.isActive
-                      ? LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppTheme.primaryColor.withOpacity(0.15),
-                            AppTheme.primaryLight.withOpacity(0.1),
-                          ],
-                        )
-                      : null,
                   color: widget.isActive
-                      ? null
+                      ? LumioColors.primaryLight
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                  borderRadius: LumioRadius.radiusFull,
                 ),
-                child: widget.child ?? Icon( // Modified to accept child
-                  widget.icon,
-                  color: widget.isActive
-                      ? AppTheme.primaryColor
-                      : (Theme.of(context).brightness == Brightness.dark
-                          ? AppTheme.darkTextPrimary
-                          : AppTheme.textPrimary),
-                  size: 26,
+                child: Center(
+                  child: widget.child ??
+                      Icon(
+                        widget.icon,
+                        color: widget.isActive
+                            ? LumioColors.primary
+                            : LumioColors.textSecondary(context),
+                        size: 24,
+                      ),
                 ),
               ),
               const SizedBox(height: 4),
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 200),
-                style: TextStyle(
-                  fontSize: widget.isActive ? 12 : 11,
-                  fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.w500,
+              Text(
+                widget.label,
+                style: (widget.isActive
+                        ? LumioTypography.navLabelActive
+                        : LumioTypography.navLabel)
+                    .copyWith(
                   color: widget.isActive
-                      ? AppTheme.primaryColor
-                      : (Theme.of(context).brightness == Brightness.dark
-                          ? AppTheme.darkTextPrimary
-                          : AppTheme.textPrimary),
+                      ? LumioColors.primary
+                      : LumioColors.textSecondary(context),
                 ),
-                child: Text(widget.label),
               ),
             ],
           ),
@@ -639,19 +603,14 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurface : Colors.white,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(AppTheme.radiusXL),
-        ),
+        color: LumioColors.surface(context),
+        borderRadius: LumioRadius.bottomSheet,
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(AppTheme.spacingLG),
+          padding: LumioSpacing.paddingLG,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -660,53 +619,52 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
                 child: Container(
                   width: 40,
                   height: 4,
-                  margin: const EdgeInsets.only(bottom: AppTheme.spacingLG),
+                  margin: EdgeInsets.only(bottom: LumioSpacing.lg),
                   decoration: BoxDecoration(
-                    color: AppTheme.textTertiary,
-                    borderRadius: BorderRadius.circular(2),
+                    color: LumioColors.border(context),
+                    borderRadius: LumioRadius.radiusFull,
                   ),
                 ),
               ),
               Text(
                 'Create New',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+                style: LumioTypography.headlineSmall.copyWith(
+                  color: LumioColors.textPrimary(context),
                 ),
               ),
-              const SizedBox(height: AppTheme.spacingMD),
+              SizedBox(height: LumioSpacing.md),
               _CreateOptionTile(
                 icon: Icons.task_rounded,
                 title: 'Create Task',
                 subtitle: 'Add a new reminder or task',
-                color: AppTheme.primaryColor,
+                color: LumioColors.primary,
                 onTap: onCreateTask,
               ),
-              const SizedBox(height: AppTheme.spacingSM),
+              SizedBox(height: LumioSpacing.sm),
               _CreateOptionTile(
                 icon: Icons.flag_rounded,
                 title: 'Create Goal',
                 subtitle: 'Set a new long-term goal',
-                color: AppTheme.primaryLight,
+                color: LumioColors.categoryBusiness,
                 onTap: onCreateGoal,
               ),
-              const SizedBox(height: AppTheme.spacingSM),
+              SizedBox(height: LumioSpacing.sm),
               _CreateOptionTile(
                 icon: Icons.wb_sunny_rounded,
                 title: 'Plan Task for the Day',
                 subtitle: 'Structure your day with AI',
-                color: Colors.amber,
+                color: LumioColors.warning,
                 onTap: onPlanDay,
               ),
-              const SizedBox(height: AppTheme.spacingSM),
+              SizedBox(height: LumioSpacing.sm),
               _CreateOptionTile(
                 icon: Icons.mic_rounded,
                 title: 'Hands-Free Mode',
                 subtitle: 'Voice-guided goal planning',
-                color: Colors.purpleAccent,
+                color: LumioColors.categoryPersonal,
                 onTap: onStartHandsFree,
               ),
-              const SizedBox(height: AppTheme.spacingMD),
+              SizedBox(height: LumioSpacing.md),
             ],
           ),
         ),
@@ -741,9 +699,6 @@ class _CreateOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -751,16 +706,14 @@ class _CreateOptionTile extends StatelessWidget {
           HapticFeedback.mediumImpact();
           onTap();
         },
-        borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+        borderRadius: LumioRadius.radiusMD,
         child: Container(
-          padding: const EdgeInsets.all(AppTheme.spacingMD),
+          padding: LumioSpacing.paddingMD,
           decoration: BoxDecoration(
-            color: isDark
-                ? AppTheme.darkSurfaceElevated
-                : AppTheme.backgroundColor,
-            borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+            color: LumioColors.background(context),
+            borderRadius: LumioRadius.radiusMD,
             border: Border.all(
-              color: isDark ? AppTheme.darkBorder : AppTheme.borderColor,
+              color: LumioColors.border(context),
               width: 1,
             ),
           ),
@@ -771,7 +724,7 @@ class _CreateOptionTile extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                  borderRadius: LumioRadius.radiusMD,
                 ),
                 child: Icon(
                   icon,
@@ -779,27 +732,22 @@ class _CreateOptionTile extends StatelessWidget {
                   size: 24,
                 ),
               ),
-              const SizedBox(width: AppTheme.spacingMD),
+              SizedBox(width: LumioSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? AppTheme.darkTextPrimary
-                            : AppTheme.textPrimary,
+                      style: LumioTypography.titleSmall.copyWith(
+                        color: LumioColors.textPrimary(context),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: isDark
-                            ? AppTheme.darkTextSecondary
-                            : AppTheme.textSecondary,
+                      style: LumioTypography.bodySmall.copyWith(
+                        color: LumioColors.textSecondary(context),
                       ),
                     ),
                   ],
@@ -807,9 +755,7 @@ class _CreateOptionTile extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right_rounded,
-                color: isDark
-                    ? AppTheme.darkTextTertiary
-                    : AppTheme.textTertiary,
+                color: LumioColors.textTertiary(context),
               ),
             ],
           ),

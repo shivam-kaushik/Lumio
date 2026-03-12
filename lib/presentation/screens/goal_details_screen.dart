@@ -7,7 +7,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../providers/growth_provider.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../widgets/animated_progress_bar.dart';
 import '../widgets/ai_loading_dialog.dart';
 import '../../data/models/goal.dart';
@@ -247,13 +247,13 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        border: Border.all(color: AppTheme.borderColor),
+                        border: Border.all(color: LumioColors.borderLight),
                         borderRadius: BorderRadius.circular(12),
                         color: Colors.grey.shade50,
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_today, size: 20, color: AppTheme.primaryColor),
+                          Icon(Icons.calendar_today, size: 20, color: LumioColors.primary),
                           const SizedBox(width: 8),
                           Text(
                             selectedDate != null
@@ -338,7 +338,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
+              backgroundColor: LumioColors.error,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -491,7 +491,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('✨ Generated ${tasks.length} tasks!'),
-              backgroundColor: AppTheme.successColor,
+              backgroundColor: LumioColors.success,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -506,7 +506,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: AppTheme.errorColor,
+            backgroundColor: LumioColors.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -648,7 +648,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('✨ Generated ${result.length} subtasks!'),
-              backgroundColor: AppTheme.successColor,
+              backgroundColor: LumioColors.success,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -663,7 +663,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error generating subtasks: $e'),
-            backgroundColor: AppTheme.errorColor,
+            backgroundColor: LumioColors.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -703,7 +703,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.add_task, color: AppTheme.primaryColor),
+              leading: Icon(Icons.add_task, color: LumioColors.primary),
               title: const Text('Add Subtask'),
               onTap: () {
                 Navigator.pop(context);
@@ -714,7 +714,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.delete_rounded, color: AppTheme.errorColor),
+              leading: Icon(Icons.delete_rounded, color: LumioColors.error),
               title: const Text('Delete Task'),
               onTap: () async {
                 final provider = context.read<GrowthProvider>(); // Capture context safely
@@ -735,7 +735,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                       ElevatedButton(
                         onPressed: () => Navigator.pop(context, true),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.errorColor,
+                          backgroundColor: LumioColors.error,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -766,10 +766,10 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
   }
 
   Color _getProgressColor(double progress) {
-    if (progress >= 0.75) return AppTheme.successColor;
-    if (progress >= 0.5) return AppTheme.primaryColor;
-    if (progress >= 0.25) return AppTheme.secondaryColor;
-    return AppTheme.textSecondary;
+    if (progress >= 0.75) return LumioColors.success;
+    if (progress >= 0.5) return LumioColors.primary;
+    if (progress >= 0.25) return LumioColors.info;
+    return LumioColors.textSecondaryLight;
   }
 
   // Determine local image asset based on goal name/category
@@ -879,7 +879,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
               growthProvider.reorderTasks(widget.goalId, taskOldIndex, taskNewIndex);
             },
             header: Padding(
-              padding: const EdgeInsets.all(AppTheme.spacingMD),
+              padding: const EdgeInsets.all(LumioSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -893,7 +893,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                           width: double.infinity,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(16),
-                            color: AppTheme.primaryColor.withOpacity(0.1),
+                            color: LumioColors.primary.withOpacity(0.1),
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(16),
@@ -901,7 +901,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                                 ? CachedNetworkImage(
                                     imageUrl: goal.imageUrl!,
                                     fit: BoxFit.cover,
-                                    placeholder: (context, url) => Center(child: CircularProgressIndicator(color: AppTheme.primaryColor)),
+                                    placeholder: (context, url) => Center(child: CircularProgressIndicator(color: LumioColors.primary)),
                                     errorWidget: (context, url, error) => _buildLocalSvgPlaceholder(goal.name),
                                   )
                                 : _buildLocalSvgPlaceholder(goal.name),
@@ -1022,7 +1022,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: AppTheme.spacingLG),
+                    const SizedBox(height: LumioSpacing.lg),
                     Row(
                       children: [
                         Expanded(
@@ -1031,7 +1031,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                             icon: const Icon(Icons.auto_awesome),
                             label: const Text('AI Generate'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryColor,
+                              backgroundColor: LumioColors.primary,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1045,8 +1045,8 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                             icon: const Icon(Icons.add_circle_outline),
                             label: const Text('Add Task'),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.primaryColor,
-                              side: BorderSide(color: AppTheme.primaryColor, width: 2),
+                              foregroundColor: LumioColors.primary,
+                              side: BorderSide(color: LumioColors.primary, width: 2),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
@@ -1054,7 +1054,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppTheme.spacingLG),
+                    const SizedBox(height: LumioSpacing.lg),
                     Text(
                       'Tasks',
                       style: TextStyle(
@@ -1063,7 +1063,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                         color: _getTextPrimaryColor(isDark),
                       ),
                     ),
-                    const SizedBox(height: AppTheme.spacingMD),
+                    const SizedBox(height: LumioSpacing.md),
 
                     if (_isAddingTask)
                         _buildInlineTaskForm(isDark),
@@ -1103,7 +1103,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 20),
           decoration: BoxDecoration(
-            color: AppTheme.errorColor,
+            color: LumioColors.error,
             borderRadius: BorderRadius.circular(16),
           ),
           child: const Icon(Icons.delete_rounded, color: Colors.white, size: 28),
@@ -1463,10 +1463,10 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
         decoration: BoxDecoration(
-          color: AppTheme.errorColor.withOpacity(0.2),
+          color: LumioColors.error.withOpacity(0.2),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Icon(Icons.delete_rounded, color: AppTheme.errorColor, size: 20),
+        child: const Icon(Icons.delete_rounded, color: LumioColors.error, size: 20),
       ),
       confirmDismiss: (direction) async {
         return await showDialog<bool>(
@@ -1593,7 +1593,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
       fit: BoxFit.cover,
       width: double.infinity,
       height: 200,
-      placeholderBuilder: (BuildContext context) => Center(child: CircularProgressIndicator(color: AppTheme.primaryColor)),
+      placeholderBuilder: (BuildContext context) => Center(child: CircularProgressIndicator(color: LumioColors.primary)),
     );
   }
 
@@ -1684,7 +1684,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
 
     if (task.isCompleted) {
       status = 'Completed';
-      color = AppTheme.successColor;
+      color = LumioColors.success;
       icon = Icons.check_circle;
     } else if (task.scheduledDate == null) {
       status = 'Upcoming';
@@ -1692,11 +1692,11 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
       icon = Icons.schedule;
     } else if (task.scheduledDate!.isBefore(DateTime.now())) {
       status = 'Overdue';
-      color = AppTheme.errorColor;
+      color = LumioColors.error;
       icon = Icons.warning_rounded;
     } else if (task.scheduledDate!.difference(DateTime.now()).inDays <= 1) {
       status = 'In Progress';
-      color = AppTheme.primaryColor;
+      color = LumioColors.primary;
       icon = Icons.play_circle_filled;
     } else {
       status = 'Upcoming';
@@ -1742,7 +1742,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
       background: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: AppTheme.errorColor,
+          color: LumioColors.error,
           borderRadius: BorderRadius.circular(16),
         ),
         alignment: Alignment.centerRight,
@@ -1770,7 +1770,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.errorColor,
+                  backgroundColor: LumioColors.error,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -1805,7 +1805,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
           border: Border.all(
             color: task.isCompleted
                 ? Colors.grey.shade200
-                : AppTheme.primaryColor.withOpacity(0.3),
+                : LumioColors.primary.withOpacity(0.3),
             width: 2,
           ),
           boxShadow: [
@@ -1845,7 +1845,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(message),
-                          backgroundColor: AppTheme.successColor,
+                          backgroundColor: LumioColors.success,
                           duration: const Duration(seconds: 2),
                           behavior: SnackBarBehavior.floating,
                           shape: RoundedRectangleBorder(
@@ -1863,12 +1863,12 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: task.isCompleted
-                          ? AppTheme.successColor
-                          : AppTheme.primaryColor,
+                          ? LumioColors.success
+                          : LumioColors.primary,
                       width: 2.5,
                     ),
                     color: task.isCompleted
-                        ? AppTheme.successColor
+                        ? LumioColors.success
                         : Colors.transparent,
                   ),
                   child: task.isCompleted
@@ -1933,13 +1933,13 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                border: Border.all(color: AppTheme.borderColor),
+                                border: Border.all(color: LumioColors.borderLight),
                                 borderRadius: BorderRadius.circular(8),
                                 color: Colors.grey.shade50,
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.calendar_today, size: 16, color: AppTheme.primaryColor),
+                                  Icon(Icons.calendar_today, size: 16, color: LumioColors.primary),
                                   const SizedBox(width: 6),
                                   Text(
                                     _editDates[task.id] != null
@@ -1978,7 +1978,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                                   onPressed: () => _saveEditedTask(task, growthProvider),
                                   child: const Text('Save', style: TextStyle(fontSize: 12)),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.primaryColor,
+                                    backgroundColor: LumioColors.primary,
                                     padding: const EdgeInsets.symmetric(vertical: 8),
                                   ),
                                 ),
@@ -2000,8 +2000,8 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                                     ? TextDecoration.lineThrough
                                     : null,
                                 color: task.isCompleted
-                                    ? AppTheme.textSecondary
-                                    : AppTheme.textPrimary,
+                                    ? LumioColors.textSecondaryLight
+                                    : LumioColors.textPrimaryLight,
                               ),
                             ),
                             if (task.description.isNotEmpty) ...[
@@ -2009,7 +2009,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                               Text(
                                 task.description,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: AppTheme.textSecondary,
+                                  color: LumioColors.textSecondaryLight,
                                   decoration: task.isCompleted
                                       ? TextDecoration.lineThrough
                                       : null,
@@ -2027,7 +2027,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
               IconButton(
                 icon: Icon(
                   Icons.more_vert_rounded,
-                  color: AppTheme.textSecondary,
+                  color: LumioColors.textSecondaryLight,
                 ),
                 onPressed: () => _showTaskMenu(task),
               ),
@@ -2108,7 +2108,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                   children: [
                     Icon(Icons.subdirectory_arrow_right,
                       size: 16,
-                      color: AppTheme.primaryColor,
+                      color: LumioColors.primary,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -2118,7 +2118,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryColor,
+                        color: LumioColors.primary,
                       ),
                     ),
                     const Spacer(),
@@ -2128,10 +2128,10 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          color: LumioColors.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: AppTheme.primaryColor.withOpacity(0.3),
+                            color: LumioColors.primary.withOpacity(0.3),
                           ),
                         ),
                         child: Row(
@@ -2140,7 +2140,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                             Icon(
                               Icons.add_rounded,
                               size: 16,
-                              color: AppTheme.primaryColor,
+                              color: LumioColors.primary,
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -2148,7 +2148,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: AppTheme.primaryColor,
+                                color: LumioColors.primary,
                               ),
                             ),
                           ],
@@ -2181,7 +2181,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
       background: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: AppTheme.errorColor,
+          color: LumioColors.error,
           borderRadius: BorderRadius.circular(10),
         ),
         alignment: Alignment.centerRight,
@@ -2209,7 +2209,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.errorColor,
+                  backgroundColor: LumioColors.error,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -2250,7 +2250,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
           border: Border.all(
             color: subtask.isCompleted
                 ? Colors.grey.shade200
-                : AppTheme.primaryColor.withOpacity(0.2),
+                : LumioColors.primary.withOpacity(0.2),
             width: 1.5,
           ),
         ),
@@ -2277,7 +2277,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                       : Icons.circle_outlined,
                   size: 20,
                   color: subtask.isCompleted
-                      ? AppTheme.successColor
+                      ? LumioColors.success
                       : Colors.grey.shade400,
                 ),
               ),
@@ -2366,7 +2366,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
             ),
             title: Row(
               children: [
-                Icon(Icons.edit_note_rounded, color: AppTheme.primaryColor),
+                Icon(Icons.edit_note_rounded, color: LumioColors.primary),
                 const SizedBox(width: 8),
                 const Text('Edit Subtask', style: TextStyle(fontWeight: FontWeight.w700)),
               ],
@@ -2407,13 +2407,13 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        border: Border.all(color: AppTheme.borderColor),
+                        border: Border.all(color: LumioColors.borderLight),
                         borderRadius: BorderRadius.circular(12),
                         color: Colors.grey.shade50,
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_today, size: 20, color: AppTheme.primaryColor),
+                          Icon(Icons.calendar_today, size: 20, color: LumioColors.primary),
                           const SizedBox(width: 8),
                           Text(
                             selectedDate != null
@@ -2506,7 +2506,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
             ),
             title: Row(
               children: [
-                Icon(Icons.add_task_rounded, color: AppTheme.primaryColor),
+                Icon(Icons.add_task_rounded, color: LumioColors.primary),
                 const SizedBox(width: 8),
                 const Text('Add Subtask', style: TextStyle(fontWeight: FontWeight.w700)),
               ],
@@ -2548,13 +2548,13 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        border: Border.all(color: AppTheme.borderColor),
+                        border: Border.all(color: LumioColors.borderLight),
                         borderRadius: BorderRadius.circular(12),
                         color: Colors.grey.shade50,
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_today, size: 20, color: AppTheme.primaryColor),
+                          Icon(Icons.calendar_today, size: 20, color: LumioColors.primary),
                           const SizedBox(width: 8),
                           Text(
                             selectedDate != null
@@ -2604,7 +2604,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
                   });
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
+                  backgroundColor: LumioColors.primary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
