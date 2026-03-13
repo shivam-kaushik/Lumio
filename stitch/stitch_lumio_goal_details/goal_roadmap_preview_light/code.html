@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumio - Your AI Goal Roadmap</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ee992b",
+                        "background-light": "#f8f7f6",
+                        "background-dark": "#221a10",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .step-line::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 40px;
+            bottom: -20px;
+            width: 2px;
+            background: #ee992b33;
+            transform: translateX(-50%);
+        }
+        .step-line-last::after {
+            display: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light text-slate-900 font-display">
+<div class="relative flex h-auto min-h-screen w-full max-w-md mx-auto flex-col bg-background-light shadow-2xl overflow-x-hidden">
+<!-- Header -->
+<header class="flex items-center bg-background-light/80 backdrop-blur-md sticky top-0 z-10 p-4 justify-between border-b border-primary/10">
+<button class="text-slate-900 flex size-10 shrink-0 items-center justify-center hover:bg-primary/10 rounded-full transition-colors">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="text-slate-900 text-lg font-bold leading-tight tracking-tight flex-1 text-center pr-10">Your Roadmap</h1>
+</header>
+<main class="flex-1 pb-24">
+<!-- Hero Title -->
+<div class="px-6 pt-8 pb-4">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mb-3">
+<span class="material-symbols-outlined text-sm">auto_awesome</span>
+                    AI Generated
+                </div>
+<h2 class="text-slate-900 text-3xl font-extrabold leading-tight tracking-tight">Become a UI Designer</h2>
+<p class="text-slate-600 mt-2 text-base leading-relaxed">We've crafted a 6-week journey to help you master the fundamentals and land your first client.</p>
+</div>
+<!-- Roadmap Timeline -->
+<div class="px-6 py-4 space-y-8">
+<!-- Milestone 1 -->
+<div class="relative flex gap-4 group">
+<div class="flex flex-col items-center step-line">
+<div class="z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</div>
+</div>
+<div class="flex flex-1 flex-col pb-2">
+<div class="bg-white rounded-xl p-5 shadow-sm border border-primary/5 hover:border-primary/20 transition-all">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-slate-900 text-lg font-bold leading-none">Discovery &amp; Fundamentals</h3>
+<span class="text-primary text-xs font-semibold bg-primary/10 px-2 py-1 rounded">2 days</span>
+</div>
+<p class="text-slate-600 text-sm leading-relaxed mb-4">Learn design principles, typography basics, and set up your professional Figma workspace.</p>
+<div class="w-full h-32 rounded-lg bg-center bg-cover border border-slate-100" data-alt="Modern workspace with designer tools and laptop" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCOmCSBA4eS2GhkMt2NZ1IJCkjM_KKRYXClZBucfEd_aZ6gEsVp0LSx7Aj4EtmJMtOahtx3wi1kDfytnib-N7iQCGsxbCcmJC1mlgtDVVPuo31_NyPiAo-KQP-To566KFhN41dXe5QSHyQf2gHpm-3Ph-ESA8sglGkquGzMWaIli_MOz_1_GrclHC4hxl7Vac9UU8Puhyh-2f1J036gPDWNrg3J1FuXQbdDh2jmPgkVWJ8qYtiM0OFeY8KFLDEPLto3T9b1ypf0orB5');"></div>
+</div>
+</div>
+</div>
+<!-- Milestone 2 -->
+<div class="relative flex gap-4 group">
+<div class="flex flex-col items-center step-line">
+<div class="z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
+<span class="material-symbols-outlined text-[20px]">architecture</span>
+</div>
+</div>
+<div class="flex flex-1 flex-col pb-2">
+<div class="bg-white rounded-xl p-5 shadow-sm border border-primary/5">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-slate-900 text-lg font-bold leading-none">Component Mastery</h3>
+<span class="text-primary text-xs font-semibold bg-primary/10 px-2 py-1 rounded">1 week</span>
+</div>
+<p class="text-slate-600 text-sm leading-relaxed">Master auto-layout, design systems, and building responsive mobile-first interfaces.</p>
+</div>
+</div>
+</div>
+<!-- Milestone 3 -->
+<div class="relative flex gap-4 group">
+<div class="flex flex-col items-center step-line">
+<div class="z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
+<span class="material-symbols-outlined text-[20px]">import_contacts</span>
+</div>
+</div>
+<div class="flex flex-1 flex-col pb-2">
+<div class="bg-white rounded-xl p-5 shadow-sm border border-primary/5">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-slate-900 text-lg font-bold leading-none">Portfolio Project</h3>
+<span class="text-primary text-xs font-semibold bg-primary/10 px-2 py-1 rounded">3 weeks</span>
+</div>
+<p class="text-slate-600 text-sm leading-relaxed mb-4">Design a full case study from wireframes to high-fidelity prototypes for a fintech app.</p>
+<div class="w-full h-32 rounded-lg bg-center bg-cover border border-slate-100" data-alt="App prototype screens showing dashboard metrics" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAwTfIovkng38RCqIVQ-2LmGt5DrNPj73UnJGASfAyaZ07VSe6d_rkCVms4CEONxPPuNJ6eyEyqMkHgd0tpTbCGKCylf03iwROkYLABdxgHoTRWPRebGNjardL75LKipdIyMt0Ilf3cNkPnnN3rxSYpMiHPJy2JF4OXm8qSTRdwLQ1MKutljH3a9tjRQJEiCc04jO8v_SZyXLEQvMCDlHQQvPOWqMeZaXbT9ieCtOV9Wvc7FkAC-0C_SOvn5cBMluueuJ_fVFsz2Mua');"></div>
+</div>
+</div>
+</div>
+<!-- Milestone 4 -->
+<div class="relative flex gap-4 group">
+<div class="flex flex-col items-center step-line step-line-last">
+<div class="z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
+<span class="material-symbols-outlined text-[20px]">rocket_launch</span>
+</div>
+</div>
+<div class="flex flex-1 flex-col pb-2">
+<div class="bg-white rounded-xl p-5 shadow-sm border border-primary/5">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-slate-900 text-lg font-bold leading-none">Job Readiness</h3>
+<span class="text-primary text-xs font-semibold bg-primary/10 px-2 py-1 rounded">2 weeks</span>
+</div>
+<p class="text-slate-600 text-sm leading-relaxed">Optimize your LinkedIn, prepare for interviews, and start your outreach campaign.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="px-6 mt-8 space-y-4">
+<button class="w-full flex items-center justify-center gap-2 bg-primary text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-primary/30 hover:brightness-110 active:scale-[0.98] transition-all">
+                    Start This Goal
+                    <span class="material-symbols-outlined">play_circle</span>
+</button>
+<button class="w-full flex items-center justify-center gap-2 bg-white text-slate-700 py-4 rounded-xl font-semibold text-base border border-slate-200 hover:bg-slate-50 transition-all">
+<span class="material-symbols-outlined text-primary">tune</span>
+                    Refine with AI
+                </button>
+</div>
+</main>
+<!-- Bottom Nav -->
+<nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 backdrop-blur-lg border-t border-slate-100 px-6 py-2 flex justify-between items-center z-20">
+<a class="flex flex-col items-center gap-1 p-2 text-slate-400" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="text-[10px] font-medium">Home</span>
+</a>
+<a class="flex flex-col items-center gap-1 p-2 text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">target</span>
+<span class="text-[10px] font-medium">Goals</span>
+</a>
+<a class="flex flex-col items-center gap-1 p-2 text-slate-400" href="#">
+<span class="material-symbols-outlined">explore</span>
+<span class="text-[10px] font-medium">Explore</span>
+</a>
+<a class="flex flex-col items-center gap-1 p-2 text-slate-400" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-medium">Profile</span>
+</a>
+</nav>
+</div>
+</body></html>

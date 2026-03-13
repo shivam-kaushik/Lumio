@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "primary": "#ee992b",
+                "background-light": "#f8f7f6",
+                "background-dark": "#221a10",
+                "neutral-warm": "#f5f0eb",
+                "charcoal": "#1b150d"
+              },
+              fontFamily: {
+                "display": ["Inter"]
+              },
+              borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+            },
+          },
+        }
+      </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-slate-200 font-display">
+<!-- Mock App Background -->
+<div class="relative mx-auto max-w-md h-screen bg-background-light overflow-hidden shadow-2xl flex flex-col">
+<!-- Dashboard Header Mockup -->
+<div class="p-6 flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">person</span>
+</div>
+<span class="material-symbols-outlined text-charcoal">notifications</span>
+</div>
+<h2 class="text-2xl font-bold text-charcoal">Good morning, Sarah</h2>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-white p-4 rounded shadow-sm border border-primary/10">
+<p class="text-xs text-charcoal/60">Focus Minutes</p>
+<p class="text-xl font-bold text-charcoal">320</p>
+</div>
+<div class="bg-white p-4 rounded shadow-sm border border-primary/10">
+<p class="text-xs text-charcoal/60">Streak</p>
+<p class="text-xl font-bold text-charcoal">7 Days</p>
+</div>
+</div>
+</div>
+<!-- Overlay Shadow -->
+<div class="absolute inset-0 bg-charcoal/40 backdrop-blur-sm z-10"></div>
+<!-- Bottom Sheet Component -->
+<div class="absolute inset-x-0 bottom-0 z-20 flex flex-col bg-neutral-warm rounded-t-lg shadow-[0_-10px_40px_rgba(0,0,0,0.1)] max-h-[90%] overflow-hidden">
+<!-- BottomSheetHandle -->
+<div class="flex flex-col items-center pt-3 pb-2">
+<div class="h-1.5 w-12 rounded-full bg-primary/20"></div>
+<button class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-primary/10 text-charcoal/60">
+<span class="material-symbols-outlined text-sm">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto pb-10">
+<!-- Header Section -->
+<div class="px-6 pt-2 pb-6 text-center">
+<h4 class="text-primary text-xs font-bold uppercase tracking-widest mb-4">Level &amp; Progress</h4>
+<!-- Level Badge -->
+<div class="inline-flex items-center justify-center px-8 py-3 bg-primary rounded-full shadow-lg shadow-primary/30 mb-6">
+<span class="text-white text-3xl font-bold">Level 4</span>
+</div>
+<!-- Progress Section -->
+<div class="flex flex-col gap-3 text-left bg-white/50 p-5 rounded-lg border border-primary/5">
+<div class="flex justify-between items-end">
+<p class="text-charcoal text-lg font-semibold">XP to Level 5</p>
+<p class="text-primary text-sm font-bold">750 / 1000 XP</p>
+</div>
+<div class="h-3 w-full bg-primary/10 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 75%;"></div>
+</div>
+<p class="text-charcoal/70 text-sm italic leading-relaxed">
+                            "Keep it up, Sarah! You're only 250 XP away from Level 5."
+                        </p>
+</div>
+</div>
+<!-- Achievements Section -->
+<div class="px-6">
+<h3 class="text-charcoal text-lg font-bold mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">military_tech</span>
+                        Recent Achievements
+                    </h3>
+<div class="grid grid-cols-3 gap-4">
+<!-- Badge 1 -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/60 p-0.5 flex items-center justify-center shadow-md">
+<div class="w-full h-full bg-neutral-warm rounded-full flex items-center justify-center overflow-hidden border-2 border-white">
+<span class="material-symbols-outlined text-primary text-3xl">local_fire_department</span>
+</div>
+</div>
+<span class="text-[11px] font-bold text-charcoal text-center leading-tight">7-Day Streak</span>
+</div>
+<!-- Badge 2 -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/60 p-0.5 flex items-center justify-center shadow-md">
+<div class="w-full h-full bg-neutral-warm rounded-full flex items-center justify-center overflow-hidden border-2 border-white">
+<span class="material-symbols-outlined text-primary text-3xl">psychology</span>
+</div>
+</div>
+<span class="text-[11px] font-bold text-charcoal text-center leading-tight">Deep Work Master</span>
+</div>
+<!-- Badge 3 -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/60 p-0.5 flex items-center justify-center shadow-md">
+<div class="w-full h-full bg-neutral-warm rounded-full flex items-center justify-center overflow-hidden border-2 border-white">
+<span class="material-symbols-outlined text-primary text-3xl">ads_click</span>
+</div>
+</div>
+<span class="text-[11px] font-bold text-charcoal text-center leading-tight">Goal Setter</span>
+</div>
+</div>
+</div>
+<!-- Call to Action -->
+<div class="mt-8 px-6">
+<button class="w-full bg-charcoal text-white py-4 rounded-full font-bold shadow-xl hover:bg-charcoal/90 transition-colors">
+                        Continue Journey
+                    </button>
+</div>
+</div>
+</div>
+</div>
+</body></html>

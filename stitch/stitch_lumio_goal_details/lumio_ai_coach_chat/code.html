@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumio AI Coach Chat</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#d4913a",
+                        "background-light": "#f8f7f6",
+                        "background-dark": "#201a12",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#2d261e",
+                        "message-ai-light": "#f2eee9", 
+                        "message-ai-dark": "#2d261e",
+                        "message-user-light": "#1a150f",
+                        "message-user-dark": "#d4913a",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+        .variation-filled {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display antialiased text-slate-900 dark:text-slate-100 h-screen flex flex-col overflow-hidden">
+<header class="flex-none pt-12 pb-2 px-4 flex items-center justify-between bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm z-10 sticky top-0">
+<button class="flex items-center justify-center p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-slate-900 dark:text-slate-100">arrow_back</span>
+</button>
+<div class="flex-1 flex flex-col items-center justify-center">
+<h1 class="text-sm font-semibold tracking-wide uppercase text-primary mb-0.5">Coach</h1>
+<button class="flex items-center gap-2 px-3 py-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+<span class="text-slate-900 dark:text-slate-100 font-bold text-lg leading-none">Personal Growth</span>
+<span class="material-symbols-outlined text-slate-500 text-sm">expand_more</span>
+</button>
+</div>
+<button class="flex items-center justify-center p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-slate-900 dark:text-slate-100">more_vert</span>
+</button>
+</header>
+<main class="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
+<div class="flex justify-center py-4">
+<span class="text-xs font-medium text-slate-400 dark:text-slate-500 bg-black/5 dark:bg-white/5 px-3 py-1 rounded-full">Today, 9:41 AM</span>
+</div>
+<div class="flex items-end gap-3 group">
+<div class="w-10 h-10 rounded-full shrink-0 bg-cover bg-center shadow-sm border-2 border-white dark:border-surface-dark" data-alt="Abstract warm portrait of AI coach" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBkaFpmPZYri2yrJAmdZ4wCbNAkwE56Iq6SHE9XNzPq_4EafVEKKbDDQtoQJv-36iiDI8OJvznZtvwaOVRS35B6H2naTvzbfpM5Te1mFE_n-By_qXhvwP6gwsj9t1RBZvuM-mWLNNFH4etpIghnhSiczfo_r1God_fIUhZyCDmiKB5oH4oFpRHFCHNVVu5A535tZJEt3KO3u9wUEcMvgpgNh__EwQSJj3-b2GveXSMhFwxVGeunaP_ZrwLKQfdd6TgZEcaYFD27Z4Rh');"></div>
+<div class="flex flex-col gap-1 max-w-[85%]">
+<span class="text-xs text-primary font-medium ml-4">Lumio</span>
+<div class="p-4 bg-message-ai-light dark:bg-message-ai-dark rounded-2xl rounded-bl-sm text-slate-800 dark:text-slate-100 shadow-sm">
+<p class="leading-relaxed">Hello! I see you're aiming to launch your course by Q3. That's exciting! How can I help you break down this goal today?</p>
+</div>
+</div>
+</div>
+<div class="flex items-end justify-end gap-3 group">
+<div class="flex flex-col items-end gap-1 max-w-[85%]">
+<div class="p-4 bg-[#1a150f] dark:bg-primary rounded-2xl rounded-br-sm text-white dark:text-[#1a150f] shadow-md">
+<p class="leading-relaxed">I'm feeling a bit overwhelmed with the curriculum planning.</p>
+</div>
+</div>
+</div>
+<div class="flex items-end gap-3 group">
+<div class="w-10 h-10 rounded-full shrink-0 bg-cover bg-center shadow-sm border-2 border-white dark:border-surface-dark" data-alt="Abstract warm portrait of AI coach" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB5in0tOnGq9FUbt5iEkciLbVaURpmuuuuwM4Hx0Vo4kRF-v2LrSeYYBTnXqX2FC7AQhMMb76cA1ZGN7s1jVJz_epL9terS-O7uQJJcF3RfuvKgXKACeMTb85NbLqtW71W4xBe3QcCw7LBvC50zA43DYBUkH7AnfCKCVx05la0zU_QOrTAPju3HPTdU9pKvcYGd2VzzbLQoClCaO0VZtLJCbzyxAzgFfP4C6TUsESRFbkxrlUSft_p0yiCgCkKs-J7RigbfSpm6QTSl');"></div>
+<div class="flex flex-col gap-1 max-w-[85%]">
+<span class="text-xs text-primary font-medium ml-4">Lumio</span>
+<div class="p-4 bg-message-ai-light dark:bg-message-ai-dark rounded-2xl rounded-bl-sm text-slate-800 dark:text-slate-100 shadow-sm">
+<p class="leading-relaxed">I understand. Let's start small. Would you like to outline the main modules first, or focus on defining your target student persona?</p>
+</div>
+</div>
+</div>
+<div class="h-24"></div>
+</main>
+<div class="flex-none bg-background-light dark:bg-background-dark pb-4">
+<div class="flex gap-2 overflow-x-auto px-4 pb-4 no-scrollbar">
+<button class="whitespace-nowrap flex items-center gap-1.5 px-4 py-2 rounded-full border border-primary/20 bg-surface-light dark:bg-surface-dark shadow-sm hover:border-primary hover:text-primary transition-all active:scale-95">
+<span class="material-symbols-outlined text-[18px] text-primary">list_alt</span>
+<span class="text-sm font-medium">Outline modules</span>
+</button>
+<button class="whitespace-nowrap flex items-center gap-1.5 px-4 py-2 rounded-full border border-primary/20 bg-surface-light dark:bg-surface-dark shadow-sm hover:border-primary hover:text-primary transition-all active:scale-95">
+<span class="material-symbols-outlined text-[18px] text-primary">person_search</span>
+<span class="text-sm font-medium">Define persona</span>
+</button>
+<button class="whitespace-nowrap flex items-center gap-1.5 px-4 py-2 rounded-full border border-primary/20 bg-surface-light dark:bg-surface-dark shadow-sm hover:border-primary hover:text-primary transition-all active:scale-95">
+<span class="material-symbols-outlined text-[18px] text-primary">lightbulb</span>
+<span class="text-sm font-medium">Brainstorm</span>
+</button>
+</div>
+<div class="px-4 flex items-end gap-3 pb-2">
+<div class="flex-1 bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-700 rounded-[2rem] p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all flex items-center">
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+<span class="material-symbols-outlined">add</span>
+</button>
+<input class="flex-1 bg-transparent border-none focus:ring-0 p-2 text-base placeholder-slate-400 dark:placeholder-slate-500 text-slate-900 dark:text-slate-100" placeholder="Message Lumio..." type="text"/>
+</div>
+<button class="w-14 h-14 shrink-0 bg-primary rounded-full shadow-lg shadow-primary/30 flex items-center justify-center text-[#1a150f] hover:scale-105 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[28px] variation-filled">mic</span>
+</button>
+</div>
+</div>
+<nav class="flex-none bg-surface-light dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 pb-6 pt-2 px-6">
+<ul class="flex items-center justify-between">
+<li class="flex flex-col items-center gap-1">
+<button class="p-2 text-slate-400 hover:text-primary transition-colors flex flex-col items-center">
+<span class="material-symbols-outlined text-2xl">home</span>
+<span class="text-[10px] font-medium mt-1">Home</span>
+</button>
+</li>
+<li class="flex flex-col items-center gap-1">
+<button class="p-2 text-slate-400 hover:text-primary transition-colors flex flex-col items-center">
+<span class="material-symbols-outlined text-2xl">flag</span>
+<span class="text-[10px] font-medium mt-1">Goals</span>
+</button>
+</li>
+<li class="flex flex-col items-center -mt-8">
+<button class="w-14 h-14 bg-primary rounded-full shadow-lg shadow-primary/30 flex items-center justify-center text-[#1a150f] hover:scale-105 active:scale-95 transition-transform border-4 border-background-light dark:border-background-dark">
+<span class="material-symbols-outlined text-3xl font-bold">add</span>
+</button>
+</li>
+<li class="flex flex-col items-center gap-1">
+<button class="p-2 text-primary flex flex-col items-center">
+<span class="material-symbols-outlined text-2xl variation-filled">calendar_today</span>
+<span class="text-[10px] font-medium mt-1">Today</span>
+</button>
+</li>
+<li class="flex flex-col items-center gap-1">
+<button class="p-2 text-slate-400 hover:text-primary transition-colors flex flex-col items-center">
+<span class="material-symbols-outlined text-2xl">person</span>
+<span class="text-[10px] font-medium mt-1">Profile</span>
+</button>
+</li>
+</ul>
+</nav>
+
+</body></html>

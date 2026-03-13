@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumio Profile Screen</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined|Material+Icons+Round" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#D98E34", // Gold/Orange from screenshot
+                        "primary-light": "#FDF4E5",
+                        "primary-dark": "#3D2B14",
+                        "background-light": "#FAFAFA",
+                        "background-dark": "#121212",
+                        "card-light": "#FFFFFF",
+                        "card-dark": "#1E1E1E",
+                        "text-main-light": "#1A1A1A",
+                        "text-main-dark": "#E5E5E5",
+                        "text-sub-light": "#6B7280",
+                        "text-sub-dark": "#9CA3AF",
+                    },
+                    fontFamily: {
+                        display: ['Plus Jakarta Sans', 'sans-serif'],
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                        'xl': '1rem',
+                        '2xl': '1.5rem',
+                        '3xl': '2rem',
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'nav': '0 -4px 20px -2px rgba(0, 0, 0, 0.05)',
+                    }
+                },
+            },
+        };
+    </script>
+<style>.no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-sans text-text-main-light dark:text-text-main-dark min-h-screen pb-32">
+<header class="sticky top-0 z-50 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md px-6 pt-12 pb-4 flex items-center justify-between">
+<button class="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-text-main-light dark:text-text-main-dark">
+<span class="material-icons-outlined">arrow_back</span>
+</button>
+<h1 class="text-xl font-bold">Profile</h1>
+<button class="p-2 -mr-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-text-main-light dark:text-text-main-dark">
+<span class="material-icons-outlined">settings</span>
+</button>
+</header>
+<main class="px-6 space-y-6">
+<div class="bg-gradient-to-b from-primary-light/50 to-white dark:from-primary-dark/30 dark:to-card-dark rounded-3xl p-8 flex flex-col items-center text-center shadow-sm">
+<div class="relative mb-4">
+<div class="w-24 h-24 rounded-full overflow-hidden border-4 border-white dark:border-card-dark shadow-md">
+<img alt="Profile Picture of Alex Rivera" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlsF29gHDxcStqbNaSoj6lYUMpOxVsDMIUMu9lVnFT4YmE6H8vLzPbpCUpt8ZAHQGN0YovYeXCji4RtURGj5gSNifMkknfxHbS4fGyMe-0CG47RzWEBPArz511j3wMbS795ebGCzmKycAk_vlFhHA7sVJGMd2T4o-7_lrzch-zhaETUOUT2-KlKrHn2HM0PHV6AAmj5QibcoBpQVZXrZsM-2gBOFsNRgg54C63UdiXIgVWdNKB59XdoQY075NJTE01z1r8ZNNsp1fW"/>
+</div>
+<div class="absolute bottom-0 right-0 bg-primary text-white p-1 rounded-full border-2 border-white dark:border-card-dark flex items-center justify-center w-8 h-8">
+<span class="material-icons-round text-sm">verified</span>
+</div>
+</div>
+<h2 class="text-2xl font-bold mb-2">Alex Rivera</h2>
+<div class="bg-primary-light dark:bg-primary/20 text-primary dark:text-primary-light text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider mb-4">
+                Lumio Premium
+            </div>
+<p class="text-sm text-text-sub-light dark:text-text-sub-dark leading-relaxed">
+                Solopreneur • Building the future of work • Member since 2021
+            </p>
+</div>
+<div class="grid grid-cols-3 gap-4">
+<div class="bg-card-light dark:bg-card-dark rounded-3xl p-4 flex flex-col items-center justify-center text-center shadow-soft border border-transparent dark:border-white/5 h-32">
+<span class="material-icons-round text-primary text-2xl mb-2">local_fire_department</span>
+<span class="text-2xl font-bold">14</span>
+<span class="text-xs text-text-sub-light dark:text-text-sub-dark font-medium mt-1">Day Streak</span>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-3xl p-4 flex flex-col items-center justify-center text-center shadow-soft border border-transparent dark:border-white/5 h-32">
+<span class="material-icons-round text-primary text-2xl mb-2">timer</span>
+<span class="text-2xl font-bold">128h</span>
+<span class="text-xs text-text-sub-light dark:text-text-sub-dark font-medium mt-1">Focus Time</span>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-3xl p-4 flex flex-col items-center justify-center text-center shadow-soft border border-transparent dark:border-white/5 h-32">
+<span class="material-icons-round text-primary text-2xl mb-2">check_circle</span>
+<span class="text-2xl font-bold">452</span>
+<span class="text-xs text-text-sub-light dark:text-text-sub-dark font-medium mt-1">Tasks Done</span>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark rounded-3xl p-6 shadow-soft border border-transparent dark:border-white/5">
+<div class="flex items-center justify-between mb-8">
+<h3 class="font-bold text-lg">Productivity Trends</h3>
+<button class="flex items-center text-xs font-medium text-text-sub-light dark:text-text-sub-dark hover:text-primary transition-colors">
+                    This Week <span class="material-icons-round text-sm ml-1">expand_more</span>
+</button>
+</div>
+<div class="relative h-32 w-full flex items-end justify-between px-2">
+<div class="w-2 bg-gray-100 dark:bg-white/10 h-12 rounded-t-full relative group">
+<div class="absolute bottom-0 w-full bg-primary/30 h-8 rounded-t-full transition-all group-hover:bg-primary"></div>
+</div>
+<div class="w-2 bg-gray-100 dark:bg-white/10 h-16 rounded-t-full relative group">
+<div class="absolute bottom-0 w-full bg-primary/30 h-12 rounded-t-full transition-all group-hover:bg-primary"></div>
+</div>
+<div class="w-2 bg-gray-100 dark:bg-white/10 h-24 rounded-t-full relative group">
+<div class="absolute bottom-0 w-full bg-primary/30 h-16 rounded-t-full transition-all group-hover:bg-primary"></div>
+</div>
+<div class="w-2 bg-gray-100 dark:bg-white/10 h-28 rounded-t-full relative group">
+<div class="absolute bottom-0 w-full bg-primary h-24 rounded-t-full shadow-lg shadow-primary/30"></div> 
+</div>
+<div class="w-2 bg-gray-100 dark:bg-white/10 h-20 rounded-t-full relative group">
+<div class="absolute bottom-0 w-full bg-primary/30 h-10 rounded-t-full transition-all group-hover:bg-primary"></div>
+</div>
+<div class="w-2 bg-gray-100 dark:bg-white/10 h-14 rounded-t-full relative group">
+<div class="absolute bottom-0 w-full bg-primary/30 h-6 rounded-t-full transition-all group-hover:bg-primary"></div>
+</div>
+<div class="w-2 bg-gray-100 dark:bg-white/10 h-16 rounded-t-full relative group">
+<div class="absolute bottom-0 w-full bg-primary/30 h-8 rounded-t-full transition-all group-hover:bg-primary"></div>
+</div>
+</div>
+<div class="flex justify-between mt-4 px-1 text-xs text-text-sub-light dark:text-text-sub-dark font-medium uppercase">
+<span class="w-4 text-center">M</span>
+<span class="w-4 text-center">T</span>
+<span class="w-4 text-center">W</span>
+<span class="w-4 text-center text-primary font-bold">T</span>
+<span class="w-4 text-center">F</span>
+<span class="w-4 text-center">S</span>
+<span class="w-4 text-center">S</span>
+</div>
+</div>
+<div>
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-bold text-lg">Badges</h3>
+<button class="text-sm font-medium text-primary hover:text-primary/80 transition-colors">View All</button>
+</div>
+<div class="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+<div class="flex-shrink-0 w-20 h-20 rounded-full bg-primary-light dark:bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-primary">
+<span class="material-icons-round text-3xl">emoji_events</span>
+</div>
+<div class="flex-shrink-0 w-20 h-20 rounded-full bg-primary-light dark:bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-primary">
+<span class="material-icons-round text-3xl">bolt</span>
+</div>
+<div class="flex-shrink-0 w-20 h-20 rounded-full bg-primary-light dark:bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-primary">
+<span class="material-icons-round text-3xl">psychology</span>
+</div>
+<div class="flex-shrink-0 w-20 h-20 rounded-full bg-gray-50 dark:bg-white/5 border-2 border-dashed border-gray-200 dark:border-white/10 flex items-center justify-center text-gray-300 dark:text-gray-600">
+<span class="material-icons-round text-3xl">lock</span>
+</div>
+</div>
+</div>
+<div class="space-y-4">
+<button class="w-full bg-card-light dark:bg-card-dark rounded-3xl p-4 flex items-center shadow-soft border border-transparent dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group">
+<div class="w-10 h-10 rounded-full bg-primary-light dark:bg-primary/20 flex items-center justify-center text-primary mr-4 group-hover:scale-110 transition-transform">
+<span class="material-icons-round">person_outline</span>
+</div>
+<span class="flex-1 text-left font-medium text-lg">Account Details</span>
+<span class="material-icons-round text-gray-400 dark:text-gray-600">chevron_right</span>
+</button>
+<button class="w-full bg-card-light dark:bg-card-dark rounded-3xl p-4 flex items-center shadow-soft border border-transparent dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group">
+<div class="w-10 h-10 rounded-full bg-primary-light dark:bg-primary/20 flex items-center justify-center text-primary mr-4 group-hover:scale-110 transition-transform">
+<span class="material-icons-round">notifications_none</span>
+</div>
+<span class="flex-1 text-left font-medium text-lg">Notifications</span>
+<span class="material-icons-round text-gray-400 dark:text-gray-600">chevron_right</span>
+</button>
+<button class="w-full bg-card-light dark:bg-card-dark rounded-3xl p-4 flex items-center shadow-soft border border-transparent dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group">
+<div class="w-10 h-10 rounded-full bg-primary-light dark:bg-primary/20 flex items-center justify-center text-primary mr-4 group-hover:scale-110 transition-transform">
+<span class="material-icons-round">tune</span>
+</div>
+<span class="flex-1 text-left font-medium text-lg">Preferences</span>
+<span class="material-icons-round text-gray-400 dark:text-gray-600">chevron_right</span>
+</button>
+</div>
+</main>
+<nav class="fixed bottom-0 left-0 right-0 bg-card-light dark:bg-card-dark shadow-nav pt-2 pb-8 px-6 flex justify-between items-center z-50 rounded-t-3xl border-t border-gray-100 dark:border-white/5">
+<a class="flex flex-col items-center gap-1 w-16 text-text-sub-light dark:text-text-sub-dark hover:text-primary dark:hover:text-primary transition-colors" href="#">
+<span class="material-icons-round text-2xl">home</span>
+<span class="text-[10px] font-medium">Home</span>
+</a>
+<a class="flex flex-col items-center gap-1 w-16 text-text-sub-light dark:text-text-sub-dark hover:text-primary dark:hover:text-primary transition-colors" href="#">
+<span class="material-icons-outlined text-2xl">track_changes</span>
+<span class="text-[10px] font-medium">Goals</span>
+</a>
+<div class="relative -top-8">
+<button class="bg-primary text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg shadow-primary/40 transform transition-transform active:scale-95 hover:scale-105 border-4 border-white dark:border-background-dark">
+<span class="material-icons-round text-3xl">add</span>
+</button>
+</div>
+<a class="flex flex-col items-center gap-1 w-16 text-text-sub-light dark:text-text-sub-dark hover:text-primary dark:hover:text-primary transition-colors" href="#">
+<span class="material-icons-outlined text-2xl">calendar_today</span>
+<span class="text-[10px] font-medium">Today</span>
+</a>
+<a class="flex flex-col items-center gap-1 w-16 text-primary dark:text-primary transition-colors" href="#">
+<span class="material-icons-round text-2xl">person</span>
+<span class="text-[10px] font-medium">Profile</span>
+</a>
+</nav>
+
+</body></html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ee992b",
+                        "background-light": "#f8f7f6",
+                        "background-dark": "#221a10",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<title>Lumio Notifications</title>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<!-- Background Content (Dimmed) -->
+<div class="relative flex h-screen w-full flex-col overflow-hidden brightness-50 contrast-75">
+<!-- Mock App Content -->
+<div class="flex-1 p-6 space-y-6">
+<div class="flex items-center justify-between">
+<div class="h-10 w-10 rounded-full bg-primary/20"></div>
+<div class="h-6 w-24 bg-slate-200 dark:bg-slate-800 rounded"></div>
+<span class="material-symbols-outlined text-slate-400">search</span>
+</div>
+<div class="h-40 w-full bg-primary/10 rounded-xl"></div>
+<div class="space-y-4">
+<div class="h-20 w-full bg-white dark:bg-slate-800 rounded-lg shadow-sm"></div>
+<div class="h-20 w-full bg-white dark:bg-slate-800 rounded-lg shadow-sm"></div>
+<div class="h-20 w-full bg-white dark:bg-slate-800 rounded-lg shadow-sm"></div>
+</div>
+</div>
+<!-- Bottom Nav Bar (Background) -->
+<div class="flex gap-2 border-t border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark px-4 pb-6 pt-2">
+<a class="flex flex-1 flex-col items-center justify-end gap-1 rounded-full text-primary" href="#">
+<span class="material-symbols-outlined text-2xl">home</span>
+<p class="text-[10px] font-medium uppercase tracking-wider">Home</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined text-2xl">track_changes</span>
+<p class="text-[10px] font-medium uppercase tracking-wider">Goals</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined text-2xl">checklist</span>
+<p class="text-[10px] font-medium uppercase tracking-wider">Tasks</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined text-2xl">settings</span>
+<p class="text-[10px] font-medium uppercase tracking-wider">Settings</p>
+</a>
+</div>
+</div>
+<!-- Bottom Sheet Overlay -->
+<div class="fixed inset-0 z-50 flex flex-col justify-end bg-black/20 backdrop-blur-[2px]">
+<!-- Bottom Sheet Container -->
+<div class="relative w-full max-w-md mx-auto bg-[#F5F0EB] dark:bg-background-dark rounded-t-[20px] shadow-2xl overflow-hidden">
+<!-- Drag Handle -->
+<div class="flex h-6 w-full items-center justify-center">
+<div class="h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-700"></div>
+</div>
+<!-- Header -->
+<div class="flex items-center justify-between px-6 py-2">
+<h2 class="text-[#2D2D2D] dark:text-slate-100 text-2xl font-bold tracking-tight">Notifications</h2>
+<button class="flex items-center justify-center h-10 w-10 rounded-full bg-white/50 dark:bg-slate-800 hover:bg-white transition-colors">
+<span class="material-symbols-outlined text-slate-600 dark:text-slate-300">close</span>
+</button>
+</div>
+<!-- Notification List -->
+<div class="px-4 py-4 space-y-3 pb-12 max-h-[70vh] overflow-y-auto">
+<!-- Notification Item 1 -->
+<div class="group flex items-start gap-4 p-4 bg-white/60 dark:bg-slate-800/60 rounded-xl border border-white/40 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm">
+<div class="flex items-center justify-center h-12 w-12 rounded-lg bg-primary/20 shrink-0">
+<span class="material-symbols-outlined text-primary">auto_awesome</span>
+</div>
+<div class="flex-1 space-y-1">
+<div class="flex justify-between items-center">
+<span class="text-[10px] font-bold text-primary/80 uppercase tracking-widest">AI INSIGHT</span>
+<span class="text-xs text-slate-400">2h ago</span>
+</div>
+<p class="text-[#2D2D2D] dark:text-slate-200 text-sm font-medium leading-relaxed">
+                            AI Insight: You're 20% more productive in the mornings!
+                        </p>
+</div>
+</div>
+<!-- Notification Item 2 -->
+<div class="group flex items-start gap-4 p-4 bg-white/60 dark:bg-slate-800/60 rounded-xl border border-white/40 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm">
+<div class="flex items-center justify-center h-12 w-12 rounded-lg bg-green-100 dark:bg-green-900/30 shrink-0">
+<span class="material-symbols-outlined text-green-600 dark:text-green-500">emoji_events</span>
+</div>
+<div class="flex-1 space-y-1">
+<div class="flex justify-between items-center">
+<span class="text-[10px] font-bold text-green-600/80 dark:text-green-500/80 uppercase tracking-widest">GOAL MILESTONE</span>
+<span class="text-xs text-slate-400">5h ago</span>
+</div>
+<p class="text-[#2D2D2D] dark:text-slate-200 text-sm font-medium leading-relaxed">
+                            Goal Milestone: You've reached 50% of your "Learn Spanish" goal
+                        </p>
+</div>
+</div>
+<!-- Notification Item 3 -->
+<div class="group flex items-start gap-4 p-4 bg-white/60 dark:bg-slate-800/60 rounded-xl border border-white/40 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm">
+<div class="flex items-center justify-center h-12 w-12 rounded-lg bg-blue-100 dark:bg-blue-900/30 shrink-0">
+<span class="material-symbols-outlined text-blue-600 dark:text-blue-500">schedule</span>
+</div>
+<div class="flex-1 space-y-1">
+<div class="flex justify-between items-center">
+<span class="text-[10px] font-bold text-blue-600/80 dark:text-blue-500/80 uppercase tracking-widest">TASK REMINDER</span>
+<span class="text-xs text-slate-400">Today, 8:00 AM</span>
+</div>
+<p class="text-[#2D2D2D] dark:text-slate-200 text-sm font-medium leading-relaxed">
+                            Task Reminder: Don't forget your morning workout
+                        </p>
+</div>
+</div>
+<!-- Notification Item 4 (Additional for scrolling visual) -->
+<div class="group flex items-start gap-4 p-4 bg-white/40 dark:bg-slate-800/40 rounded-xl border border-white/20 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm opacity-60">
+<div class="flex items-center justify-center h-12 w-12 rounded-lg bg-slate-100 dark:bg-slate-900/30 shrink-0">
+<span class="material-symbols-outlined text-slate-500">lightbulb</span>
+</div>
+<div class="flex-1 space-y-1">
+<div class="flex justify-between items-center">
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">TIP</span>
+<span class="text-xs text-slate-400">Yesterday</span>
+</div>
+<p class="text-[#2D2D2D] dark:text-slate-200 text-sm font-medium leading-relaxed">
+                            Lumio Tip: Use focus mode to block distracting apps.
+                        </p>
+</div>
+</div>
+</div>
+<!-- Bottom Safe Area Padding -->
+<div class="h-8 bg-[#F5F0EB] dark:bg-background-dark"></div>
+</div>
+</div>
+</body></html>
