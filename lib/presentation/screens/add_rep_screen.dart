@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 
 /// Legacy screen retained for navigation compatibility.
 /// Rep logging has been removed now that skills are deprecated.

@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../providers/auth_provider.dart' as app_auth;
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../widgets/modern_smart_card.dart';
 import '../../core/services/premium_service.dart';
 import 'settings_screen.dart';

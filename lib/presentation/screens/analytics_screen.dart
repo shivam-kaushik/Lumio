@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/reminder_provider.dart';
 import '../../core/services/weekly_insights_service.dart';
 import '../../data/repositories/firestore_reminder_repository.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 
 /// Analytics screen showing completion statistics and weekly insights
 class AnalyticsScreen extends StatefulWidget {

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'dart:math' as math;
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/growth_provider.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../../data/models/goal.dart';
 import 'goal_details_screen.dart';
 
