@@ -1,4 +1,4 @@
-import 'dart:async'; 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -7,22 +7,21 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../core/services/privacy_gpt_service.dart';
 import '../../core/services/sound_service.dart';
 import '../providers/growth_provider.dart';
+import '../providers/auth_provider.dart' as app_auth;
 import '../../data/models/goal_task.dart';
 import '../theme/theme.dart';
 import 'daily_report_screen.dart';
-import 'day_planner_history_screen.dart'; 
+import 'day_planner_history_screen.dart';
 import '../widgets/active_task_timer.dart';
 import '../widgets/quick_task_input_sheet.dart';
-import '../widgets/timeline_task_tile.dart';
-import '../utils/analytics_helper.dart'; 
-import 'package:intl/intl.dart'; 
-import 'package:shared_preferences/shared_preferences.dart'; // Added
-import 'package:confetti/confetti.dart'; // Gamification
-import '../widgets/streak_counter.dart'; // Gamification
-import '../widgets/level_up_overlay.dart'; // Gamification
-import 'dart:async'; // StreamSubscription
-import '../widgets/avatar_widget.dart'; // Phase 3
-import 'avatar_editor_screen.dart'; // Phase 3
+import '../utils/analytics_helper.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:confetti/confetti.dart';
+import '../widgets/streak_counter.dart';
+import '../widgets/level_up_overlay.dart';
+import '../widgets/avatar_widget.dart';
+import 'avatar_editor_screen.dart';
 
 class DayPlannerScreen extends StatefulWidget {
   final DateTime? initialDate;
@@ -36,16 +35,17 @@ class DayPlannerScreen extends StatefulWidget {
 class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBindingObserver {
   final _inputController = TextEditingController();
   final stt.SpeechToText _speech = stt.SpeechToText();
-  
+  final ScrollController _scrollController = ScrollController();
+
   bool _isConverting = false;
   bool _isListening = false;
   bool _speechAvailable = false;
   List<Map<String, dynamic>>? _generatedPlan;
   Timer? _rolloverTimer;
   bool _isViewingToday = true;
-  late DateTime _selectedDate; 
-  late ConfettiController _confettiController; // Gamification 
-  StreamSubscription? _levelSubscription; // Level Up Listener 
+  late DateTime _selectedDate;
+  late ConfettiController _confettiController;
+  StreamSubscription? _levelSubscription;
 
   // Schedule Settings
   TimeOfDay _wakeUpTime = const TimeOfDay(hour: 8, minute: 0);
@@ -56,22 +56,20 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); 
-    
-    // Initialize date from constructor or default to now
+    WidgetsBinding.instance.addObserver(this);
+
     _selectedDate = widget.initialDate ?? DateTime.now();
     _isViewingToday = AnalyticsHelper.isSameDay(_selectedDate, DateTime.now());
-    
+
     _initSpeech();
-    
-    // Listen for Level Up
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<GrowthProvider>();
       _levelSubscription = provider.levelUpStream.listen((newLevel) {
          if (mounted) {
            showDialog(
              context: context,
-             barrierDismissible: false, // Force them to celebrate!
+             barrierDismissible: false,
              builder: (_) => LevelUpOverlay(
                newLevel: newLevel,
                onDismiss: () => Navigator.of(context).pop(),
@@ -81,8 +79,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
       });
     });
     _startRolloverCheck();
-    _loadScheduleSettings(); // Load saved custom schedule
-    
+    _loadScheduleSettings();
+
     _confettiController = ConfettiController(duration: const Duration(seconds: 2));
   }
 
@@ -91,11 +89,11 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     setState(() {
       _wakeUpTitle = prefs.getString('schedule_wakeup_title') ?? "Rise and Shine";
       _bedTimeTitle = prefs.getString('schedule_bedtime_title') ?? "Wind Down";
-      
+
       final wakeHour = prefs.getInt('schedule_wakeup_hour') ?? 8;
       final wakeMin = prefs.getInt('schedule_wakeup_min') ?? 0;
       _wakeUpTime = TimeOfDay(hour: wakeHour, minute: wakeMin);
-      
+
       final bedHour = prefs.getInt('schedule_bedtime_hour') ?? 22;
       final bedMin = prefs.getInt('schedule_bedtime_min') ?? 0;
       _bedTime = TimeOfDay(hour: bedHour, minute: bedMin);
@@ -141,15 +139,13 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                    initialTime: initialTime,
                  );
                  if (picked != null) {
-                    Navigator.pop(context); // Close current dialog to refresh (simple way)
-                    // Save temporarily and reopen? Or better, use StatefulWidget dialog.
-                    // For simplicity, let's just update main state and reopen content
+                    Navigator.pop(context);
                     if (isWakeUp) {
                        setState(() => _wakeUpTime = picked);
                     } else {
                        setState(() => _bedTime = picked);
                     }
-                    _showEditAnchorDialog(isWakeUp); // Reopen with new time
+                    _showEditAnchorDialog(isWakeUp);
                  }
                },
              ),
@@ -190,20 +186,19 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     _rolloverTimer?.cancel();
     _confettiController.dispose();
     _levelSubscription?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
   void _startRolloverCheck() {
-    // Check every minute for day change
     _rolloverTimer = Timer.periodic(const Duration(minutes: 1), (_) => _checkRollover());
   }
 
   void _checkRollover() {
     if (!mounted) return;
-    
+
     final now = DateTime.now();
-    
-    // If we are supposed to be viewing "Today", but the date has drifted, update it.
+
     if (_isViewingToday && !AnalyticsHelper.isSameDay(_selectedDate, now)) {
        debugPrint("📅 Day Rollover Detected! Updating to $now");
        setState(() {
@@ -215,7 +210,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _checkRollover(); // Force check immediately on resume
+      _checkRollover();
     }
   }
 
@@ -272,12 +267,10 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     if (_isListening) await _speech.stop();
 
     setState(() => _isConverting = true);
-    
-    // 1. Call AI
+
     final gpt = PrivacyGptService();
-    // Get plan but don't set separate state yet
     final plan = await gpt.generateDailySchedule(_inputController.text);
-    
+
     if (plan == null) {
        setState(() => _isConverting = false);
        if (mounted) {
@@ -288,16 +281,12 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
        return;
     }
 
-    // 2. Auto-Confirm & Save (Skip Review Screen)
     try {
       final provider = context.read<GrowthProvider>();
-      
-      // Ensure Daily Goal Exists for SELECTED DATE
+
       final goalId = await provider.ensureDailyGoal(_selectedDate);
-      
-      // Create Tasks
+
       for (var item in plan) {
-        // Parse explicit time if available
         DateTime? finalDate = _selectedDate;
         if (item['specificTime'] != null) {
             final parts = item['specificTime'].toString().split(':');
@@ -309,9 +298,9 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                }
             }
         }
-        
+
         final task = GoalTask(
-          id: 0, 
+          id: 0,
           goalId: goalId,
           title: item['title'] ?? 'Untitled',
           description: item['description'] ?? '',
@@ -321,16 +310,16 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
           createdAt: DateTime.now(),
           isCompleted: false,
           subtasks: [],
-          scheduledDate: finalDate, // Use precise time if available
+          scheduledDate: finalDate,
         );
-        
+
         await provider.createTask(task);
       }
 
       if (mounted) {
         _inputController.clear();
-        _generatedPlan = null; // Ensure this stays null so we don't trigger review UI
-        
+        _generatedPlan = null;
+
         SoundService().playMagic();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Day Plan Created Successfully!')),
@@ -347,8 +336,6 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     }
   }
 
-
-
   void _showQuickAdd(BuildContext context, GrowthProvider provider) {
       showModalBottomSheet(
           context: context,
@@ -356,7 +343,6 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
           backgroundColor: Colors.transparent,
           builder: (context) => QuickTaskInputSheet(
               onSubmit: (title, date, priority, tags, repeat, location) async {
-                  // Add directly to day's plan
                   final goalId = await provider.ensureDailyGoal(_selectedDate);
                   final task = GoalTask(
                       id: 0,
@@ -365,14 +351,14 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                       description: '',
                       priority: priority,
                       createdAt: DateTime.now(),
-                      scheduledDate: _selectedDate, // Use selected date
+                      scheduledDate: _selectedDate,
                       frequency: repeat ?? 'one-time',
                       suggestedLocation: location ?? 'any',
                   );
                   await provider.createTask(task);
                   if (mounted) Navigator.pop(context);
               },
-              initialDate: _selectedDate, // Pass selected date to quick add
+              initialDate: _selectedDate,
           ),
       );
   }
@@ -387,40 +373,41 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
-        // If user manually picks a date, we respect their choice.
-        // If they pick "Today", we resume auto-rollover.
-        // If they pick "Yesterday", auto-rollover stops (so it doesn't jump back to Today).
         _isViewingToday = AnalyticsHelper.isSameDay(picked, DateTime.now());
       });
     }
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? LumioColors.textPrimaryDark : LumioColors.textPrimaryLight;
-    final subtleColor = isDark ? LumioColors.textSecondaryDark : LumioColors.textSecondaryLight;
+    final backgroundColor = isDark ? LumioColors.backgroundDark : const Color(0xFFF8F7F6);
+    final surfaceColor = isDark ? LumioColors.surfaceDark : Colors.white;
+    final textColor = isDark ? LumioColors.textPrimaryDark : const Color(0xFF1A150F);
+    final subtleColor = isDark ? LumioColors.textSecondaryDark : const Color(0xFF917755);
+    final dividerColor = isDark ? const Color(0xFF403A32) : const Color(0xFFE5DDD2);
 
     return Consumer<GrowthProvider>(
       builder: (context, provider, _) {
-        // Check for existing plan
         final isToday = AnalyticsHelper.isSameDay(_selectedDate, DateTime.now());
         final dateStr = "${_selectedDate.year}-${_selectedDate.month}-${_selectedDate.day}";
         final goalName = "Daily Plan - $dateStr";
-        
-        // Collect tasks for the selected date: ONLY from "Daily Plan" and "Inbox"
+
         List<GoalTask> tasks = [];
-        
-        // 1. Daily Plan Tasks
+
         try {
            final dailyPlanGoal = provider.goals.firstWhere((g) => g.name == goalName);
            tasks.addAll(provider.getTasksForGoal(dailyPlanGoal.id));
-        } catch (_) {
-           // No daily plan goal yet, that's fine
-        }
+        } catch (_) {}
 
-        // 2. Inbox Tasks (Scheduled for today OR Created today)
         try {
            final inboxGoal = provider.goals.firstWhere((g) => g.name == 'Inbox');
            final inboxTasks = provider.getTasksForGoal(inboxGoal.id);
@@ -428,45 +415,33 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                final dateToCheck = t.scheduledDate ?? t.createdAt;
                return AnalyticsHelper.isSameDay(dateToCheck, _selectedDate);
            }));
-        } catch (_) {
-           // No Inbox, or no inbox tasks
-        }
-        
-        // Check tasks
+        } catch (_) {}
+
         final hasPlan = tasks.isNotEmpty;
-        
+
         if (hasPlan && _generatedPlan == null) {
-          // MODE B: DASHBOARD (Plan Exists)
-          
-          // Find active task for Timer (Prioritize Focused ID, then Started Task)
           GoalTask? activeTask;
-          
+
           if (provider.focusedTaskId != null) {
               try {
                   activeTask = tasks.firstWhere((t) => t.id == provider.focusedTaskId);
               } catch (_) {
-                  // Focused task might be in another goal or hidden, try finding in all tasks
                   try {
                        activeTask = provider.allTasks.firstWhere((t) => t.id == provider.focusedTaskId);
-                  } catch (e) {
-                       // Task might be deleted
-                  }
+                  } catch (e) {}
               }
           }
-          
-          // Fallback: If no focus but something is running (e.g. app restart), show that
+
           if (activeTask == null) {
               try {
                  activeTask = tasks.firstWhere((t) => t.startedAt != null);
               } catch (_) {
                   try {
-                      // Check globally if not in today's view
                       activeTask = provider.allTasks.firstWhere((t) => t.startedAt != null);
                   } catch (_) {}
               }
           }
 
-          // Sort tasks for timeline
           tasks.sort((a, b) {
             final aTime = _getSortableTime(a);
             final bTime = _getSortableTime(b);
@@ -474,28 +449,34 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
           });
 
           return Scaffold(
-            backgroundColor: theme.scaffoldBackgroundColor,
+            backgroundColor: backgroundColor,
             body: Stack(
               children: [
                 SafeArea(
-                  child: CustomScrollView(
-                    slivers: [
-                      // 1. Header & Date Strip
-                      SliverToBoxAdapter(
-                        child: _buildDateHeader(theme, textColor, subtleColor),
-                      ),
+                  child: Column(
+                    children: [
+                      // Header
+                      _buildStitchHeader(context, provider, isDark, textColor, subtleColor, surfaceColor, dividerColor),
 
-                      // 2. Active Timer (Floating at top if Focus is active)
-                      if (activeTask != null)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: ActiveTaskTimer(task: activeTask),
-                          ),
+                      // Main Content
+                      Expanded(
+                        child: ListView(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.only(bottom: 100),
+                          children: [
+                            // AI Schedule Optimized Card
+                            _buildAIInsightCard(context, isDark, textColor, subtleColor, surfaceColor),
+
+                            // Week Date Picker
+                            _buildWeekDatePicker(isDark, textColor, subtleColor, surfaceColor, dividerColor),
+
+                            const SizedBox(height: 16),
+
+                            // Timeline
+                            _buildTimeline(context, provider, tasks, activeTask?.id, isDark, textColor, subtleColor, surfaceColor, dividerColor),
+                          ],
                         ),
-
-                      // 3. Timeline Content (Converted to Slivers)
-                      _buildTimelineSliver(context, provider, tasks, activeTask?.id, isDark, textColor, subtleColor),
+                      ),
                     ],
                   ),
                 ),
@@ -508,56 +489,42 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                     displayTarget: false,
                     gravity: 0.3,
                     numberOfParticles: 20,
-                    colors: const [Colors.green, Colors.blue, Colors.pink, Colors.orange, Colors.purple], 
+                    colors: const [Colors.green, Colors.blue, Colors.pink, Colors.orange, Colors.purple],
                   ),
                 ),
               ],
             ),
-            floatingActionButton: Padding(
-              padding: const EdgeInsets.only(bottom: 100.0), // Clear nav bar
-              child: FloatingActionButton(
-                heroTag: "day_planner_fab_mode_b",
-                onPressed: () => _showQuickAdd(context, provider),
-                backgroundColor: LumioColors.primary,
-                child: const Icon(Icons.add, color: Colors.white),
-              ),
-            ),
           );
         }
 
-        // MODE A: MORNING DUMP (No Plan or Creating New)
-        // ... (Keep existing implementation) ...
+        // MODE A: MORNING DUMP (No Plan)
         return Scaffold(
-          backgroundColor: theme.scaffoldBackgroundColor,
-          // Removed AppBar to match Timeline style
-
-          floatingActionButton: _generatedPlan == null ? Padding(
-                padding: const EdgeInsets.only(bottom: 90), 
-                child: FloatingActionButton(
-                    heroTag: "day_planner_fab_mode_a",
-                    onPressed: () => _showQuickAdd(context, provider),
-                    backgroundColor: LumioColors.primary,
-                    tooltip: "Add Manual Task",
-                    child: const Icon(Icons.add, color: Colors.white),
-                ),
-            ) : null,
-          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+          backgroundColor: backgroundColor,
           body: SafeArea(
             child: Column(
               children: [
-                // 1. Unified Header
-                _buildDateHeader(theme, textColor, subtleColor),
-                
-                // 1. Input Section
+                // Header
+                _buildStitchHeader(context, provider, isDark, textColor, subtleColor, surfaceColor, dividerColor),
+
+                // Week Date Picker
+                _buildWeekDatePicker(isDark, textColor, subtleColor, surfaceColor, dividerColor),
+
+                // Input Section
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24.0),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const SizedBox(height: 20), // Add top spacing for scroll
+                        const SizedBox(height: 40),
+                        Icon(
+                          Icons.wb_sunny_outlined,
+                          size: 64,
+                          color: LumioColors.primary.withOpacity(0.3),
+                        ),
+                        const SizedBox(height: 24),
                         Text(
-                          isToday ? "What needs to happen today?" : "What needs to happen on ${AnalyticsHelper.formatDate(_selectedDate)}?",
+                          isToday ? "What needs to happen today?" : "Plan for ${DateFormat('MMM d').format(_selectedDate)}",
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: textColor,
@@ -565,177 +532,222 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         Text(
                           "Dump your thoughts. We'll structure them.",
-                          style: TextStyle(color: subtleColor),
+                          style: TextStyle(color: subtleColor, fontSize: 14),
                         ),
                         const SizedBox(height: 32),
-                        Stack(
-                          alignment: Alignment.bottomRight,
-                          children: [
-                            TextField(
-                              controller: _inputController,
-                              style: TextStyle(color: textColor, fontSize: 18),
-                              maxLines: 6,
-                              decoration: InputDecoration(
-                                hintText: "e.g., Finish the report, call John at 2pm, gym at 5...",
-                                hintStyle: TextStyle(color: subtleColor.withOpacity(0.5)),
-                                filled: true,
-                                fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide.none,
+                        Container(
+                          decoration: BoxDecoration(
+                            color: surfaceColor,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: dividerColor),
+                          ),
+                          child: Stack(
+                            alignment: Alignment.bottomRight,
+                            children: [
+                              TextField(
+                                controller: _inputController,
+                                style: TextStyle(color: textColor, fontSize: 16),
+                                maxLines: 6,
+                                decoration: InputDecoration(
+                                  hintText: "e.g., Finish the report, call John at 2pm, gym at 5...",
+                                  hintStyle: TextStyle(color: subtleColor.withOpacity(0.5)),
+                                  filled: true,
+                                  fillColor: Colors.transparent,
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 56),
                                 ),
-                                contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 48), // Space for fab
                               ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: FloatingActionButton.small(
-                                onPressed: _toggleListening,
-                                backgroundColor: _isListening ? LumioColors.error : LumioColors.primary,
-                                child: Icon(_isListening ? Icons.stop : Icons.mic, color: Colors.white),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Material(
+                                  color: _isListening ? LumioColors.error : LumioColors.primary,
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: InkWell(
+                                    onTap: _toggleListening,
+                                    borderRadius: BorderRadius.circular(24),
+                                    child: Container(
+                                      width: 44,
+                                      height: 44,
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        _isListening ? Icons.stop : Icons.mic,
+                                        color: Colors.white,
+                                        size: 22,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 24),
                         SizedBox(
                           width: double.infinity,
-                          height: 56,
+                          height: 52,
                           child: ElevatedButton(
                             onPressed: _isConverting ? null : _generatePlan,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: LumioColors.primary,
+                              foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              elevation: 4,
+                              shadowColor: LumioColors.primary.withOpacity(0.4),
                             ),
-                            child: _isConverting 
-                                ? const CircularProgressIndicator(color: Colors.white)
-                                : const Text("Structure My Day", style: TextStyle(fontSize: 18, color: Colors.white)),
+                            child: _isConverting
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  )
+                                : const Text(
+                                    "Structure My Day",
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                  ),
                           ),
                         ),
-                        const SizedBox(height: 100), // Bottom padding for keyboard/FAB
+                        const SizedBox(height: 16),
+                        TextButton.icon(
+                          onPressed: () => _showQuickAdd(context, provider),
+                          icon: Icon(Icons.add, color: subtleColor),
+                          label: Text(
+                            "Or add a task manually",
+                            style: TextStyle(color: subtleColor),
+                          ),
+                        ),
+                        const SizedBox(height: 100),
                       ],
                     ),
                   ),
                 ),
-                ],
-              ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  // --- Helpers for Timeline UI ---
-
-  DateTime _getSortableTime(GoalTask task) {
-    if (task.scheduledDate != null) {
-      if (task.scheduledDate!.hour == 0 && task.scheduledDate!.minute == 0) {
-        // Map fuzzy times to approximate hours for sorting
-        if (task.suggestedTime == 'morning') return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 9);
-        if (task.suggestedTime == 'afternoon') return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 14);
-        if (task.suggestedTime == 'evening') return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 18);
-        return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 12); // "Any" -> Noon
-      }
-      return task.scheduledDate!;
+  String _getUserName() {
+    try {
+      final authProvider = context.read<app_auth.AuthProvider>();
+      final name = authProvider.user?.displayName ?? 'there';
+      return name.split(' ').first;
+    } catch (_) {
+      return 'there';
     }
-    return DateTime.now().add(const Duration(days: 365)); // Put undefined at end
   }
 
-  Widget _buildDateHeader(ThemeData theme, Color textColor, Color subtleColor) {
-    // Generate dates for the strip (e.g., this week)
-    // For simplicity, we center on _selectedDate and show +/- 3 days
-    final startDate = _selectedDate.subtract(const Duration(days: 3));
-    final dates = List.generate(7, (index) => startDate.add(Duration(days: index)));
+  Widget _buildStitchHeader(
+    BuildContext context,
+    GrowthProvider provider,
+    bool isDark,
+    Color textColor,
+    Color subtleColor,
+    Color surfaceColor,
+    Color dividerColor,
+  ) {
+    final userName = _getUserName();
+    final isToday = AnalyticsHelper.isSameDay(_selectedDate, DateTime.now());
 
     return Container(
-      color: theme.scaffoldBackgroundColor, // Or specific header color
-      padding: const EdgeInsets.only(top: 16, bottom: 24),
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      child: Row(
         children: [
-          // Month Year Row with Calendar Icon
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    DateFormat('MMMM yyyy').format(_selectedDate),
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 24, 
-                      fontWeight: FontWeight.bold
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+          // Profile Avatar
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AvatarEditorScreen()),
+              );
+            },
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: LumioColors.primary.withOpacity(0.2),
+                  width: 2,
                 ),
-                Row(
-                  children: [
-                    const StreakCounter(),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: _pickDate,
-                      icon: const Icon(Icons.calendar_month, color: LumioColors.primary),
-                    ),
-                  ],
-                )
-              ],
+              ),
+              child: ClipOval(
+                child: AvatarWidget(
+                  config: provider.avatarConfig,
+                  size: 40,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 24),
-          // Horizontal Date Strip
-          SizedBox(
-            height: 70, 
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              itemCount: dates.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 20),
-              itemBuilder: (context, index) {
-                final date = dates[index];
-                final isSelected = AnalyticsHelper.isSameDay(date, _selectedDate);
-                final isToday = AnalyticsHelper.isSameDay(date, DateTime.now());
-                
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedDate = date),
-                  child: Column(
+          const SizedBox(width: 12),
+
+          // Greeting & Date
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "${_getGreeting()}, $userName",
+                  style: TextStyle(
+                    color: subtleColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                GestureDetector(
+                  onTap: _pickDate,
+                  child: Row(
                     children: [
                       Text(
-                        DateFormat('E').format(date), 
+                        isToday
+                            ? "Today, ${DateFormat('MMM d').format(_selectedDate)}"
+                            : DateFormat('EEE, MMM d').format(_selectedDate),
                         style: TextStyle(
-                          color: isSelected 
-                              ? LumioColors.primary 
-                              : (isToday ? textColor : subtleColor),
-                          fontWeight: FontWeight.w600
-                        )
+                          color: textColor,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: isSelected ? LumioColors.primary : Colors.transparent,
-                          shape: BoxShape.circle,
-                          border: isToday && !isSelected ? Border.all(color: LumioColors.primary) : null,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          "${date.day}",
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : textColor,
-                            fontWeight: FontWeight.bold
-                          ),
-                        ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.expand_more,
+                        color: subtleColor,
+                        size: 18,
                       ),
                     ],
                   ),
-                );
-              },
+                ),
+              ],
+            ),
+          ),
+
+          // Notification Button
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              shape: BoxShape.circle,
+              border: Border.all(color: dividerColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              onPressed: () {},
+              icon: Icon(Icons.notifications_outlined, color: textColor, size: 22),
+              padding: EdgeInsets.zero,
             ),
           ),
         ],
@@ -743,165 +755,657 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
     );
   }
 
-  Widget _buildTimelineSliver(BuildContext context, GrowthProvider provider, List<GoalTask> tasks, int? activeTaskId, bool isDark, Color textColor, Color subtleColor) {
-     return SliverPadding(
-       padding: const EdgeInsets.only(left: 24, right: 24, bottom: 100),
-       sliver: SliverList(
-         delegate: SliverChildListDelegate([
-           // 1. Rise and Shine Anchor
-           _buildTimelineAnchor(
-             icon: Icons.wb_sunny_rounded,
-             time: _wakeUpTime.format(context),
-             title: _wakeUpTitle,
-             color: LumioColors.primary,
-             isStart: true,
-             isDark: isDark,
-             textColor: textColor,
-             subtleColor: subtleColor,
-             onTap: () => _showEditAnchorDialog(true),
-           ),
-           
-           // 2. Task List
-           if (tasks.isEmpty)
-             Padding(
-               padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 40),
-               child: Text(
-                 "No tasks scheduled yet. Tap + to add one!", 
-                 style: TextStyle(color: subtleColor.withOpacity(0.5)),
-                 textAlign: TextAlign.center,
-               ),
-             )
-           else
-             ...tasks.asMap().entries.map((entry) {
-               final index = entry.key;
-               final task = entry.value;
-               return TimelineTaskTile(
-                 task: task,
-                 isFirst: index == 0,
-                 isLast: index == tasks.length - 1,
-                 isPast: task.isCompleted, 
-                 onTap: () => _showEditTask(task, provider),
-                 onDelete: () {
-                   setState(() {});
-                   provider.deleteTask(task.id);
-                 },
-                 onToggle: (val) {
-                   if (val == true) {
-                      provider.completeTask(task.id);
-                   } else {
-                      provider.uncompleteTask(task.id);
-                   }
-                 },
-                 onToggleTimer: () => provider.toggleTaskTimer(task.id),
-               );
-             }),
+  Widget _buildAIInsightCard(
+    BuildContext context,
+    bool isDark,
+    Color textColor,
+    Color subtleColor,
+    Color surfaceColor,
+  ) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [LumioColors.surfaceDark, const Color(0xFF322C24)]
+              : [surfaceColor, const Color(0xFFFDFBF7)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: LumioColors.primary.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Decorative circle
+          Positioned(
+            top: -8,
+            right: -8,
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: LumioColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
 
-           // 3. Wind Down Anchor
-           _buildTimelineAnchor(
-             icon: Icons.nights_stay_rounded,
-             time: _bedTime.format(context),
-             title: _bedTimeTitle,
-             color: const Color(0xFF6C757D), 
-             isStart: false,
-             isDark: isDark,
-             textColor: textColor,
-             subtleColor: subtleColor,
-             onTap: () => _showEditAnchorDialog(false),
-           ),
-         ]),
-       ),
-     );
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icon
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: LumioColors.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome,
+                    color: LumioColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Schedule Optimized",
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Your tasks have been organized for optimal focus. Deep work is scheduled during your peak hours.",
+                        style: TextStyle(
+                          color: subtleColor,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Review Button
+                Material(
+                  color: LumioColors.primary,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    onTap: () {},
+                    borderRadius: BorderRadius.circular(8),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Text(
+                        "Review",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.1, end: 0);
   }
 
-  Widget _buildTimelineAnchor({
-    required IconData icon,
-    required String time,
-    required String title,
-    required Color color,
-    required bool isStart,
+  Widget _buildWeekDatePicker(
+    bool isDark,
+    Color textColor,
+    Color subtleColor,
+    Color surfaceColor,
+    Color dividerColor,
+  ) {
+    final startDate = _selectedDate.subtract(const Duration(days: 3));
+    final dates = List.generate(7, (index) => startDate.add(Duration(days: index)));
+
+    return SizedBox(
+      height: 72,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: dates.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final date = dates[index];
+          final isSelected = AnalyticsHelper.isSameDay(date, _selectedDate);
+          final isToday = AnalyticsHelper.isSameDay(date, DateTime.now());
+
+          return GestureDetector(
+            onTap: () => setState(() {
+              _selectedDate = date;
+              _isViewingToday = AnalyticsHelper.isSameDay(date, DateTime.now());
+            }),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 56,
+              decoration: BoxDecoration(
+                color: isSelected ? LumioColors.primary : surfaceColor,
+                borderRadius: BorderRadius.circular(16),
+                border: isSelected ? null : Border.all(color: dividerColor),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: LumioColors.primary.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    DateFormat('E').format(date).substring(0, 3),
+                    style: TextStyle(
+                      color: isSelected
+                          ? Colors.white.withOpacity(0.9)
+                          : subtleColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "${date.day}",
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : textColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (isToday && !isSelected) ...[
+                    const SizedBox(height: 2),
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: const BoxDecoration(
+                        color: LumioColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTimeline(
+    BuildContext context,
+    GrowthProvider provider,
+    List<GoalTask> tasks,
+    int? activeTaskId,
+    bool isDark,
+    Color textColor,
+    Color subtleColor,
+    Color surfaceColor,
+    Color dividerColor,
+  ) {
+    final now = DateTime.now();
+    final currentMinutes = now.hour * 60 + now.minute;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          // Timeline with tasks
+          ...tasks.asMap().entries.map((entry) {
+            final index = entry.key;
+            final task = entry.value;
+            final taskTime = _getSortableTime(task);
+            final taskMinutes = taskTime.hour * 60 + taskTime.minute;
+            final isActive = task.id == activeTaskId;
+            final isPast = task.isCompleted;
+
+            // Check if current time indicator should appear before this task
+            final showCurrentTimeBeforeThis = index == 0
+                ? currentMinutes < taskMinutes
+                : false;
+
+            // Check if current time indicator should appear after this task
+            bool showCurrentTimeAfterThis = false;
+            if (index < tasks.length - 1) {
+              final nextTask = tasks[index + 1];
+              final nextTaskTime = _getSortableTime(nextTask);
+              final nextTaskMinutes = nextTaskTime.hour * 60 + nextTaskTime.minute;
+              showCurrentTimeAfterThis = AnalyticsHelper.isSameDay(_selectedDate, now) &&
+                  currentMinutes >= taskMinutes &&
+                  currentMinutes < nextTaskMinutes;
+            }
+
+            return Column(
+              children: [
+                if (showCurrentTimeBeforeThis && AnalyticsHelper.isSameDay(_selectedDate, now))
+                  _buildCurrentTimeIndicator(now, subtleColor),
+
+                _buildTimelineTaskCard(
+                  context,
+                  provider,
+                  task,
+                  isActive: isActive,
+                  isPast: isPast,
+                  isDark: isDark,
+                  textColor: textColor,
+                  subtleColor: subtleColor,
+                  surfaceColor: surfaceColor,
+                  dividerColor: dividerColor,
+                ),
+
+                // Current time indicator after this task if needed
+                if (showCurrentTimeAfterThis)
+                  _buildCurrentTimeIndicator(now, subtleColor),
+              ],
+            );
+          }),
+
+          // Free slot at the end
+          _buildFreeSlot(isDark, subtleColor, dividerColor),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCurrentTimeIndicator(DateTime now, Color subtleColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 48,
+            child: Text(
+              DateFormat('HH:mm').format(now),
+              style: TextStyle(
+                color: LumioColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: LumioColors.primary,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: LumioColors.primary.withOpacity(0.4),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Container(
+              height: 2,
+              color: LumioColors.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineTaskCard(
+    BuildContext context,
+    GrowthProvider provider,
+    GoalTask task, {
+    required bool isActive,
+    required bool isPast,
     required bool isDark,
     required Color textColor,
     required Color subtleColor,
-    VoidCallback? onTap,
+    required Color surfaceColor,
+    required Color dividerColor,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: IntrinsicHeight(
+    final taskTime = _getSortableTime(task);
+    final timeStr = DateFormat('HH:mm').format(taskTime);
+    final progress = task.startedAt != null && task.estimatedMinutes != null
+        ? DateTime.now().difference(task.startedAt!).inMinutes / task.estimatedMinutes!
+        : 0.0;
+
+    // Get tag color based on priority/type
+    Color tagColor;
+    String tagLabel;
+    switch (task.priority) {
+      case 'high':
+        tagColor = LumioColors.primary;
+        tagLabel = 'Priority';
+        break;
+      case 'low':
+        tagColor = Colors.green;
+        tagLabel = 'Easy';
+        break;
+      default:
+        tagColor = Colors.indigo;
+        tagLabel = 'Task';
+    }
+
+    // Secondary tag based on suggested time
+    Color? secondaryTagColor;
+    String? secondaryTagLabel;
+    if (task.suggestedTime == 'morning') {
+      secondaryTagColor = const Color(0xFF917755);
+      secondaryTagLabel = 'Morning';
+    } else if (task.suggestedTime == 'afternoon') {
+      secondaryTagColor = Colors.orange;
+      secondaryTagLabel = 'Afternoon';
+    } else if (task.suggestedTime == 'evening') {
+      secondaryTagColor = Colors.purple;
+      secondaryTagLabel = 'Evening';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Opacity(
+        opacity: isPast ? 0.6 : 1.0,
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-             // Time
-             SizedBox(
-               width: 80,
-               child: Padding(
-                 padding: const EdgeInsets.symmetric(vertical: 20),
-                 child: Text(
-                   time,
-                   textAlign: TextAlign.right,
-                   style: TextStyle(
-                     color: subtleColor, // Use subtleColor
-                     fontWeight: FontWeight.w600,
-                     fontSize: 12,
-                   ),
-                 ),
-               ),
-             ),
-             // Line & Node
-             SizedBox(
-                width: 40,
-                child: Stack(
-                  alignment: Alignment.topCenter,
-                  children: [
-                     if (isStart)
-                       Positioned(
-                         top: 40, bottom: 0, 
-                         child: Container(width: 2, color: subtleColor.withOpacity(0.3))
-                       ),
-                     if (!isStart)
-                       Positioned(
-                         top: 0, bottom: 40, 
-                         child: Container(width: 2, color: subtleColor.withOpacity(0.3))
-                       ),
-                     
-                     Container(
-                       margin: const EdgeInsets.only(top: 10),
-                       width: 50, height: 50,
-                       decoration: BoxDecoration(
-                         color: isStart ? color : (isDark ? const Color(0xFF3E3E42) : Colors.grey.shade300),
-                         shape: BoxShape.circle,
-                       ),
-                       child: Icon(icon, color: isStart || isDark ? Colors.white : Colors.black54, size: 24),
-                     ),
-                  ],
-                )
-             ),
-             // Title
-             Expanded(
-               child: Padding(
-                 padding: const EdgeInsets.only(left: 16, top: 24),
-                 child: Column(
-                   crossAxisAlignment: CrossAxisAlignment.start,
-                   children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          color: textColor, 
-                          fontSize: 18, 
-                          fontWeight: FontWeight.bold
-                        )
+            // Time
+            SizedBox(
+              width: 48,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Text(
+                  timeStr,
+                  style: TextStyle(
+                    color: isActive ? LumioColors.primary : subtleColor,
+                    fontSize: 12,
+                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Task Card
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _showEditTask(task, provider),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border(
+                      left: BorderSide(
+                        color: isActive ? LumioColors.primary : Colors.transparent,
+                        width: 4,
                       ),
-                      if (isStart) ...[
-                        const SizedBox(height: 4),
-                      ]
-                   ],
-                 )
-               )
-             )
+                    ),
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: LumioColors.primary.withOpacity(0.1),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
+                      children: [
+                        // Drag indicator
+                        Positioned(
+                          right: 8,
+                          top: 0,
+                          bottom: 0,
+                          child: Icon(
+                            Icons.drag_indicator,
+                            color: subtleColor.withOpacity(0.3),
+                            size: 20,
+                          ),
+                        ),
+
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 32, 14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Tags
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  _buildTag(tagLabel, tagColor, isDark),
+                                  if (secondaryTagLabel != null)
+                                    _buildTag(secondaryTagLabel, secondaryTagColor!, isDark),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+
+                              // Title
+                              Text(
+                                task.title,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  decoration: isPast ? TextDecoration.lineThrough : null,
+                                ),
+                              ),
+
+                              // Description
+                              if (task.description.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  task.description,
+                                  style: TextStyle(
+                                    color: subtleColor,
+                                    fontSize: 13,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+
+                              // Footer: Time/Collaborators
+                              if (task.estimatedMinutes != null || isActive) ...[
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    if (isActive) ...[
+                                      Icon(Icons.timer, size: 14, color: subtleColor),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "${((1 - progress.clamp(0.0, 1.0)) * (task.estimatedMinutes ?? 30)).toInt()}m left",
+                                        style: TextStyle(
+                                          color: subtleColor,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ] else if (task.estimatedMinutes != null) ...[
+                                      Icon(Icons.schedule, size: 14, color: subtleColor),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "${task.estimatedMinutes}m",
+                                        style: TextStyle(
+                                          color: subtleColor,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                    const Spacer(),
+                                    // Checkbox
+                                    GestureDetector(
+                                      onTap: () {
+                                        if (isPast) {
+                                          provider.uncompleteTask(task.id);
+                                        } else {
+                                          provider.completeTask(task.id);
+                                          _confettiController.play();
+                                        }
+                                      },
+                                      child: Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: isPast ? LumioColors.primary : Colors.transparent,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: isPast ? LumioColors.primary : dividerColor,
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: isPast
+                                            ? const Icon(Icons.check, color: Colors.white, size: 14)
+                                            : null,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+
+                        // Progress bar at bottom for active task
+                        if (isActive && progress > 0)
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              height: 3,
+                              color: dividerColor.withOpacity(0.3),
+                              child: FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: progress.clamp(0.0, 1.0),
+                                child: Container(color: LumioColors.primary),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildTag(String label, Color color, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(isDark ? 0.2 : 0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFreeSlot(bool isDark, Color subtleColor, Color dividerColor) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 48,
+            child: Text(
+              "",
+              style: TextStyle(color: subtleColor, fontSize: 12),
+              textAlign: TextAlign.right,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: dividerColor,
+                  width: 2,
+                  style: BorderStyle.solid,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add, size: 16, color: subtleColor.withOpacity(0.7)),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Free Slot",
+                    style: TextStyle(
+                      color: subtleColor.withOpacity(0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  DateTime _getSortableTime(GoalTask task) {
+    if (task.scheduledDate != null) {
+      if (task.scheduledDate!.hour == 0 && task.scheduledDate!.minute == 0) {
+        if (task.suggestedTime == 'morning') return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 9);
+        if (task.suggestedTime == 'afternoon') return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 14);
+        if (task.suggestedTime == 'evening') return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 18);
+        return DateTime(task.scheduledDate!.year, task.scheduledDate!.month, task.scheduledDate!.day, 12);
+      }
+      return task.scheduledDate!;
+    }
+    return DateTime.now().add(const Duration(days: 365));
   }
 
   void _showEditTask(GoalTask task, GrowthProvider provider) {
@@ -931,5 +1435,4 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
           ),
       );
   }
-
 }

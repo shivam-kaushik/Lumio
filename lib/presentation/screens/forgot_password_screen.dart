@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/auth_provider.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 
 /// Forgot password screen for password reset
 class ForgotPasswordScreen extends StatefulWidget {
