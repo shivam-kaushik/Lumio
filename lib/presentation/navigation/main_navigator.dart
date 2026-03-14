@@ -199,63 +199,7 @@ class MainNavigatorState extends State<MainNavigator>
       ),
       bottomNavigationBar: _buildBottomNavBar(context),
       extendBody: true,
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: _currentIndex == 0 
-        ? Consumer<ReminderProvider>(
-            builder: (context, reminderProvider, _) {
-              return Consumer<GrowthProvider>(
-                builder: (context, growthProvider, _) {
-                  // Calculate visible tasks (logic must match HomeScreen)
-                  bool hasTasks = false;
-                  
-                  // 1. Classic Reminders (Enabled only)
-                  if (reminderProvider.reminders.where((r) => r.enabled).isNotEmpty) {
-                      hasTasks = true;
-                  }
-                  
-                  // 2. Growth Tasks (Inbox or Today)
-                  if (!hasTasks && growthProvider.tasksByGoal.isNotEmpty) {
-                      // Find Inbox
-                      int? inboxId;
-                      try {
-                          inboxId = growthProvider.goals.firstWhere((g) => g.name == 'Inbox').id;
-                      } catch (_) {}
-                      
-                      final allTasks = growthProvider.tasksByGoal.values.expand((l) => l);
-                      // debugPrint('Searching Tasks...'); 
-                      for (var t in allTasks) {
-                          if (t.isCompleted) continue; // Skip completed
-
-                          // Inbox Task?
-                          if (inboxId != null && t.goalId == inboxId) {
-                              hasTasks = true;
-                              break;
-                          }
-                          // Today Task?
-                          if (t.scheduledDate != null && DateTimeUtils.isToday(t.scheduledDate!.toLocal())) {
-                              hasTasks = true;
-                              break;
-                          }
-                      }
-                  }
-
-                  if (!hasTasks) return const SizedBox.shrink();
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 50.0), // Adjust to be above navbar
-                    child: FloatingActionButton(
-                      onPressed: () => _showQuickTaskSheet(context),
-                      backgroundColor: LumioColors.primary,
-                      elevation: 4,
-                      shape: const CircleBorder(),
-                      child: const Icon(Icons.add, color: Colors.white),
-                    ),
-                  );
-                },
-              );
-            },
-          )
-        : null,
+      // FAB removed from home screen - using center navigation button instead
     );
   }
 

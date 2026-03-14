@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:fluttermoji/fluttermoji.dart';
 import '../providers/growth_provider.dart';
 import '../widgets/avatar_widget.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 
 class AvatarEditorScreen extends StatefulWidget {
   const AvatarEditorScreen({super.key});

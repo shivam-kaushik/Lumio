@@ -5,7 +5,7 @@ import '../providers/reminder_provider.dart';
 import '../providers/growth_provider.dart';
 import '../widgets/reminder_card.dart';
 import '../widgets/quick_task_input_sheet.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../../data/models/reminder.dart';
 import '../../data/models/goal_task.dart';
 
