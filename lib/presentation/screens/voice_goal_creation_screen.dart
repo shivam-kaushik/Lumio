@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../providers/growth_provider.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../../core/services/privacy_gpt_service.dart';
 import '../../core/services/text_to_speech_service.dart';
 import '../../core/services/permission_service.dart';
