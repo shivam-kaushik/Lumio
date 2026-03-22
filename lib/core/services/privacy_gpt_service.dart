@@ -308,7 +308,6 @@ Create a COMPLETE business execution plan with:
      - motivationAnchor: Why this task matters for the goal (1 sentence)
      - estimatedFrequency: "daily", "weekly", "monthly", or "one-time"
      - suggestedTime: "morning", "afternoon", "evening", or "any"
-     - suggestedLocation: "home", "office", "coffee_shop", or "any"
 
 3. **Weekly Goals** (3-5 weekly milestones):
    - What should be accomplished each week
@@ -344,8 +343,7 @@ Return ONLY valid JSON:
       "isMilestone": false,
       "motivationAnchor": "This moves you closer to launching because...",
       "estimatedFrequency": "weekly",
-      "suggestedTime": "morning",
-      "suggestedLocation": "office"
+      "suggestedTime": "morning"
     }
   ],
   "weeklyGoals": [
@@ -439,7 +437,6 @@ Return ONLY valid JSON:
           'motivationAnchor': 'A solid plan is the foundation of successful execution',
           'estimatedFrequency': 'one-time',
           'suggestedTime': 'morning',
-          'suggestedLocation': 'any',
         },
         {
           'title': 'Execute core tasks',
@@ -451,7 +448,6 @@ Return ONLY valid JSON:
           'motivationAnchor': 'Consistent daily action compounds into significant progress',
           'estimatedFrequency': 'daily',
           'suggestedTime': 'any',
-          'suggestedLocation': 'any',
         },
         {
           'title': 'Review and adjust',
@@ -463,7 +459,6 @@ Return ONLY valid JSON:
           'motivationAnchor': 'Regular reviews keep you on track and allow course correction',
           'estimatedFrequency': 'weekly',
           'suggestedTime': 'evening',
-          'suggestedLocation': 'any',
         },
       ],
       'weeklyGoals': [
@@ -500,7 +495,6 @@ For each subtask, provide:
 - description: What to do
 - estimatedFrequency: "daily", "weekly", "monthly", or "one-time"
 - suggestedTime: "morning", "afternoon", "evening", or "any"
-- suggestedLocation: "home", "office", "coffee_shop", or "any"
 - priority: "high", "medium", or "low"
 
 Return ONLY valid JSON in this format:
@@ -512,7 +506,6 @@ Return ONLY valid JSON in this format:
       "description": "what to do",
       "estimatedFrequency": "daily",
       "suggestedTime": "morning",
-      "suggestedLocation": "office",
       "priority": "high"
     }
   ]
@@ -585,7 +578,6 @@ Return ONLY valid JSON in this format:
           'description': 'Research and create a plan for achieving this goal',
           'estimatedFrequency': 'weekly',
           'suggestedTime': 'morning',
-          'suggestedLocation': 'any',
           'priority': 'high',
         },
         {
@@ -593,7 +585,6 @@ Return ONLY valid JSON in this format:
           'description': 'Work on tasks related to this goal',
           'estimatedFrequency': 'daily',
           'suggestedTime': 'any',
-          'suggestedLocation': 'any',
           'priority': 'high',
         },
         {
@@ -601,7 +592,6 @@ Return ONLY valid JSON in this format:
           'description': 'Review and adjust your approach',
           'estimatedFrequency': 'weekly',
           'suggestedTime': 'evening',
-          'suggestedLocation': 'any',
           'priority': 'medium',
         },
       ],
