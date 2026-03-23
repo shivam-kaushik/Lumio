@@ -743,7 +743,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       initialPriority: reminder.priority.name,
                       initialDate: reminder.timeAt,
                       initialTags: [reminder.category.name], 
-                      onSubmit: (title, date, priority, tags, repeat, location) {
+                      onSubmit: (title, date, priority, tags, repeat) {
                           // Map tags to Category
                           ReminderCategory newCat = ReminderCategory.other;
                           for (var tag in tags) {

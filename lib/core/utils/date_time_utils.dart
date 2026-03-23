@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/models/reminder.dart';
@@ -202,7 +201,7 @@ class ReminderUtils {
   /// Group reminders by current context (location, time, category)
   static Map<String, List<Reminder>> groupByContext(
     List<Reminder> reminders, {
-    Position? currentPosition,
+    dynamic currentPosition,
     DateTime? currentTime,
   }) {
     final groups = <String, List<Reminder>>{
@@ -258,7 +257,7 @@ class ReminderUtils {
   /// Get reminders relevant to current context
   static List<Reminder> getRelevantReminders(
     List<Reminder> allReminders, {
-    Position? currentPosition,
+    dynamic currentPosition,
     DateTime? currentTime,
   }) {
     final groups = groupByContext(
