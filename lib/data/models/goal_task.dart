@@ -14,7 +14,6 @@ class GoalTask {
   final String priority; // 'high', 'medium', 'low'
   final String frequency; // 'daily', 'weekly', 'monthly', 'one-time'
   final String suggestedTime; // 'morning', 'afternoon', 'evening', 'any'
-  final String suggestedLocation; // 'home', 'office', 'coffee_shop', 'any'
   final bool isMilestone;
   final String? motivationAnchor;
   final DateTime? scheduledDate;
@@ -39,7 +38,6 @@ class GoalTask {
     this.priority = 'medium',
     this.frequency = 'one-time',
     this.suggestedTime = 'any',
-    this.suggestedLocation = 'any',
     this.isMilestone = false,
     this.motivationAnchor,
     this.scheduledDate,
@@ -82,7 +80,6 @@ class GoalTask {
       priority: map['priority'] as String? ?? 'medium',
       frequency: map['frequency'] as String? ?? 'one-time',
       suggestedTime: map['suggested_time'] as String? ?? 'any',
-      suggestedLocation: map['suggested_location'] as String? ?? 'any',
       isMilestone: (map['is_milestone'] as int? ?? 0) == 1,
       motivationAnchor: map['motivation_anchor'] as String?,
       scheduledDate: map['scheduled_date'] != null
@@ -118,7 +115,6 @@ class GoalTask {
       'priority': priority,
       'frequency': frequency,
       'suggested_time': suggestedTime,
-      'suggested_location': suggestedLocation,
       'is_milestone': isMilestone ? 1 : 0,
       'motivation_anchor': motivationAnchor,
       'scheduled_date': scheduledDate?.toIso8601String(),
@@ -146,7 +142,6 @@ class GoalTask {
       'priority': priority,
       'frequency': frequency,
       'suggested_time': suggestedTime,
-      'suggested_location': suggestedLocation,
       'is_milestone': isMilestone ? 1 : 0,
       'motivation_anchor': motivationAnchor,
       'scheduled_date': scheduledDate?.toIso8601String(),
@@ -174,7 +169,6 @@ class GoalTask {
     String? priority,
     String? frequency,
     String? suggestedTime,
-    String? suggestedLocation,
     bool? isMilestone,
     String? motivationAnchor,
     DateTime? scheduledDate,
@@ -199,7 +193,6 @@ class GoalTask {
       priority: priority ?? this.priority,
       frequency: frequency ?? this.frequency,
       suggestedTime: suggestedTime ?? this.suggestedTime,
-      suggestedLocation: suggestedLocation ?? this.suggestedLocation,
       isMilestone: isMilestone ?? this.isMilestone,
       motivationAnchor: motivationAnchor ?? this.motivationAnchor,
       scheduledDate: scheduledDate ?? this.scheduledDate,
@@ -256,7 +249,6 @@ class GoalTask {
       priority: data['priority'] as String? ?? 'medium',
       frequency: data['frequency'] as String? ?? 'one-time',
       suggestedTime: data['suggestedTime'] as String? ?? (data['suggested_time'] as String?) ?? 'any',
-      suggestedLocation: data['suggestedLocation'] as String? ?? (data['suggested_location'] as String?) ?? 'any',
       isMilestone: (data['isMilestone'] ?? data['is_milestone']) == true || (data['isMilestone'] ?? data['is_milestone']) == 1,
       motivationAnchor: data['motivationAnchor'] as String? ?? data['motivation_anchor'] as String?,
       scheduledDate: data['scheduledDate'] != null || data['scheduled_date'] != null
@@ -299,7 +291,6 @@ class GoalTask {
       'priority': priority,
       'frequency': frequency,
       'suggestedTime': suggestedTime,
-      'suggestedLocation': suggestedLocation,
       'isMilestone': isMilestone,
       'motivationAnchor': motivationAnchor,
       'scheduledDate': scheduledDate != null ? Timestamp.fromDate(scheduledDate!) : null,
