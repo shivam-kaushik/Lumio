@@ -18,7 +18,6 @@ void main() {
           'priority': 'high',
           'frequency': 'daily',
           'suggested_time': 'morning',
-          'suggested_location': 'home',
           'is_milestone': 1,
           'motivation_anchor': 'Stay focused!',
           'scheduled_date': now.add(const Duration(days: 1)).toIso8601String(),
@@ -47,7 +46,6 @@ void main() {
       expect(restored.priority, 'high');
       expect(restored.frequency, 'daily');
       expect(restored.suggestedTime, 'morning');
-      expect(restored.suggestedLocation, 'home');
       expect(restored.isMilestone, true);
       expect(restored.motivationAnchor, 'Stay focused!');
       expect(restored.isCompleted, true);
@@ -228,7 +226,6 @@ void main() {
       expect(task.priority, 'medium');
       expect(task.frequency, 'one-time');
       expect(task.suggestedTime, 'any');
-      expect(task.suggestedLocation, 'any');
       expect(task.isMilestone, false);
       expect(task.isCompleted, false);
       expect(task.order, 0);
