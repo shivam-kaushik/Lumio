@@ -1,13 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:provider/provider.dart'; // NEW
-import '../providers/growth_provider.dart'; // NEW
-import '../../data/models/user_location.dart'; // NEW
-import '../widgets/location_reminder_dialog.dart'; // NEW
-import '../../data/models/user_location.dart'; 
 import '../theme/app_theme.dart';
-import '../screens/map_view_screen.dart'; // NEW
 
 /// A smart TextEditingController that highlights keywords
 class SmartTextEditingController extends TextEditingController {
@@ -57,30 +51,27 @@ extension SplitAll on String {
 
 class QuickTaskInputSheet extends StatefulWidget {
   final Function(
-    String title, 
-    DateTime? date, 
-    String priority, 
+    String title,
+    DateTime? date,
+    String priority,
     List<String> tags,
     String? repeat,     // daily, weekly, etc.
-    String? location,   // e.g. "Work", "Home"
   ) onSubmit;
 
   final String? initialTitle;
   final String? initialPriority;
   final List<String>? initialTags;
   final String? initialRepeat;
-  final String? initialLocation;
-  final DateTime? initialDate; // NEW
+  final DateTime? initialDate;
   final bool isEditing;
 
   const QuickTaskInputSheet({
-    super.key, 
+    super.key,
     required this.onSubmit,
     this.initialTitle,
     this.initialPriority,
     this.initialTags,
     this.initialRepeat,
-    this.initialLocation,
     this.initialDate,
     this.isEditing = false,
   });
@@ -103,7 +94,6 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
   List<String> get _allTags => {..._manualTags, ..._textTags}.toList();
 
   String? _parsedRepeat;
-  String? _parsedLocation;
   
   // Regex Patterns
   static final _datePattern = RegExp(r'\b(today|tomorrow|mon|tue|wed|thu|fri|sat|sun)\b', caseSensitive: false);
@@ -140,9 +130,6 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
 
     if (widget.initialRepeat != null) {
         _parsedRepeat = widget.initialRepeat;
-    }
-    if (widget.initialLocation != null) {
-        _parsedLocation = widget.initialLocation;
     }
     if (widget.initialDate != null) {
         _parsedDate = widget.initialDate;
@@ -270,7 +257,7 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
         }
     }
 
-    widget.onSubmit(cleanTitle, finalDate, _parsedPriority, _allTags, _parsedRepeat, _parsedLocation);
+    widget.onSubmit(cleanTitle, finalDate, _parsedPriority, _allTags, _parsedRepeat);
   }
 
   @override
@@ -348,15 +335,15 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
           // Smart Detected Chips (Animated)
           AnimatedContainer(
             duration: 300.ms,
-            height: (_parsedDate != null || _parsedTime != null || _parsedRepeat != null || _parsedLocation != null || _allTags.isNotEmpty || true) ? 40 : 0,
+            height: (_parsedDate != null || _parsedTime != null || _parsedRepeat != null || _allTags.isNotEmpty || true) ? 40 : 0,
             child: SingleChildScrollView(
                  scrollDirection: Axis.horizontal,
                  padding: const EdgeInsets.symmetric(horizontal: 16),
                  child: Row(
                     children: [
-                        if (_parsedDate != null) 
+                        if (_parsedDate != null)
                             _InfoChip(
-                                icon: Icons.calendar_today, 
+                                icon: Icons.calendar_today,
                                 label: DateFormat('MMM d').format(_parsedDate!),
                                 color: Colors.blue,
                             ).animate().scale(duration: 200.ms, curve: Curves.easeOutBack),
@@ -371,12 +358,6 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
                                 icon: Icons.repeat_rounded,
                                 label: _parsedRepeat!,
                                 color: Colors.teal,
-                            ).animate().scale(duration: 200.ms, delay: 100.ms),
-                        if (_parsedLocation != null)
-                             _InfoChip(
-                                icon: Icons.location_on_rounded,
-                                label: _parsedLocation!,
-                                color: Colors.pinkAccent,
                             ).animate().scale(duration: 200.ms, delay: 100.ms),
                         _InfoChip(
                             icon: Icons.flag, 
@@ -480,15 +461,6 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
                            const PopupMenuItem(value: 'monthly', child: Text("Monthly")),
                        ],
                    ),
-                   // 5. Location
-                   IconButton(
-                       icon: Icon(Icons.location_on_rounded, color: _parsedLocation != null ? Colors.pinkAccent : null),
-                       tooltip: 'Location',
-                       onPressed: () {
-                           _showLocationPicker(context);
-                       },
-                   ),
-
                    const Spacer(),
                    
                    // Submit using Send Icon (more standard for chat-like input)
@@ -517,113 +489,6 @@ class _QuickTaskInputSheetState extends State<QuickTaskInputSheet> with TickerPr
     );
   }
 
-  void _showLocationPicker(BuildContext context) {
-      showModalBottomSheet(
-          context: context,
-          backgroundColor: Colors.transparent,
-          isScrollControlled: true,
-          builder: (context) => _LocationPickerSheet(
-              onLocationSelected: (loc) {
-                  setState(() => _parsedLocation = loc);
-              },
-          ),
-      );
-  }
-}
-
-class _LocationPickerSheet extends StatelessWidget {
-    final Function(String?) onLocationSelected;
-
-    const _LocationPickerSheet({required this.onLocationSelected});
-
-    @override
-    Widget build(BuildContext context) {
-        final savedLocations = context.watch<GrowthProvider>().savedLocations;
-        final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
-
-        return Container(
-            height: 400,
-            decoration: BoxDecoration(
-                color: isDark ? AppTheme.darkSurface : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-                children: [
-                    const SizedBox(height: 16),
-                    Text("Select Location", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    Expanded(
-                        child: ListView(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            children: [
-                                ListTile(
-                                    leading: const CircleAvatar(backgroundColor: Colors.redAccent, child: Icon(Icons.close, color: Colors.white, size: 20)),
-                                    title: const Text("None"),
-                                    onTap: () {
-                                        onLocationSelected(null);
-                                        Navigator.pop(context);
-                                    },
-                                ),
-                                ...savedLocations.map((loc) => ListTile(
-                                    leading: CircleAvatar(backgroundColor: AppTheme.primaryColor.withOpacity(0.1), child: Icon(loc.icon, color: AppTheme.primaryColor, size: 20)),
-                                    title: Text(loc.name),
-                                    subtitle: Text("${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}", style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                    trailing: IconButton(
-                                        icon: const Icon(Icons.delete_outline, size: 18),
-                                        onPressed: () => context.read<GrowthProvider>().deleteSavedLocation(loc.id),
-                                    ),
-                                    onTap: () {
-                                        onLocationSelected(loc.name);
-                                        Navigator.pop(context);
-                                    },
-                                )),
-                                ListTile(
-                                    leading: const CircleAvatar(backgroundColor: Colors.green, child: Icon(Icons.add_location_alt_outlined, color: Colors.white, size: 20)),
-                                    title: const Text("Add New Location"),
-                                    onTap: () async {
-                                        // Open Map View for Selection
-                                        final result = await Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                                builder: (context) => const Scaffold(
-                                                    // MapViewScreen handles its own headers/layout mostly, 
-                                                    // but we wrap in Scaffold to be safe if it doesn't have one 
-                                                    // (It seems it returns a Column, so it needs a Scaffold parent).
-                                                    body: MapViewScreen(),
-                                                ),
-                                                settings: const RouteSettings(arguments: true), // true = forLocationSelectionOnly
-                                            ),
-                                        );
-
-                                        if (result != null && result is Map) {
-                                            final name = result['locationName'] ?? 'New Location';
-                                            final lat = result['latitude'];
-                                            final lng = result['longitude'];
-                                            
-                                            if (lat != null && lng != null) {
-                                                // Save
-                                                final newLoc = UserLocation(
-                                                    id: DateTime.now().millisecondsSinceEpoch.toString(), 
-                                                    name: name, 
-                                                    latitude: lat, 
-                                                    longitude: lng
-                                                );
-                                                await context.read<GrowthProvider>().addSavedLocation(newLoc);
-                                                
-                                                onLocationSelected(name);
-                                                if (context.mounted) Navigator.pop(context);
-                                            }
-                                        }
-                                    },
-                                ),
-                            ],
-                        ),
-                    ),
-                ],
-            ),
-        );
-    }
 }
 
 class _InfoChip extends StatelessWidget {
