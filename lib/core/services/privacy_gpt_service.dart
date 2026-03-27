@@ -308,6 +308,10 @@ Create a COMPLETE business execution plan with:
      - motivationAnchor: Why this task matters for the goal (1 sentence)
      - estimatedFrequency: "daily", "weekly", "monthly", or "one-time"
      - suggestedTime: "morning", "afternoon", "evening", or "any"
+     - subtasks: Array of 2-4 concrete action steps to complete this task, each with:
+       - title: Short, actionable subtask name
+       - description: Exactly what to do (specific)
+       - estimatedHours: Hours needed for this subtask
 
 3. **Weekly Goals** (3-5 weekly milestones):
    - What should be accomplished each week
@@ -343,7 +347,11 @@ Return ONLY valid JSON:
       "isMilestone": false,
       "motivationAnchor": "This moves you closer to launching because...",
       "estimatedFrequency": "weekly",
-      "suggestedTime": "morning"
+      "suggestedTime": "morning",
+      "subtasks": [
+        {"title": "subtask name", "description": "what to do specifically", "estimatedHours": 2.0},
+        {"title": "another subtask", "description": "specific action", "estimatedHours": 1.5}
+      ]
     }
   ],
   "weeklyGoals": [
@@ -437,6 +445,12 @@ Return ONLY valid JSON:
           'motivationAnchor': 'A solid plan is the foundation of successful execution',
           'estimatedFrequency': 'one-time',
           'suggestedTime': 'morning',
+          'subtasks': [
+            {'title': 'Define success criteria', 'description': 'Write down what done looks like in measurable terms', 'estimatedHours': 1.0},
+            {'title': 'Research existing approaches', 'description': 'Look up how others have achieved similar goals', 'estimatedHours': 3.0},
+            {'title': 'Create action plan document', 'description': 'Write your step-by-step strategy with timelines', 'estimatedHours': 2.0},
+            {'title': 'Identify required resources', 'description': 'List tools, skills, or help you will need', 'estimatedHours': 1.0},
+          ],
         },
         {
           'title': 'Execute core tasks',
@@ -448,6 +462,11 @@ Return ONLY valid JSON:
           'motivationAnchor': 'Consistent daily action compounds into significant progress',
           'estimatedFrequency': 'daily',
           'suggestedTime': 'any',
+          'subtasks': [
+            {'title': 'Complete first milestone', 'description': 'Focus on the first concrete deliverable', 'estimatedHours': (daysUntilDeadline * hoursPerDay * 0.15).toDouble()},
+            {'title': 'Build on momentum', 'description': 'Continue executing with daily focus sessions', 'estimatedHours': (daysUntilDeadline * hoursPerDay * 0.2).toDouble()},
+            {'title': 'Reach halfway checkpoint', 'description': 'Verify progress and adjust approach if needed', 'estimatedHours': (daysUntilDeadline * hoursPerDay * 0.1).toDouble()},
+          ],
         },
         {
           'title': 'Review and adjust',
@@ -459,6 +478,11 @@ Return ONLY valid JSON:
           'motivationAnchor': 'Regular reviews keep you on track and allow course correction',
           'estimatedFrequency': 'weekly',
           'suggestedTime': 'evening',
+          'subtasks': [
+            {'title': 'Review completed work', 'description': 'Assess quality and completeness of what you have done', 'estimatedHours': 1.0},
+            {'title': 'Identify blockers', 'description': 'Note anything slowing you down and brainstorm solutions', 'estimatedHours': 0.5},
+            {'title': 'Update plan for next week', 'description': 'Revise tasks and priorities based on current progress', 'estimatedHours': 0.5},
+          ],
         },
       ],
       'weeklyGoals': [
