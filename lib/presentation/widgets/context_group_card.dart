@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../data/models/reminder.dart';
@@ -17,7 +16,7 @@ class ContextGroupCard extends StatelessWidget {
   final Function(Reminder)? onReminderTap;
   final Function(String, bool)? onToggle;
   final Function(String)? onDelete;
-  final Position? currentPosition;
+  final dynamic currentPosition; // Kept for API compatibility
   final String? currentActivity;
 
   const ContextGroupCard({
@@ -417,9 +416,7 @@ class ContextGroupCard extends StatelessWidget {
             AppTheme.successColor,
           ),
         ...waitingStatuses.take(3).map((status) {
-          final text = status.distance != null
-              ? '⏳ ${status.getFormattedDistance()}'
-              : '⏳ ${status.statusText}';
+          final text = '⏳ ${status.statusText}';
           return _buildStatusChip(
             context,
             theme,
