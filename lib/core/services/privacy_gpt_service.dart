@@ -288,79 +288,23 @@ Return JSON:
       final totalAvailableHours = daysUntilDeadline * hoursPerDay;
 
       final prompt = '''
-You are Lumio, a private, hands-free execution assistant for solopreneurs. Your purpose is to help entrepreneurs turn spoken intentions into structured business roadmaps.
+Goal: "$goalDescription"
+Deadline: ${targetDeadline.toString().split(' ')[0]} ($daysUntilDeadline days away)
 
-Goal: $goalDescription
-Target Deadline: ${targetDeadline.toString().split(' ')[0]} (${daysUntilDeadline} days from now)
-Available Hours Per Day: $hoursPerDay hours
-Total Available Hours: ~${totalAvailableHours.toStringAsFixed(0)} hours
+Break this goal into 4-7 actionable tasks. Each task needs 2-3 concrete subtasks.
 
-Create a COMPLETE business execution plan with:
-
-1. **Task Breakdown** (5-12 tasks):
-   - Each task must have:
-     - title: Short, actionable name
-     - description: What to do (specific and clear)
-     - estimatedHours: Realistic hours needed (consider complexity)
-     - priority: "high", "medium", or "low"
-     - dependencies: Array of task titles this depends on (empty if none)
-     - isMilestone: true if this is a major checkpoint
-     - motivationAnchor: Why this task matters for the goal (1 sentence)
-     - estimatedFrequency: "daily", "weekly", "monthly", or "one-time"
-     - suggestedTime: "morning", "afternoon", "evening", or "any"
-     - subtasks: Array of 2-4 concrete action steps to complete this task, each with:
-       - title: Short, actionable subtask name
-       - description: Exactly what to do (specific)
-       - estimatedHours: Hours needed for this subtask
-
-3. **Weekly Goals** (3-5 weekly milestones):
-   - What should be accomplished each week
-   - Realistic progress markers
-
-4. **Risk Alerts** (2-4 potential issues):
-   - What could derail this plan
-   - How to mitigate risks
-
-5. **Total Estimated Hours**: Sum of all subtask hours
-
-CRITICAL RULES:
-- Total estimated hours MUST fit within available hours (${totalAvailableHours.toStringAsFixed(0)} hours)
-- If it doesn't fit, prioritize and reduce scope realistically
-- Distribute tasks evenly across the timeline
-- Include buffer time (20% of total)
-- Make tasks specific and actionable
-- Consider dependencies (some tasks must come before others)
-- Include milestone checkpoints
-- Each task should have a clear "why" (motivationAnchor)
-
-Return ONLY valid JSON:
+Return ONLY valid JSON, no markdown:
 {
-  "goal": "goal name",
-  "totalEstimatedHours": 120,
   "tasks": [
     {
-      "title": "task name",
-      "description": "what to do",
-      "estimatedHours": 8.0,
+      "title": "Task name",
+      "description": "What to do",
       "priority": "high",
-      "dependencies": [],
-      "isMilestone": false,
-      "motivationAnchor": "This moves you closer to launching because...",
-      "estimatedFrequency": "weekly",
-      "suggestedTime": "morning",
       "subtasks": [
-        {"title": "subtask name", "description": "what to do specifically", "estimatedHours": 2.0},
-        {"title": "another subtask", "description": "specific action", "estimatedHours": 1.5}
+        {"title": "Subtask", "description": "Specific action"},
+        {"title": "Subtask", "description": "Specific action"}
       ]
     }
-  ],
-  "weeklyGoals": [
-    "Week 1: Complete market research and validate idea",
-    "Week 2: Design core features and create wireframes"
-  ],
-  "riskAlerts": [
-    "Risk: Scope creep could delay launch. Mitigation: Stick to MVP features only.",
-    "Risk: Underestimating development time. Mitigation: Add 20% buffer to estimates."
   ]
 }
 ''';
@@ -384,9 +328,9 @@ Return ONLY valid JSON:
             }
           ],
           'temperature': 0.7,
-          'max_tokens': 2000,
+          'max_tokens': 900,
         }),
-      ).timeout(const Duration(seconds: 20));
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -620,6 +564,97 @@ Return ONLY valid JSON in this format:
         },
       ],
     };
+  }
+
+  /// Generate subtasks for a specific task using AI
+  Future<List<Map<String, dynamic>>> generateSubtasksForTask(
+    String goalName,
+    String taskTitle, {
+    String? taskDescription,
+  }) async {
+    try {
+      final premiumService = PremiumService();
+      final isPremium = await premiumService.isPremium();
+
+      if (!isPremium) {
+        return _fallbackSubtasksForTask(taskTitle);
+      }
+
+      final apiKey = dotenv.env['OPENAI_API_KEY'];
+      if (apiKey == null || apiKey.isEmpty || apiKey == 'your_openai_api_key_here') {
+        return _fallbackSubtasksForTask(taskTitle);
+      }
+
+      final prompt = '''
+Break this task into 3-5 concrete, actionable subtasks.
+
+Goal: $goalName
+Task: $taskTitle
+${taskDescription != null && taskDescription.isNotEmpty ? 'Context: $taskDescription' : ''}
+
+For each subtask provide:
+- title: Short, action-verb name (e.g. "Write intro paragraph")
+- description: One sentence on what to do specifically
+
+Return ONLY a valid JSON array:
+[
+  {"title": "subtask name", "description": "what to do"},
+  {"title": "subtask name", "description": "what to do"}
+]
+''';
+
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': [
+            {
+              'role': 'system',
+              'content': 'You are a productivity assistant. Break tasks into actionable subtasks. Return only valid JSON.',
+            },
+            {'role': 'user', 'content': prompt},
+          ],
+          'temperature': 0.6,
+          'max_tokens': 600,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['choices'][0]['message']['content'] as String;
+        try {
+          String jsonContent = content.trim();
+          if (jsonContent.contains('```json')) {
+            jsonContent = jsonContent.split('```json')[1].split('```')[0].trim();
+          } else if (jsonContent.contains('```')) {
+            jsonContent = jsonContent.split('```')[1].split('```')[0].trim();
+          }
+          final parsed = jsonDecode(jsonContent) as List;
+          return parsed.cast<Map<String, dynamic>>();
+        } catch (e) {
+          debugPrint('❌ Error parsing subtasks for task response: $e');
+          return _fallbackSubtasksForTask(taskTitle);
+        }
+      } else {
+        return _fallbackSubtasksForTask(taskTitle);
+      }
+    } catch (e) {
+      debugPrint('❌ Error generating subtasks for task: $e');
+      return _fallbackSubtasksForTask(taskTitle);
+    }
+  }
+
+  List<Map<String, dynamic>> _fallbackSubtasksForTask(String taskTitle) {
+    return [
+      {'title': 'Plan approach', 'description': 'Define the steps and strategy needed to complete $taskTitle'},
+      {'title': 'Gather resources', 'description': 'Collect any tools, materials, or information required'},
+      {'title': 'Execute main work', 'description': 'Complete the core work for this task'},
+      {'title': 'Review and wrap up', 'description': 'Check quality and finalize the output'},
+    ];
   }
 
   /// Generate motivational message for reminder (Solopreneur Execution Assistant)

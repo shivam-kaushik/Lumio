@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
@@ -358,56 +359,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProductivityTrends(BuildContext context) {
-    return Container(
-      padding: LumioSpacing.cardPadding,
-      decoration: BoxDecoration(
-        color: LumioColors.surface(context),
-        borderRadius: LumioRadius.radiusXXL,
-        boxShadow: LumioShadows.getSoft(context),
-        border: Border.all(
-          color: LumioColors.border(context).withOpacity(0.5),
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Consumer<GrowthProvider>(
+      builder: (context, growthProvider, _) {
+        final allTasks = growthProvider.allTasks;
+        final now = DateTime.now();
+        final weekStart = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: now.weekday - 1));
+
+        final dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+        final dayCounts = List.generate(7, (i) {
+          final day = weekStart.add(Duration(days: i));
+          return allTasks.where((t) {
+            if (!t.isCompleted || t.completedAt == null) return false;
+            final cd = DateTime(t.completedAt!.year, t.completedAt!.month, t.completedAt!.day);
+            return cd == day;
+          }).length.toDouble();
+        });
+
+        final maxCount = dayCounts.fold(0.0, math.max);
+        final fills = dayCounts.map((c) => maxCount > 0 ? (c / maxCount).clamp(0.1, 1.0) : 0.1).toList();
+        final todayIndex = now.weekday - 1; // 0=Mon, 6=Sun
+
+        return Container(
+          padding: LumioSpacing.cardPadding,
+          decoration: BoxDecoration(
+            color: LumioColors.surface(context),
+            borderRadius: LumioRadius.radiusXXL,
+            boxShadow: LumioShadows.getSoft(context),
+            border: Border.all(
+              color: LumioColors.border(context).withOpacity(0.5),
+            ),
+          ),
+          child: Column(
             children: [
-              Text(
-                'Productivity Trends',
-                style: LumioTypography.titleMedium.copyWith(
-                  color: LumioColors.textPrimary(context),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Productivity Trends',
+                    style: LumioTypography.titleMedium.copyWith(
+                      color: LumioColors.textPrimary(context),
+                    ),
+                  ),
+                  Text(
+                    'This Week',
+                    style: LumioTypography.bodySmall.copyWith(
+                      color: LumioColors.textSecondary(context),
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                'This Week',
-                style: LumioTypography.bodySmall.copyWith(
-                  color: LumioColors.textSecondary(context),
+              SizedBox(height: LumioSpacing.xl),
+              SizedBox(
+                height: 100,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(7, (i) {
+                    final isToday = i == todayIndex;
+                    return _buildBar(context, dayLabels[i], fills[i], isToday);
+                  }),
                 ),
               ),
             ],
           ),
-          SizedBox(height: LumioSpacing.xl),
-
-          // Bar chart
-          SizedBox(
-            height: 100,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _buildBar(context, 'M', 0.3, false),
-                _buildBar(context, 'T', 0.5, false),
-                _buildBar(context, 'W', 0.7, false),
-                _buildBar(context, 'T', 0.9, true), // Today
-                _buildBar(context, 'F', 0.4, false),
-                _buildBar(context, 'S', 0.2, false),
-                _buildBar(context, 'S', 0.35, false),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -446,73 +463,258 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildBadgesSection(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Consumer<GrowthProvider>(
+      builder: (context, growthProvider, _) {
+        final stats = growthProvider.userStats;
+        final streak = stats?.streak ?? 0;
+        final level = stats?.level ?? 1;
+        final tasksCompleted = growthProvider.allTasks.where((t) => t.isCompleted).length;
+        final completedGoals = growthProvider.goals.where((g) {
+          final tasks = growthProvider.getTasksForGoal(g.id);
+          if (tasks.isEmpty) return false;
+          final done = tasks.where((t) => t.isCompleted).length;
+          return done == tasks.length && tasks.isNotEmpty;
+        }).length;
+
+        final allBadges = _getBadgeDefinitions(streak, level, tasksCompleted, completedGoals);
+        final preview = allBadges.take(4).toList();
+
+        return Column(
           children: [
-            Text(
-              'Badges',
-              style: LumioTypography.titleMedium.copyWith(
-                color: LumioColors.textPrimary(context),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Badges',
+                  style: LumioTypography.titleMedium.copyWith(
+                    color: LumioColors.textPrimary(context),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => _showAllBadges(context, allBadges),
+                  child: Text(
+                    'View All',
+                    style: LumioTypography.bodyMedium.copyWith(
+                      color: LumioColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: LumioSpacing.md),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: preview.asMap().entries.map((e) => Padding(
+                  padding: EdgeInsets.only(right: e.key < preview.length - 1 ? LumioSpacing.md : 0),
+                  child: _buildBadgeTile(context, e.value),
+                )).toList(),
               ),
             ),
-            GestureDetector(
-              onTap: () {
-                // TODO: View all badges
-              },
-              child: Text(
-                'View All',
-                style: LumioTypography.bodyMedium.copyWith(
-                  color: LumioColors.primary,
-                  fontWeight: FontWeight.w600,
+          ],
+        );
+      },
+    );
+  }
+
+  List<Map<String, dynamic>> _getBadgeDefinitions(int streak, int level, int tasksCompleted, int completedGoals) {
+    return [
+      {
+        'icon': Icons.local_fire_department_rounded,
+        'name': 'Streak Master',
+        'description': 'Maintain a 7-day streak',
+        'color': Colors.orange,
+        'unlocked': streak >= 7,
+      },
+      {
+        'icon': Icons.emoji_events_rounded,
+        'name': 'Goal Getter',
+        'description': 'Complete your first goal',
+        'color': Colors.amber,
+        'unlocked': completedGoals >= 1,
+      },
+      {
+        'icon': Icons.check_circle_rounded,
+        'name': 'Task Champion',
+        'description': 'Complete 50 tasks',
+        'color': LumioColors.success,
+        'unlocked': tasksCompleted >= 50,
+      },
+      {
+        'icon': Icons.psychology_rounded,
+        'name': 'Power User',
+        'description': 'Reach level 5',
+        'color': Colors.purple,
+        'unlocked': level >= 5,
+      },
+      {
+        'icon': Icons.bolt_rounded,
+        'name': 'Speedster',
+        'description': 'Maintain a 3-day streak',
+        'color': LumioColors.primary,
+        'unlocked': streak >= 3,
+      },
+      {
+        'icon': Icons.star_rounded,
+        'name': 'Rising Star',
+        'description': 'Complete 10 tasks',
+        'color': Colors.blue,
+        'unlocked': tasksCompleted >= 10,
+      },
+    ];
+  }
+
+  Widget _buildBadgeTile(BuildContext context, Map<String, dynamic> badge) {
+    final unlocked = badge['unlocked'] as bool;
+    final color = badge['color'] as Color;
+
+    return GestureDetector(
+      onTap: () => _showBadgeDetail(context, badge),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: unlocked ? color.withOpacity(0.15) : LumioColors.border(context).withOpacity(0.2),
+              border: Border.all(
+                color: unlocked ? color.withOpacity(0.5) : LumioColors.border(context),
+                width: 2,
+              ),
+              boxShadow: unlocked ? [
+                BoxShadow(
+                  color: color.withOpacity(0.2),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
+              ] : null,
+            ),
+            child: Icon(
+              badge['icon'] as IconData,
+              size: 28,
+              color: unlocked ? color : LumioColors.textTertiary(context),
+            ),
+          ),
+          SizedBox(height: LumioSpacing.xs),
+          SizedBox(
+            width: 68,
+            child: Text(
+              badge['name'] as String,
+              style: LumioTypography.labelSmall.copyWith(
+                color: unlocked ? LumioColors.textPrimary(context) : LumioColors.textTertiary(context),
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBadgeDetail(BuildContext context, Map<String, dynamic> badge) {
+    final unlocked = badge['unlocked'] as bool;
+    final color = badge['color'] as Color;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: LumioColors.surface(context),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: unlocked ? color.withOpacity(0.15) : LumioColors.border(context).withOpacity(0.2),
+                border: Border.all(color: unlocked ? color.withOpacity(0.5) : LumioColors.border(context), width: 2),
+              ),
+              child: Icon(badge['icon'] as IconData, size: 36, color: unlocked ? color : LumioColors.textTertiary(context)),
+            ),
+            SizedBox(height: LumioSpacing.md),
+            Text(
+              badge['name'] as String,
+              style: LumioTypography.titleMedium.copyWith(color: LumioColors.textPrimary(context)),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: LumioSpacing.xs),
+            Text(
+              badge['description'] as String,
+              style: LumioTypography.bodyMedium.copyWith(color: LumioColors.textSecondary(context)),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: LumioSpacing.md),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: LumioSpacing.md, vertical: LumioSpacing.xs),
+              decoration: BoxDecoration(
+                color: unlocked ? LumioColors.success.withOpacity(0.1) : LumioColors.border(context).withOpacity(0.3),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                unlocked ? 'Unlocked' : 'Locked',
+                style: LumioTypography.labelSmall.copyWith(
+                  color: unlocked ? LumioColors.success : LumioColors.textSecondary(context),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            SizedBox(height: LumioSpacing.md),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAllBadges(BuildContext context, List<Map<String, dynamic>> badges) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+        decoration: BoxDecoration(
+          color: LumioColors.surface(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: EdgeInsets.all(LumioSpacing.lg),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('All Badges', style: LumioTypography.titleLarge.copyWith(color: LumioColors.textPrimary(context))),
+                  Text('${badges.where((b) => b['unlocked'] as bool).length}/${badges.length}',
+                      style: LumioTypography.bodyMedium.copyWith(color: LumioColors.textSecondary(context))),
+                ],
+              ),
+            ),
+            Flexible(
+              child: GridView.builder(
+                padding: EdgeInsets.fromLTRB(LumioSpacing.lg, 0, LumioSpacing.lg, LumioSpacing.xl),
+                shrinkWrap: true,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 20,
+                  childAspectRatio: 0.75,
+                ),
+                itemCount: badges.length,
+                itemBuilder: (_, i) => _buildBadgeTile(context, badges[i]),
               ),
             ),
           ],
         ),
-        SizedBox(height: LumioSpacing.md),
-
-        // Badges row
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildBadge(context, Icons.emoji_events_rounded, true),
-              SizedBox(width: LumioSpacing.md),
-              _buildBadge(context, Icons.bolt_rounded, true),
-              SizedBox(width: LumioSpacing.md),
-              _buildBadge(context, Icons.psychology_rounded, true),
-              SizedBox(width: LumioSpacing.md),
-              _buildBadge(context, Icons.lock_outline_rounded, false),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBadge(BuildContext context, IconData icon, bool unlocked) {
-    return Container(
-      width: 80,
-      height: 80,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: unlocked
-            ? LumioColors.primaryLight
-            : LumioColors.border(context).withOpacity(0.3),
-        border: Border.all(
-          color: unlocked
-              ? LumioColors.primary.withOpacity(0.3)
-              : LumioColors.border(context),
-          width: 2,
-          style: unlocked ? BorderStyle.solid : BorderStyle.none,
-        ),
-      ),
-      child: Icon(
-        icon,
-        size: 32,
-        color: unlocked ? LumioColors.primary : LumioColors.textTertiary(context),
       ),
     );
   }
@@ -537,18 +739,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const RecentNotificationsScreen()),
-            );
-          },
-        ),
-        SizedBox(height: LumioSpacing.md),
-        _buildSettingsItem(
-          context,
-          icon: Icons.tune_rounded,
-          title: 'Preferences',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
             );
           },
         ),
