@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/growth_provider.dart';
-import '../theme/app_theme.dart';
-import '../widgets/modern_smart_card.dart';
+import '../theme/theme.dart';
 import '../../data/models/goal_task.dart';
 import '../../data/models/goal.dart';
+import 'goal_details_screen.dart';
 
-/// Calendar screen showing all scheduled subtasks across all goals
+/// Lumio-themed Calendar screen showing all tasks with deadlines across all goals
 class SubtasksCalendarScreen extends StatefulWidget {
   const SubtasksCalendarScreen({super.key});
 
@@ -17,7 +18,7 @@ class SubtasksCalendarScreen extends StatefulWidget {
 
 class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
   DateTime _selectedDay = DateTime.now();
-  DateTime _focusedDay = DateTime.now();
+  DateTime _focusedMonth = DateTime.now();
 
   @override
   void initState() {
@@ -27,108 +28,56 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
     });
   }
 
-  List<GoalTask> _getTasksForDay(DateTime day) {
-    final growthProvider = context.read<GrowthProvider>();
+  List<GoalTask> _getTasksForDay(GrowthProvider provider, DateTime day) {
     final dateKey = DateTime(day.year, day.month, day.day);
-    
-    // Get all tasks from all goals
-    final allTasks = <GoalTask>[];
-    for (var goal in growthProvider.goals) {
-      final tasks = growthProvider.getTasksForGoal(goal.id);
-      for (var task in tasks) {
+    final result = <GoalTask>[];
+    for (final goal in provider.goals) {
+      if (goal.name == 'Inbox' || goal.name.startsWith('Daily Plan')) continue;
+      for (final task in provider.getTasksForGoal(goal.id)) {
         if (task.scheduledDate != null) {
-          final scheduledKey = DateTime(
-            task.scheduledDate!.year,
-            task.scheduledDate!.month,
-            task.scheduledDate!.day,
-          );
-          if (scheduledKey == dateKey && !task.isCompleted) {
-            allTasks.add(task);
+          final d = task.scheduledDate!;
+          if (DateTime(d.year, d.month, d.day) == dateKey) {
+            result.add(task);
           }
         }
       }
     }
-    return allTasks;
+    return result;
+  }
+
+  bool _dayHasTasks(GrowthProvider provider, DateTime day) {
+    return _getTasksForDay(provider, day).isNotEmpty;
+  }
+
+  void _prevMonth() {
+    setState(() {
+      _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month - 1, 1);
+    });
+  }
+
+  void _nextMonth() {
+    setState(() {
+      _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month + 1, 1);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
     return Scaffold(
-      backgroundColor: isDark ? Colors.black : AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Calendar'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
+      backgroundColor: LumioColors.background(context),
       body: Consumer<GrowthProvider>(
-        builder: (context, growthProvider, child) {
-          return Column(
-            children: [
-              // Calendar header with month navigation
-              Container(
-                padding: const EdgeInsets.all(AppTheme.spacingMD),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.chevron_left_rounded,
-                        color: isDark 
-                            ? AppTheme.darkTextPrimary 
-                            : AppTheme.textPrimary,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _focusedDay = DateTime(
-                            _focusedDay.year,
-                            _focusedDay.month - 1,
-                            _focusedDay.day,
-                          );
-                        });
-                      },
-                    ),
-                    Text(
-                      DateFormat('MMMM yyyy').format(_focusedDay),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: isDark 
-                            ? AppTheme.darkTextPrimary 
-                            : AppTheme.textPrimary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.chevron_right_rounded,
-                        color: isDark 
-                            ? AppTheme.darkTextPrimary 
-                            : AppTheme.textPrimary,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _focusedDay = DateTime(
-                            _focusedDay.year,
-                            _focusedDay.month + 1,
-                            _focusedDay.day,
-                          );
-                        });
-                      },
-                    ),
-                  ],
+        builder: (context, provider, _) {
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: _buildHeader(context)),
+              SliverToBoxAdapter(child: _buildCalendar(context, provider)),
+              SliverToBoxAdapter(child: _buildDayLabel(context)),
+              SliverToBoxAdapter(child: _buildTasksForSelectedDay(context, provider)),
+              SliverPadding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom + 100,
                 ),
-              ),
-              // Calendar grid
-              _buildCalendarGrid(),
-              Divider(
-                color: isDark 
-                    ? AppTheme.darkDivider 
-                    : AppTheme.dividerColor,
-              ),
-              // Selected day's tasks
-              Expanded(
-                child: _buildTasksList(),
               ),
             ],
           );
@@ -137,347 +86,515 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
     );
   }
 
-  Widget _buildCalendarGrid() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final firstDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
-    final lastDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
-    final firstWeekday = firstDayOfMonth.weekday;
-    final daysInMonth = lastDayOfMonth.day;
-    
-    final weeks = <List<DateTime>>[];
-    var currentWeek = <DateTime>[];
-    
-    // Add empty cells for days before the first day of the month
-    for (var i = 1; i < firstWeekday; i++) {
-      currentWeek.add(DateTime(0));
-    }
-    
-    // Add all days of the month
-    for (var day = 1; day <= daysInMonth; day++) {
-      currentWeek.add(DateTime(_focusedDay.year, _focusedDay.month, day));
-      if (currentWeek.length == 7) {
-        weeks.add(currentWeek);
-        currentWeek = <DateTime>[];
-      }
-    }
-    
-    // Add remaining empty cells
-    while (currentWeek.length < 7 && currentWeek.isNotEmpty) {
-      currentWeek.add(DateTime(0));
-    }
-    if (currentWeek.isNotEmpty) {
-      weeks.add(currentWeek);
-    }
-    
-    return Padding(
-      padding: const EdgeInsets.all(AppTheme.spacingMD),
-      child: Column(
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        LumioSpacing.screenHorizontal,
+        MediaQuery.of(context).padding.top + LumioSpacing.md,
+        LumioSpacing.screenHorizontal,
+        LumioSpacing.sm,
+      ),
+      child: Row(
         children: [
-          // Weekday headers
-          Row(
-            children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-                .map((day) => Expanded(
-                      child: Center(
-                        child: Text(
-                          day,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isDark 
-                                ? AppTheme.darkTextSecondary 
-                                : AppTheme.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ))
-                .toList(),
+          Text(
+            'Calendar',
+            style: LumioTypography.headlineSmall.copyWith(
+              color: LumioColors.textPrimary(context),
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          const SizedBox(height: AppTheme.spacingSM),
-          // Calendar days
-          ...weeks.map((week) => Row(
-                children: week.map((day) {
-                  if (day.year == 0) {
-                    return Expanded(child: Container());
-                  }
-                  
-                  final isSelected = day.year == _selectedDay.year &&
-                      day.month == _selectedDay.month &&
-                      day.day == _selectedDay.day;
-                  final isToday = day.year == DateTime.now().year &&
-                      day.month == DateTime.now().month &&
-                      day.day == DateTime.now().day;
-                  final hasTasks = _getTasksForDay(day).isNotEmpty;
-                  
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedDay = day;
-                        });
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppTheme.primaryColor
-                              : isToday
-                                  ? AppTheme.primaryColor.withOpacity(0.3)
-                                  : Colors.transparent,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${day.day}',
-                              style: TextStyle(
-                                color: isSelected
-                                    ? Colors.white
-                                    : (isDark 
-                                        ? AppTheme.darkTextPrimary 
-                                        : AppTheme.textPrimary),
-                                fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                                fontSize: 14,
-                              ),
-                            ),
-                            if (hasTasks)
-                              Container(
-                                width: 4,
-                                height: 4,
-                                margin: const EdgeInsets.only(top: 2),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : AppTheme.primaryColor,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              )),
+          const Spacer(),
+          // Today button
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() {
+                _selectedDay = DateTime.now();
+                _focusedMonth = DateTime.now();
+              });
+            },
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: LumioSpacing.md,
+                vertical: LumioSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: LumioColors.primary.withOpacity(0.12),
+                borderRadius: LumioRadius.filterButton,
+              ),
+              child: Text(
+                'Today',
+                style: LumioTypography.labelMedium.copyWith(
+                  color: LumioColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTasksList() {
-    final tasks = _getTasksForDay(_selectedDay);
-    final growthProvider = context.read<GrowthProvider>();
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
-    if (tasks.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.calendar_today_rounded,
-              size: 64,
-              color: (isDark 
-                  ? AppTheme.darkTextSecondary 
-                  : AppTheme.textSecondary).withOpacity(0.5),
-            ),
-            const SizedBox(height: AppTheme.spacingMD),
-            Text(
-              'No tasks scheduled for ${DateFormat('MMM d, y').format(_selectedDay)}',
-              style: TextStyle(
-                color: isDark 
-                    ? AppTheme.darkTextSecondary 
-                    : AppTheme.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(
-        AppTheme.spacingMD,
-        AppTheme.spacingMD,
-        AppTheme.spacingMD,
-        100, // Bottom padding above bottom navigation bar
+  Widget _buildCalendar(BuildContext context, GrowthProvider provider) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: LumioSpacing.screenHorizontal),
+      decoration: BoxDecoration(
+        color: LumioColors.surface(context),
+        borderRadius: LumioRadius.card,
+        border: Border.all(color: LumioColors.border(context)),
+        boxShadow: LumioShadows.getSoft(context),
       ),
-      itemCount: tasks.length,
-      itemBuilder: (context, index) {
-        final task = tasks[index];
-        final goal = growthProvider.goals.firstWhere(
-          (g) => g.id == task.goalId,
-          orElse: () => Goal(
-            id: 0,
-            name: 'Unknown Goal',
-            createdAt: DateTime.now(),
-          ),
-        );
-        
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        
-        return Dismissible(
-          key: Key('subtask_calendar_${task.id}_$index'),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+      child: Column(
+        children: [
+          // Month navigation
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              LumioSpacing.md,
+              LumioSpacing.md,
+              LumioSpacing.md,
+              LumioSpacing.sm,
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: const [
-                Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _prevMonth();
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: LumioColors.background(context),
+                      borderRadius: LumioRadius.radiusMD,
+                      border: Border.all(color: LumioColors.border(context)),
+                    ),
+                    child: Icon(
+                      Icons.chevron_left_rounded,
+                      color: LumioColors.textSecondary(context),
+                      size: 20,
+                    ),
                   ),
                 ),
-                SizedBox(width: 8),
-                Icon(
-                  Icons.delete_rounded,
-                  color: Colors.white,
-                  size: 32,
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      DateFormat('MMMM yyyy').format(_focusedMonth),
+                      style: LumioTypography.titleMedium.copyWith(
+                        color: LumioColors.textPrimary(context),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _nextMonth();
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: LumioColors.background(context),
+                      borderRadius: LumioRadius.radiusMD,
+                      border: Border.all(color: LumioColors.border(context)),
+                    ),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: LumioColors.textSecondary(context),
+                      size: 20,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          confirmDismiss: (direction) async {
-            return await showDialog<bool>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Delete Task'),
-                content: Text('Are you sure you want to delete "${task.title}"?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel'),
+
+          // Weekday headers
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: LumioSpacing.sm),
+            child: Row(
+              children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                  .map((d) => Expanded(
+                        child: Center(
+                          child: Text(
+                            d,
+                            style: LumioTypography.labelSmall.copyWith(
+                              color: LumioColors.textTertiary(context),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ),
+
+          SizedBox(height: LumioSpacing.xs),
+
+          // Calendar grid
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              LumioSpacing.sm,
+              0,
+              LumioSpacing.sm,
+              LumioSpacing.md,
+            ),
+            child: _buildCalendarGrid(context, provider),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarGrid(BuildContext context, GrowthProvider provider) {
+    final firstDay = DateTime(_focusedMonth.year, _focusedMonth.month, 1);
+    final lastDay = DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0);
+    // Monday-first offset
+    final startOffset = (firstDay.weekday - 1) % 7;
+
+    final weeks = <List<DateTime?>>[];
+    var currentWeek = <DateTime?>[...List.filled(startOffset, null)];
+
+    for (var d = 1; d <= lastDay.day; d++) {
+      currentWeek.add(DateTime(_focusedMonth.year, _focusedMonth.month, d));
+      if (currentWeek.length == 7) {
+        weeks.add(currentWeek);
+        currentWeek = [];
+      }
+    }
+    while (currentWeek.isNotEmpty && currentWeek.length < 7) {
+      currentWeek.add(null);
+    }
+    if (currentWeek.isNotEmpty) weeks.add(currentWeek);
+
+    return Column(
+      children: weeks.map((week) => _buildWeekRow(context, provider, week)).toList(),
+    );
+  }
+
+  Widget _buildWeekRow(
+    BuildContext context,
+    GrowthProvider provider,
+    List<DateTime?> week,
+  ) {
+    return Row(
+      children: week.map((day) {
+        if (day == null) {
+          return const Expanded(child: SizedBox(height: 44));
+        }
+
+        final now = DateTime.now();
+        final isSelected = day.year == _selectedDay.year &&
+            day.month == _selectedDay.month &&
+            day.day == _selectedDay.day;
+        final isToday = day.year == now.year &&
+            day.month == now.month &&
+            day.day == now.day;
+        final hasTasks = _dayHasTasks(provider, day);
+
+        return Expanded(
+          child: GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() => _selectedDay = day);
+            },
+            child: Container(
+              height: 44,
+              margin: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? LumioColors.primary
+                    : isToday
+                        ? LumioColors.primaryLight
+                        : Colors.transparent,
+                borderRadius: LumioRadius.radiusMD,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '${day.day}',
+                    style: LumioTypography.bodyMedium.copyWith(
+                      color: isSelected
+                          ? Colors.white
+                          : isToday
+                              ? LumioColors.primary
+                              : LumioColors.textPrimary(context),
+                      fontWeight: isSelected || isToday
+                          ? FontWeight.w700
+                          : FontWeight.w400,
+                    ),
                   ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                    child: const Text('Delete'),
-                  ),
+                  if (hasTasks)
+                    Container(
+                      width: 4,
+                      height: 4,
+                      margin: const EdgeInsets.only(top: 2),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Colors.white.withOpacity(0.8)
+                            : LumioColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                 ],
               ),
-            ) ?? false;
-          },
-          onDismissed: (direction) async {
-            await growthProvider.deleteTask(task.id);
-            growthProvider.loadGrowthData();
-          },
-          child: ModernSmartCard(
-            margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
-            useGradient: true,
-            elevationLevel: 1,
-            child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildDayLabel(BuildContext context) {
+    final now = DateTime.now();
+    final isToday = _selectedDay.year == now.year &&
+        _selectedDay.month == now.month &&
+        _selectedDay.day == now.day;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        LumioSpacing.screenHorizontal,
+        LumioSpacing.lg,
+        LumioSpacing.screenHorizontal,
+        LumioSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Text(
+            isToday
+                ? 'Today'
+                : DateFormat('EEEE, MMM d').format(_selectedDay),
+            style: LumioTypography.titleMedium.copyWith(
+              color: LumioColors.textPrimary(context),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTasksForSelectedDay(BuildContext context, GrowthProvider provider) {
+    final tasks = _getTasksForDay(provider, _selectedDay);
+
+    if (tasks.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: LumioSpacing.screenHorizontal,
+          vertical: LumioSpacing.xl,
+        ),
+        child: Center(
+          child: Column(
             children: [
-              Row(
-                children: [
-                  // Complete button (Moved to Left)
-                  IconButton(
-                    icon: Icon(
-                      task.isCompleted
-                          ? Icons.check_circle_rounded
-                          : Icons.radio_button_unchecked_rounded,
-                      color: task.isCompleted 
-                          ? AppTheme.successColor 
-                          : (isDark 
-                              ? AppTheme.darkTextSecondary 
-                              : AppTheme.textSecondary),
-                    ),
-                    onPressed: () async {
-                      if (task.isCompleted) {
-                        // Uncomplete the task
-                        await growthProvider.uncompleteTask(task.id);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Task unmarked'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                        }
-                      } else {
-                        // Complete the task
-                        final message = await growthProvider.completeTask(task.id);
-                        if (mounted && message != null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(message),
-                              backgroundColor: Colors.green,
-                              duration: const Duration(seconds: 4),
-                            ),
-                          );
-                        }
-                      }
-                    },
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: LumioColors.primaryLight,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.event_available_rounded,
+                  color: LumioColors.primary,
+                  size: 32,
+                ),
+              ),
+              SizedBox(height: LumioSpacing.md),
+              Text(
+                'No tasks due',
+                style: LumioTypography.titleSmall.copyWith(
+                  color: LumioColors.textSecondary(context),
+                ),
+              ),
+              SizedBox(height: LumioSpacing.xs),
+              Text(
+                'Nothing scheduled for this day',
+                style: LumioTypography.bodySmall.copyWith(
+                  color: LumioColors.textTertiary(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: LumioSpacing.screenHorizontal),
+      child: Column(
+        children: tasks
+            .map((task) => _buildCalendarTaskCard(context, task, provider))
+            .toList(),
+      ),
+    );
+  }
+
+  Widget _buildCalendarTaskCard(
+    BuildContext context,
+    GoalTask task,
+    GrowthProvider provider,
+  ) {
+    final goal = provider.goals.firstWhere(
+      (g) => g.id == task.goalId,
+      orElse: () => Goal(id: 0, name: 'Unknown', createdAt: DateTime.now()),
+    );
+    final isCompleted = task.isCompleted;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: LumioSpacing.sm),
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => GoalDetailsScreen(goalId: task.goalId),
+            ),
+          );
+        },
+        child: Container(
+          padding: EdgeInsets.all(LumioSpacing.md),
+          decoration: BoxDecoration(
+            color: LumioColors.surface(context),
+            borderRadius: LumioRadius.card,
+            border: Border.all(
+              color: isCompleted
+                  ? LumioColors.primary.withOpacity(0.2)
+                  : LumioColors.border(context),
+            ),
+            boxShadow: LumioShadows.getSoft(context),
+          ),
+          child: Row(
+            children: [
+              // Completion checkbox
+              GestureDetector(
+                onTap: () async {
+                  HapticFeedback.mediumImpact();
+                  if (isCompleted) {
+                    await provider.uncompleteTask(task.id);
+                  } else {
+                    await provider.completeTask(task.id);
+                  }
+                },
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: isCompleted ? LumioColors.primary : Colors.transparent,
+                    borderRadius: LumioRadius.radiusXS,
+                    border: isCompleted
+                        ? null
+                        : Border.all(color: LumioColors.border(context), width: 2),
                   ),
-                  const SizedBox(width: AppTheme.spacingSM),
-                  // Title and content
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  child: isCompleted
+                      ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+                      : null,
+                ),
+              ),
+
+              SizedBox(width: LumioSpacing.md),
+
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      task.title,
+                      style: LumioTypography.bodyMedium.copyWith(
+                        color: isCompleted
+                            ? LumioColors.textSecondary(context)
+                            : LumioColors.textPrimary(context),
+                        decoration:
+                            isCompleted ? TextDecoration.lineThrough : null,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: LumioSpacing.xs),
+                    // Goal name
+                    Row(
                       children: [
-                        Text(
-                          task.title,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: isDark 
-                                ? AppTheme.darkTextPrimary 
-                                : AppTheme.textPrimary,
+                        Icon(
+                          Icons.flag_rounded,
+                          size: 12,
+                          color: LumioColors.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            goal.name,
+                            style: LumioTypography.labelSmall.copyWith(
+                              color: LumioColors.primary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          task.description,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: isDark 
-                                ? AppTheme.darkTextSecondary 
-                                : AppTheme.textSecondary,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Goal: ${goal.name}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (task.estimatedHours != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'Estimated: ${task.estimatedHours!.toStringAsFixed(1)} hours',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark 
-                                  ? AppTheme.darkTextTertiary 
-                                  : AppTheme.textTertiary,
+                        if (task.subtasks.isNotEmpty) ...[
+                          SizedBox(width: LumioSpacing.sm),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: LumioColors.border(context),
+                              borderRadius: LumioRadius.phaseBadge,
+                            ),
+                            child: Text(
+                              '${task.subtasks.where((s) => s.isCompleted).length}/${task.subtasks.length} subtasks',
+                              style: LumioTypography.labelSmall.copyWith(
+                                color: LumioColors.textSecondary(context),
+                              ),
                             ),
                           ),
                         ],
                       ],
                     ),
+                  ],
+                ),
+              ),
+
+              SizedBox(width: LumioSpacing.sm),
+
+              // Priority dot + chevron
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _priorityColor(task.priority),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: LumioColors.textTertiary(context),
+                    size: 18,
                   ),
                 ],
               ),
             ],
           ),
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
-}
 
+  Color _priorityColor(String priority) {
+    switch (priority) {
+      case 'high':
+        return LumioColors.error;
+      case 'medium':
+        return LumioColors.warning;
+      default:
+        return LumioColors.success;
+    }
+  }
+}

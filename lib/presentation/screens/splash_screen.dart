@@ -1,12 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:async';
 
-import '../screens/welcome_screen.dart';
-import '../screens/login_screen.dart';
-import '../navigation/main_navigator.dart';
-import '../providers/auth_provider.dart';
 import '../theme/theme.dart';
 import '../../core/services/permission_service.dart';
 
@@ -48,69 +41,20 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _controller.forward();
-    // After the first frame, ensure notification permission is requested and
-    // show a prompt to open settings if the permission was denied.
+    // Request permissions after the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final permissionService = PermissionService();
-      
-      // Request notification permission first
       await permissionService.ensureNotificationPermission(
         context,
         rationale: 'Notifications are required to deliver reminders. Please enable notifications in app settings.',
       );
-      
-      // Wait a bit before showing the next permission dialog to avoid overwhelming the user
       await Future.delayed(const Duration(milliseconds: 500));
-      
       if (!mounted) return;
-      
-      // Then request exact alarm permission (Android only, but safe to call on iOS)
       await permissionService.ensureExactAlarmPermission(
         context,
         rationale: 'Exact alarms are needed for precise reminder delivery. Please enable "Alarms & reminders" in the app settings.',
       );
     });
-
-    _navigateToNext();
-  }
-
-  Future<void> _navigateToNext() async {
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (!mounted) return;
-
-    final authProvider = context.read<AuthProvider>();
-    
-    // Wait for auth state to be determined
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    if (!mounted) return;
-
-    // Check authentication state
-    if (authProvider.isAuthenticated) {
-      // User is logged in, go to main app
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => const MainNavigator(),
-        ),
-      );
-    } else {
-      // User is not logged in, check if this is first launch
-      final prefs = await SharedPreferences.getInstance();
-      final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
-
-      if (!mounted) return;
-
-      final nextScreen = onboardingComplete
-          ? const LoginScreen()
-          : const WelcomeScreen();
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => nextScreen,
-        ),
-      );
-    }
   }
 
   @override

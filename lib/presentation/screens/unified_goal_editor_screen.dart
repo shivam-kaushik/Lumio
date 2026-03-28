@@ -4,7 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/services/premium_service.dart'; // Add PremiumService import
 import 'premium_subscription_screen.dart';
 import '../models/plan_block.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../providers/growth_provider.dart';
 import '../../core/services/privacy_gpt_service.dart';
 import '../../data/models/goal_task.dart';

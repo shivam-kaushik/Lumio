@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 
 /// Placeholder screen while legacy skill tracking is being redesigned.
 class SkillsScreen extends StatelessWidget {
