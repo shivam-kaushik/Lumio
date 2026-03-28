@@ -9,7 +9,6 @@ class GoalSubtask {
   final String priority; // 'high', 'medium', 'low'
   final String frequency; // 'daily', 'weekly', 'monthly', 'one-time'
   final String suggestedTime; // 'morning', 'afternoon', 'evening', 'any'
-  final String suggestedLocation; // 'home', 'office', 'coffee_shop', 'any'
   final bool isMilestone;
   final String? motivationAnchor;
   final DateTime? scheduledDate;
@@ -27,7 +26,6 @@ class GoalSubtask {
     this.priority = 'medium',
     this.frequency = 'one-time',
     this.suggestedTime = 'any',
-    this.suggestedLocation = 'any',
     this.isMilestone = false,
     this.motivationAnchor,
     this.scheduledDate,
@@ -52,7 +50,6 @@ class GoalSubtask {
       priority: map['priority'] as String? ?? 'medium',
       frequency: map['frequency'] as String? ?? 'one-time',
       suggestedTime: map['suggested_time'] as String? ?? 'any',
-      suggestedLocation: map['suggested_location'] as String? ?? 'any',
       isMilestone: (map['is_milestone'] as int? ?? 0) == 1,
       motivationAnchor: map['motivation_anchor'] as String?,
       scheduledDate: map['scheduled_date'] != null
@@ -78,7 +75,6 @@ class GoalSubtask {
       'priority': priority,
       'frequency': frequency,
       'suggested_time': suggestedTime,
-      'suggested_location': suggestedLocation,
       'is_milestone': isMilestone ? 1 : 0,
       'motivation_anchor': motivationAnchor,
       'scheduled_date': scheduledDate?.toIso8601String(),
@@ -99,7 +95,6 @@ class GoalSubtask {
       'priority': priority,
       'frequency': frequency,
       'suggested_time': suggestedTime,
-      'suggested_location': suggestedLocation,
       'is_milestone': isMilestone ? 1 : 0,
       'motivation_anchor': motivationAnchor,
       'scheduled_date': scheduledDate?.toIso8601String(),
@@ -119,7 +114,6 @@ class GoalSubtask {
     String? priority,
     String? frequency,
     String? suggestedTime,
-    String? suggestedLocation,
     bool? isMilestone,
     String? motivationAnchor,
     DateTime? scheduledDate,
@@ -137,7 +131,6 @@ class GoalSubtask {
       priority: priority ?? this.priority,
       frequency: frequency ?? this.frequency,
       suggestedTime: suggestedTime ?? this.suggestedTime,
-      suggestedLocation: suggestedLocation ?? this.suggestedLocation,
       isMilestone: isMilestone ?? this.isMilestone,
       motivationAnchor: motivationAnchor ?? this.motivationAnchor,
       scheduledDate: scheduledDate ?? this.scheduledDate,
