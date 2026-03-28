@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/theme.dart';
-import '../navigation/main_navigator.dart';
 import '../../core/services/permission_service.dart';
 import 'login_screen.dart';
 
@@ -77,9 +76,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
       if (!mounted) return;
 
-      // Navigate to main app
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const MainNavigator()),
+      // Navigate to login — AuthGate controls entry to the main app
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
       );
     } catch (e) {
       debugPrint('Error in onboarding: $e');

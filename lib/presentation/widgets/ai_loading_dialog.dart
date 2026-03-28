@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flutter_animate/flutter_animate.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 
-/// Modern, animated loading dialog for AI operations
+/// Lumio-themed animated loading dialog for AI operations
 class AILoadingDialog extends StatefulWidget {
   final String message;
 
@@ -20,7 +20,7 @@ class _AILoadingDialogState extends State<AILoadingDialog>
     with TickerProviderStateMixin {
   late AnimationController _rotationController;
   late AnimationController _pulseController;
-  late AnimationController _particleController;
+  late AnimationController _orbController;
 
   @override
   void initState() {
@@ -32,12 +32,12 @@ class _AILoadingDialogState extends State<AILoadingDialog>
 
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
 
-    _particleController = AnimationController(
+    _orbController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 1800),
     )..repeat();
   }
 
@@ -45,136 +45,164 @@ class _AILoadingDialogState extends State<AILoadingDialog>
   void dispose() {
     _rotationController.dispose();
     _pulseController.dispose();
-    _particleController.dispose();
+    _orbController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF2D2418) : const Color(0xFFF5F0EB);
+    final textColor = isDark ? Colors.white : const Color(0xFF1B150D);
+
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
       child: Container(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(36),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withOpacity(0.95),
-              Colors.white.withOpacity(0.9),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(32),
+          color: bgColor,
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primaryColor.withOpacity(0.3),
-              blurRadius: 40,
-              spreadRadius: 10,
+              color: LumioColors.primary.withValues(alpha: 0.25),
+              blurRadius: 50,
+              spreadRadius: 8,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
             ),
           ],
+          border: Border.all(
+            color: LumioColors.primary.withValues(alpha: 0.15),
+            width: 1.5,
+          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 3D Animated Loader
+            // Lumio amber ring animation
             SizedBox(
-              width: 120,
-              height: 120,
+              width: 110,
+              height: 110,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Outer rotating ring
+                  // Outer rotating amber arc
                   AnimatedBuilder(
                     animation: _rotationController,
-                    builder: (context, child) {
-                      return Transform.rotate(
-                        angle: _rotationController.value * 2 * math.pi,
-                        child: Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: SweepGradient(
-                              colors: [
-                                AppTheme.primaryColor,
-                                Colors.purple,
-                                AppTheme.primaryColor,
-                              ],
-                              stops: const [0.0, 0.5, 1.0],
-                            ),
-                          ),
-                          child: Container(
-                            margin: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                            ),
+                    builder: (context, _) => Transform.rotate(
+                      angle: _rotationController.value * 2 * math.pi,
+                      child: Container(
+                        width: 110,
+                        height: 110,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: SweepGradient(
+                            colors: [
+                              LumioColors.primary,
+                              LumioColors.primaryHover,
+                              LumioColors.primary.withValues(alpha: 0.1),
+                              LumioColors.primary,
+                            ],
+                            stops: const [0.0, 0.3, 0.7, 1.0],
                           ),
                         ),
-                      );
-                    },
+                        child: Container(
+                          margin: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: bgColor,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
 
-                  // Pulsing center
+                  // Counter-rotating inner ring
+                  AnimatedBuilder(
+                    animation: _rotationController,
+                    builder: (context, _) => Transform.rotate(
+                      angle: -_rotationController.value * 2 * math.pi * 0.6,
+                      child: Container(
+                        width: 78,
+                        height: 78,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: LumioColors.primary.withValues(alpha: 0.25),
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Pulsing center orb
                   AnimatedBuilder(
                     animation: _pulseController,
-                    builder: (context, child) {
-                      final scale = 0.5 + (_pulseController.value * 0.3);
+                    builder: (context, _) {
+                      final scale = 0.88 + (_pulseController.value * 0.14);
                       return Transform.scale(
                         scale: scale,
                         child: Container(
-                          width: 60,
-                          height: 60,
+                          width: 58,
+                          height: 58,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: RadialGradient(
                               colors: [
-                                AppTheme.primaryColor,
-                                AppTheme.primaryColor.withOpacity(0.6),
+                                LumioColors.primary,
+                                LumioColors.primaryPressed,
                               ],
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.primaryColor.withOpacity(0.5),
-                                blurRadius: 20,
-                                spreadRadius: 5,
+                                color: LumioColors.primary.withValues(alpha: 0.45),
+                                blurRadius: 18,
+                                spreadRadius: 3,
                               ),
                             ],
                           ),
-                          child: Icon(
-                            Icons.auto_awesome,
+                          child: const Icon(
+                            Icons.auto_awesome_rounded,
                             color: Colors.white,
-                            size: 30,
+                            size: 26,
                           ),
                         ),
                       );
                     },
                   ),
 
-                  // Floating particles
-                  ...List.generate(6, (index) {
-                    final angle = (index * math.pi * 2) / 6;
+                  // Orbiting warm dots
+                  ...List.generate(5, (i) {
+                    final angle = (i * math.pi * 2) / 5;
                     return AnimatedBuilder(
-                      animation: _particleController,
-                      builder: (context, child) {
-                        final progress = (_particleController.value + (index * 0.2)) % 1.0;
-                        final radius = 40 + (progress * 30);
-                        final opacity = 1.0 - progress;
+                      animation: _orbController,
+                      builder: (context, _) {
+                        final progress = (_orbController.value + (i * 0.22)) % 1.0;
+                        final radius = 48.0 + (progress * 12);
+                        final opacity = (1.0 - progress).clamp(0.0, 1.0);
+                        final size = 5.0 + progress * 2;
                         return Positioned(
-                          left: 60 + (math.cos(angle) * radius) - 3,
-                          top: 60 + (math.sin(angle) * radius) - 3,
+                          left: 55 + math.cos(angle + _orbController.value * math.pi * 2) * radius - size / 2,
+                          top: 55 + math.sin(angle + _orbController.value * math.pi * 2) * radius - size / 2,
                           child: Opacity(
                             opacity: opacity,
                             child: Container(
-                              width: 6,
-                              height: 6,
+                              width: size,
+                              height: size,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: Colors.purple,
+                                color: i.isEven
+                                    ? LumioColors.primary
+                                    : LumioColors.primaryHover,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.purple.withOpacity(0.5),
+                                    color: LumioColors.primary.withValues(alpha: 0.4),
                                     blurRadius: 4,
                                   ),
                                 ],
@@ -189,44 +217,49 @@ class _AILoadingDialogState extends State<AILoadingDialog>
               ),
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
 
-            // Animated text
+            // Message with fade loop
             Text(
               widget.message,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: textColor,
+                letterSpacing: -0.2,
               ),
               textAlign: TextAlign.center,
             )
-                .animate(onPlay: (controller) => controller.repeat())
-                .fadeIn(duration: 600.ms)
-                .then(delay: 400.ms)
-                .fadeOut(duration: 600.ms),
+                .animate(onPlay: (c) => c.repeat())
+                .fadeIn(duration: 700.ms)
+                .then(delay: 600.ms)
+                .fadeOut(duration: 500.ms),
 
             const SizedBox(height: 16),
 
-            // Shimmer dots
+            // Lumio amber pulsing dots
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(3, (index) {
+              children: List.generate(3, (i) {
                 return Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppTheme.primaryColor,
-                    ),
-                  )
-                      .animate(onPlay: (controller) => controller.repeat())
-                      .fadeOut(delay: (index * 200).ms, duration: 600.ms)
-                      .then()
-                      .fadeIn(duration: 600.ms),
-                );
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: LumioColors.primary,
+                  ),
+                )
+                    .animate(onPlay: (c) => c.repeat())
+                    .scaleXY(
+                      begin: 0.6,
+                      end: 1.0,
+                      delay: (i * 160).ms,
+                      duration: 480.ms,
+                      curve: Curves.easeInOut,
+                    )
+                    .then()
+                    .scaleXY(begin: 1.0, end: 0.6, duration: 480.ms, curve: Curves.easeInOut);
               }),
             ),
           ],
