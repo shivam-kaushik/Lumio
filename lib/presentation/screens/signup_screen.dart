@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/auth_provider.dart';
 import '../theme/theme.dart';
-import '../navigation/main_navigator.dart';
 import 'login_screen.dart';
 
 /// Sign up screen for creating new accounts
@@ -51,14 +50,9 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
-      // Navigate to main app
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => const MainNavigator(),
-          ),
-          (route) => false,
-        );
+      // AuthGate reacts automatically — just pop if this screen was pushed
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -82,14 +76,9 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
-      // Navigate to main app
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => const MainNavigator(),
-          ),
-          (route) => false,
-        );
+      // AuthGate reacts automatically — just pop if this screen was pushed
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
       }
     } else if (authProvider.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
