@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -5,7 +6,6 @@ import '../../core/services/premium_service.dart';
 import '../../core/services/iap_service.dart';
 import '../theme/theme.dart';
 
-/// Screen to display premium features and handle subscription
 class PremiumSubscriptionScreen extends StatefulWidget {
   const PremiumSubscriptionScreen({super.key});
 
@@ -58,39 +58,32 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen> {
   }
 
   void _onIapUpdate() {
-    if (mounted) {
-      setState(() {}); // Rebuild to show products/loading
-      if (_iapService.purchaseError != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_iapService.purchaseError!)),
-        );
-      }
+    if (!mounted) return;
+    setState(() {});
+    if (_iapService.purchaseError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_iapService.purchaseError!), backgroundColor: LumioColors.error));
     }
   }
 
   Future<void> _handlePurchase(ProductDetails? product) async {
     if (product == null) return;
-    
     setState(() => _isLoading = true);
     await _iapService.buyProduct(product);
-    // Loading state is managed by IAP stream updates mostly, but we can reset here
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _handleRestore() async {
     setState(() => _isLoading = true);
     await _iapService.restorePurchases();
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
-    // Find monthly product
-    final monthlyProduct = _iapService.products.cast<ProductDetails>().firstWhere(
-      (p) => p.id == IAPService.kMonthlySubscriptionId,
+    final isIOS = Platform.isIOS;
+
+    final monthlyProduct = _iapService.products.cast<ProductDetails?>().firstWhere(
+      (p) => p?.id == IAPService.kMonthlySubscriptionId,
       orElse: () => ProductDetails(
         id: 'premium_monthly',
         title: 'Premium Monthly',
@@ -98,72 +91,54 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen> {
         price: '\$4.99',
         rawPrice: 4.99,
         currencyCode: 'USD',
-      ), // Dummy fallback for UI testing if store not connected
+      ),
     );
 
     return Scaffold(
-      backgroundColor: isDark ? Colors.black : Colors.white,
+      backgroundColor: LumioColors.background(context),
       body: Stack(
         children: [
-          // Background Gradient decoration
           Positioned(
-            top: -100,
-            right: -100,
+            top: -80,
+            right: -80,
             child: Container(
-              width: 300,
-              height: 300,
+              width: 260,
+              height: 260,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    Colors.purple.withOpacity(0.3),
-                    Colors.transparent,
-                  ],
-                ),
+                gradient: RadialGradient(colors: [LumioColors.primary.withValues(alpha: 0.15), Colors.transparent]),
               ),
             ),
           ),
-           Positioned(
-            bottom: -50,
-            left: -50,
+          Positioned(
+            bottom: -40,
+            left: -40,
             child: Container(
-              width: 200,
-              height: 200,
+              width: 180,
+              height: 180,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    Colors.blue.withOpacity(0.2),
-                    Colors.transparent,
-                  ],
-                ),
+                gradient: RadialGradient(colors: [Colors.blue.withValues(alpha: 0.1), Colors.transparent]),
               ),
             ),
           ),
-
           SafeArea(
             child: Column(
               children: [
                 // Header
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(LumioSpacing.md),
                   child: Row(
                     children: [
                       IconButton(
                         icon: const Icon(Icons.close_rounded),
                         onPressed: () => Navigator.of(context).pop(),
-                        color: isDark ? Colors.white : Colors.black,
+                        color: LumioColors.textPrimary(context),
                       ),
                       const Spacer(),
                       TextButton(
                         onPressed: _isLoading ? null : _handleRestore,
-                        child: Text(
-                          'Restore Purchases',
-                          style: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black54,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: Text('Restore Purchases', style: TextStyle(color: LumioColors.textSecondary(context), fontWeight: FontWeight.w600)),
                       ),
                     ],
                   ),
@@ -171,90 +146,58 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen> {
 
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsets.symmetric(horizontal: LumioSpacing.lg),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const SizedBox(height: 20),
-                        // Crown Icon
+                        const SizedBox(height: LumioSpacing.lg),
                         Container(
-                          padding: const EdgeInsets.all(20),
+                          padding: const EdgeInsets.all(LumioSpacing.lg),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.1),
+                            color: Colors.amber.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.star_rounded, size: 60, color: Colors.amber)
+                          child: const Icon(Icons.star_rounded, size: 56, color: Colors.amber)
                               .animate(onPlay: (c) => c.repeat(reverse: true))
                               .scale(begin: const Offset(1, 1), end: const Offset(1.1, 1.1), duration: 2.seconds),
                         ),
-                        const SizedBox(height: 24),
-                        
-                        Text(
-                          'Unlock Lumio Premium',
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : Colors.black,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: LumioSpacing.lg),
+                        Text('Unlock Lumio Premium', style: LumioTypography.headlineLarge.copyWith(color: LumioColors.textPrimary(context)), textAlign: TextAlign.center),
+                        const SizedBox(height: LumioSpacing.sm),
                         Text(
                           'Supercharge your productivity with\nAI-powered tools and insights.',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: isDark ? Colors.white70 : Colors.black54,
-                            height: 1.5,
-                          ),
+                          style: LumioTypography.bodyLarge.copyWith(color: LumioColors.textSecondary(context), height: 1.5),
                           textAlign: TextAlign.center,
                         ),
-                        
-                        const SizedBox(height: 48),
-
-                        // Features List
+                        const SizedBox(height: LumioSpacing.xl),
                         ..._features.map((feature) => Padding(
-                          padding: const EdgeInsets.only(bottom: 24),
+                          padding: const EdgeInsets.only(bottom: LumioSpacing.lg),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(LumioSpacing.sm + 4),
                                 decoration: BoxDecoration(
-                                  color: (feature['color'] as Color).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(16),
+                                  color: (feature['color'] as Color).withValues(alpha: 0.1),
+                                  borderRadius: LumioRadius.radiusMD,
                                 ),
-                                child: Icon(
-                                  feature['icon'] as IconData,
-                                  color: feature['color'] as Color,
-                                  size: 28,
-                                ),
+                                child: Icon(feature['icon'] as IconData, color: feature['color'] as Color, size: 26),
                               ),
-                              const SizedBox(width: 16),
+                              const SizedBox(width: LumioSpacing.md),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      feature['title'],
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark ? Colors.white : Colors.black87,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      feature['description'],
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        color: isDark ? Colors.white60 : Colors.black54,
-                                        height: 1.4,
-                                      ),
-                                    ),
+                                    Text(feature['title'] as String, style: LumioTypography.titleSmall.copyWith(color: LumioColors.textPrimary(context))),
+                                    const SizedBox(height: LumioSpacing.xs),
+                                    Text(feature['description'] as String, style: LumioTypography.bodySmall.copyWith(color: LumioColors.textSecondary(context), height: 1.4)),
                                   ],
                                 ),
                               ),
                             ],
-                          ).animate().fadeIn().slideX(begin: 0.2, end: 0, duration: 400.ms, curve: Curves.easeOut),
+                          ).animate().fadeIn(duration: 400.ms).slideX(begin: 0.15, end: 0, duration: 400.ms, curve: Curves.easeOut),
                         )),
-                        
-                        const SizedBox(height: 100), // Bottom padding
+                        const SizedBox(height: 100),
                       ],
                     ),
                   ),
@@ -262,64 +205,56 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen> {
 
                 // Bottom CTA
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(LumioSpacing.lg),
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[900] : Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 20,
-                        offset: const Offset(0, -5),
-                      ),
-                    ],
+                    color: LumioColors.surface(context),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 20, offset: const Offset(0, -5))],
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                       SizedBox(
+                      SizedBox(
                         width: double.infinity,
+                        height: 56,
                         child: ElevatedButton(
                           onPressed: (_isLoading || _iapService.isLoading) ? null : () => _handlePurchase(monthlyProduct),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 4,
-                            shadowColor: AppTheme.primaryColor.withOpacity(0.4),
+                            backgroundColor: isIOS ? Colors.black : LumioColors.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: LumioRadius.button),
+                            elevation: 0,
                           ),
                           child: (_isLoading || _iapService.isLoading)
-                            ? const SizedBox(
-                                height: 24, 
-                                width: 24, 
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                              )
-                            : Text(
-                                'Upgrade for ${monthlyProduct.price}/mo',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (isIOS) ...[
+                                      const Icon(Icons.apple, size: 20),
+                                      const SizedBox(width: LumioSpacing.xs),
+                                      Text('Subscribe with Apple — ${monthlyProduct?.price ?? '\$4.99'}/mo', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                                    ] else ...[
+                                      Image.asset('assets/google_play_icon.png', width: 20, height: 20, errorBuilder: (_, __, ___) => const Icon(Icons.play_arrow_rounded, size: 20)),
+                                      const SizedBox(width: LumioSpacing.xs),
+                                      Text('Subscribe — ${monthlyProduct?.price ?? '\$4.99'}/mo', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                                    ],
+                                  ],
                                 ),
-                              ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: LumioSpacing.sm),
                       Text(
-                        'Recurring billing. Cancel anytime.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: isDark ? Colors.white38 : Colors.black38,
-                        ),
+                        isIOS
+                            ? 'Payment charged to your Apple ID. Cancel anytime.'
+                            : 'Payment processed by Google Play. Cancel anytime.',
+                        style: LumioTypography.bodySmall.copyWith(color: LumioColors.textSecondary(context)),
+                        textAlign: TextAlign.center,
                       ),
                       if (!_iapService.isAvailable)
-                         Padding(
-                           padding: const EdgeInsets.only(top: 8),
-                           child: Text(
-                            'Store unavailable or not connected',
-                            style: theme.textTheme.bodySmall?.copyWith(color: AppTheme.errorColor),
-                                                   ),
-                         ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: LumioSpacing.xs),
+                          child: Text('Store unavailable — check your connection', style: LumioTypography.bodySmall.copyWith(color: LumioColors.error)),
+                        ),
                     ],
                   ),
                 ),
