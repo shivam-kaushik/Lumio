@@ -18,9 +18,12 @@ import 'data/repositories/firestore_growth_repository.dart';
 import 'presentation/providers/reminder_provider.dart';
 import 'presentation/providers/growth_provider.dart';
 import 'presentation/providers/theme_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/screens/splash_screen.dart';
+import 'presentation/screens/login_screen.dart';
+import 'presentation/screens/welcome_screen.dart';
 import 'presentation/navigation/main_navigator.dart';
 import 'core/services/motivational_engine.dart'; // Add import
 
@@ -145,6 +148,31 @@ void main() async {
   runApp(const LumioApp());
 }
 
+/// Reactive auth gate — the ONLY place that routes to MainNavigator.
+/// No other screen may push MainNavigator directly.
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        if (auth.isLoading) return const SplashScreen();
+        if (auth.isAuthenticated) return const MainNavigator();
+        // Re-read prefs fresh every time auth state changes (e.g. sign-out).
+        return FutureBuilder<bool>(
+          future: SharedPreferences.getInstance()
+              .then((p) => p.getBool('onboarding_complete') ?? false),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const SplashScreen();
+            return snapshot.data! ? const LoginScreen() : const WelcomeScreen();
+          },
+        );
+      },
+    );
+  }
+}
+
 /// Main application widget
 class LumioApp extends StatefulWidget {
   const LumioApp({super.key});
@@ -228,7 +256,7 @@ class _LumioAppState extends State<LumioApp> {
             theme: LumioTheme.light,
             darkTheme: LumioTheme.dark,
             themeMode: themeProvider.themeMode,
-            home: const SplashScreen(),
+            home: const AuthGate(),
             routes: {
               '/home': (context) => const MainNavigator(),
             },
