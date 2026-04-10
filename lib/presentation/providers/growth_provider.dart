@@ -11,7 +11,6 @@ import '../../core/services/sound_service.dart';
 import '../../core/services/notification_service.dart'; // NEW
 import '../../core/services/gamification_service.dart'; // NEW
 import '../../core/services/avatar_service.dart'; // NEW
-import '../../data/models/user_location.dart'; 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' show DateTimeComponents;
 import 'package:shared_preferences/shared_preferences.dart'; 
 import 'dart:convert';
@@ -28,7 +27,6 @@ class GrowthProvider with ChangeNotifier {
   List<Goal> _goals = [];
   Map<int, List<GoalTask>> _tasksByGoal = {}; // goalId -> tasks
   Map<int, List<GoalPhase>> _phasesByGoal = {}; // goalId -> phases
-  List<UserLocation> _savedLocations = []; // NEW: Saved Locations
   UserStats? _userStats; // NEW: Gamification Stats
   final _levelUpController = StreamController<int>.broadcast(); // NEW: Level Up Event
   Map<String, dynamic> _avatarConfig = {}; // NEW: Avatar Config
@@ -52,7 +50,6 @@ class GrowthProvider with ChangeNotifier {
   List<Goal> get goals => _goals;
   Map<int, List<GoalTask>> get tasksByGoal => _tasksByGoal;
   Map<int, List<GoalPhase>> get phasesByGoal => _phasesByGoal;
-  List<UserLocation> get savedLocations => _savedLocations; // NEW
   UserStats? get userStats => _userStats; // NEW
   Map<String, dynamic> get avatarConfig => _avatarConfig; // NEW
   bool get showAvatarInProfile => _showAvatarInProfile; // NEW
@@ -107,9 +104,6 @@ class GrowthProvider with ChangeNotifier {
         _tasksByGoal[goal.id] = tasks;
         _phasesByGoal[goal.id] = phases;
       }));
-
-      // Load Saved Locations
-      await _loadSavedLocations();
 
       // Load Gamification Stats
       _userStats = await _gamificationService.loadStats();
@@ -233,12 +227,6 @@ class GrowthProvider with ChangeNotifier {
       notifyListeners();
       rethrow;
     }
-  }
-
-  Future<void> _persistSavedLocations() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String jsonStr = jsonEncode(_savedLocations.map((e) => e.toMap()).toList());
-    await prefs.setString('saved_locations', jsonStr);
   }
 
   // ==================== Notifications ====================
@@ -866,35 +854,6 @@ class GrowthProvider with ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
-  }
-
-  // ==================== Saved Locations ====================
-
-  Future<void> _loadSavedLocations() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? jsonStr = prefs.getString('saved_locations');
-      if (jsonStr != null) {
-        final List<dynamic> decoded = jsonDecode(jsonStr);
-        _savedLocations = decoded.map((e) => UserLocation.fromMap(e)).toList();
-      } else {
-        _savedLocations = [];
-      }
-    } catch (e) {
-      debugPrint("Error loading locations: $e");
-    }
-  }
-
-  Future<void> addSavedLocation(UserLocation loc) async {
-    _savedLocations.add(loc);
-    notifyListeners();
-    await _persistSavedLocations();
-  }
-
-  Future<void> deleteSavedLocation(String id) async {
-    _savedLocations.removeWhere((l) => l.id == id);
-    notifyListeners();
-    await _persistSavedLocations();
   }
 
   /// Explicitly close the active task view

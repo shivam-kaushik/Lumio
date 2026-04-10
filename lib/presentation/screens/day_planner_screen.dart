@@ -342,7 +342,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
           builder: (context) => QuickTaskInputSheet(
-              onSubmit: (title, date, priority, tags, repeat, location) async {
+              onSubmit: (title, date, priority, tags, repeat) async {
                   final goalId = await provider.ensureDailyGoal(_selectedDate);
                   final task = GoalTask(
                       id: 0,
@@ -353,7 +353,6 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                       createdAt: DateTime.now(),
                       scheduledDate: _selectedDate,
                       frequency: repeat ?? 'one-time',
-                      suggestedLocation: location ?? 'any',
                   );
                   await provider.createTask(task);
                   if (mounted) Navigator.pop(context);
@@ -465,7 +464,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                           padding: const EdgeInsets.only(bottom: 100),
                           children: [
                             // AI Schedule Optimized Card
-                            _buildAIInsightCard(context, isDark, textColor, subtleColor, surfaceColor),
+                            _buildAIInsightCard(context, tasks, isDark, textColor, subtleColor, surfaceColor),
 
                             // Week Date Picker
                             _buildWeekDatePicker(isDark, textColor, subtleColor, surfaceColor, dividerColor),
@@ -757,11 +756,18 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
 
   Widget _buildAIInsightCard(
     BuildContext context,
+    List<GoalTask> tasks,
     bool isDark,
     Color textColor,
     Color subtleColor,
     Color surfaceColor,
   ) {
+    final completedCount = tasks.where((t) => t.isCompleted).length;
+    final totalCount = tasks.length;
+    final titleText = tasks.isEmpty ? "Plan Your Day" : "Schedule Overview";
+    final subtitleText = tasks.isEmpty
+        ? "Your tasks have been organized for optimal focus. Deep work is scheduled during your peak hours."
+        : "$completedCount of $totalCount tasks done today";
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       decoration: BoxDecoration(
@@ -825,7 +831,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Schedule Optimized",
+                        titleText,
                         style: TextStyle(
                           color: textColor,
                           fontSize: 15,
@@ -834,7 +840,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        "Your tasks have been organized for optimal focus. Deep work is scheduled during your peak hours.",
+                        subtitleText,
                         style: TextStyle(
                           color: subtleColor,
                           fontSize: 13,
@@ -978,6 +984,45 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
+          // Section header with + button
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  AnalyticsHelper.isSameDay(_selectedDate, DateTime.now())
+                      ? "Today's Tasks"
+                      : DateFormat('MMM d\'s Tasks').format(_selectedDate),
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => _showQuickAdd(context, provider),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: LumioColors.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: LumioColors.primary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Timeline with tasks
           ...tasks.asMap().entries.map((entry) {
             final index = entry.key;
@@ -1419,13 +1464,11 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
               initialPriority: task.priority,
               initialTags: [],
               initialRepeat: task.frequency != 'one-time' ? task.frequency : null,
-              initialLocation: task.suggestedLocation != 'any' ? task.suggestedLocation : null,
-              onSubmit: (title, date, priority, tags, repeat, location) {
+              onSubmit: (title, date, priority, tags, repeat) {
                   final updatedTask = task.copyWith(
                       title: title,
                       priority: priority,
                       frequency: repeat ?? 'one-time',
-                      suggestedLocation: location ?? 'any',
                       scheduledDate: date ?? task.scheduledDate,
                   );
                   provider.updateTask(updatedTask);

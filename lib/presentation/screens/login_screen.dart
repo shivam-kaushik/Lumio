@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/auth_provider.dart';
 import '../theme/theme.dart';
-import '../navigation/main_navigator.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -49,14 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
-      // Navigate to main app
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => const MainNavigator(),
-          ),
-          (route) => false,
-        );
+      // AuthGate reacts automatically — just pop if this screen was pushed
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -80,14 +74,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
-      // Navigate to main app
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => const MainNavigator(),
-          ),
-          (route) => false,
-        );
+      // AuthGate reacts automatically — just pop if this screen was pushed
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
       }
     } else if (authProvider.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(

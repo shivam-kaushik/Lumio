@@ -1,23 +1,22 @@
 import 'dart:ui';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../providers/growth_provider.dart';
 import '../theme/theme.dart';
-import '../widgets/animated_progress_bar.dart';
 import '../widgets/ai_loading_dialog.dart';
 import '../../data/models/goal.dart';
 import '../../data/models/goal_task.dart';
+import '../../data/models/goal_settings.dart';
 import '../../core/services/adaptive_rescheduling_service.dart';
 import '../../core/services/premium_service.dart';
 import '../../core/services/privacy_gpt_service.dart';
 import 'goal_settings_screen.dart';
 
-/// Goal details screen with modern, clean UI
+/// Stitch-style Goal Details Screen
+/// Features: Large progress ring, AI insights, milestones timeline
 class GoalDetailsScreen extends StatefulWidget {
   final int goalId;
 
@@ -30,21 +29,14 @@ class GoalDetailsScreen extends StatefulWidget {
 class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
   bool _isAddingTask = false;
   int? _editingTaskId;
-  final _newTaskTitleController = TextEditingController();
-  final _newTaskDescController = TextEditingController();
-  final _scrollController = ScrollController();
-  DateTime? _newTaskDate;
-  String _newTaskPriority = 'medium';
-
-  final Map<int, TextEditingController> _editTitleControllers = {};
-  final Map<int, TextEditingController> _editDescControllers = {};
-
-  final Map<int, DateTime?> _editDates = {};
-
-  // Inline Subtask State
-  int? _addingSubtaskParentId;
   int? _editingSubtaskId;
-  final TextEditingController _inlineSubtaskController = TextEditingController();
+  final _newTaskController = TextEditingController();
+  final _inlineTaskController = TextEditingController();
+  final _inlineSubtaskController = TextEditingController();
+  final _scrollController = ScrollController();
+  final Set<int> _expandedTasks = {};
+  int? _addingSubtaskForTaskId;
+  final _newSubtaskController = TextEditingController();
 
   @override
   void initState() {
@@ -57,16 +49,11 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
 
   @override
   void dispose() {
-    _newTaskTitleController.dispose();
-    _newTaskDescController.dispose();
-    _scrollController.dispose();
-    for (var controller in _editTitleControllers.values) {
-      controller.dispose();
-    }
-    for (var controller in _editDescControllers.values) {
-      controller.dispose();
-    }
+    _newTaskController.dispose();
+    _inlineTaskController.dispose();
     _inlineSubtaskController.dispose();
+    _scrollController.dispose();
+    _newSubtaskController.dispose();
     super.dispose();
   }
 
@@ -80,360 +67,1629 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
     if (mounted && result['missedCount'] > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '${result['rescheduledCount']} missed task(s) rescheduled automatically',
-          ),
-          backgroundColor: Colors.blue,
+          content: Text('${result['rescheduledCount']} missed task(s) rescheduled'),
+          backgroundColor: LumioColors.info,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: LumioRadius.radiusMD),
         ),
       );
     }
   }
 
-  // Start editing task inline
-  void _startEditingTask(GoalTask task) {
-    setState(() {
-      _editingTaskId = task.id;
-      _editTitleControllers[task.id] = TextEditingController(text: task.title);
-      _editDescControllers[task.id] = TextEditingController(text: task.description);
-      _editDates[task.id] = task.scheduledDate;
-    });
-  }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: LumioColors.background(context),
+      body: Consumer<GrowthProvider>(
+        builder: (context, provider, _) {
+          final goal = provider.goals.firstWhere(
+            (g) => g.id == widget.goalId,
+            orElse: () => Goal(id: -1, name: 'Loading...', createdAt: DateTime.now()),
+          );
 
-  // Save edited task
-  Future<void> _saveEditedTask(GoalTask task, GrowthProvider growthProvider) async {
-    final title = _editTitleControllers[task.id]?.text.trim() ?? '';
-    if (title.isEmpty) return;
+          if (goal.id == -1) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-    final updatedTask = task.copyWith(
-      title: title,
-      description: _editDescControllers[task.id]?.text.trim() ?? '',
-      scheduledDate: _editDates[task.id],
-    );
+          final tasks = provider.getTasksForGoal(widget.goalId);
+          final progress = _calculateProgress(tasks);
+          final completedTasks = tasks.where((t) => t.isCompleted).length;
+          final totalTasks = tasks.length;
 
-    await growthProvider.updateTask(updatedTask);
-
-    setState(() {
-      _editingTaskId = null;
-      _editTitleControllers[task.id]?.dispose();
-      _editDescControllers[task.id]?.dispose();
-      _editTitleControllers.remove(task.id);
-      _editDescControllers.remove(task.id);
-      _editDates.remove(task.id);
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('✓ Task updated'),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-    }
-  }
-
-  // Cancel editing task
-  void _cancelEditingTask(int taskId) {
-    setState(() {
-      _editingTaskId = null;
-      _editTitleControllers[taskId]?.dispose();
-      _editDescControllers[taskId]?.dispose();
-      _editTitleControllers.remove(taskId);
-      _editDescControllers.remove(taskId);
-      _editDates.remove(taskId);
-    });
-  }
-
-  // Edit task deadline via DatePicker
-  Future<void> _editTaskDeadline(GoalTask task, GrowthProvider growthProvider) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: task.scheduledDate ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
-      builder: (context, child) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: isDark
-                ? const ColorScheme.dark(
-                    primary: _tealAccent,
-                    onPrimary: Colors.white,
-                    surface: Color(0xFF1A1A1A),
-                    onSurface: Color(0xFFE0E0E0),
-                  )
-                : ColorScheme.light(
-                    primary: _tealAccent,
-                    onPrimary: Colors.white,
-                    surface: Colors.white,
-                    onSurface: Colors.grey.shade900,
-                  ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null && mounted) {
-      final updatedTask = task.copyWith(scheduledDate: picked);
-      await growthProvider.updateTask(updatedTask);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Deadline updated to ${DateFormat('MMM d, y').format(picked)}'),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _editGoal(BuildContext context) async {
-    final growthProvider = context.read<GrowthProvider>();
-    final goal = growthProvider.goals.firstWhere((g) => g.id == widget.goalId);
-
-    final titleController = TextEditingController(text: goal.name);
-    DateTime? selectedDate = goal.targetDeadline;
-    double? hoursPerDay = goal.hoursPerDay;
-
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setState) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: const Text('Edit Goal', style: TextStyle(fontWeight: FontWeight.w700)),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Goal Name',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate ?? DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (date != null) {
-                        setState(() => selectedDate = date);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: LumioColors.borderLight),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey.shade50,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.calendar_today, size: 20, color: LumioColors.primary),
-                          const SizedBox(width: 8),
-                          Text(
-                            selectedDate != null
-                                ? DateFormat('MMM d, y').format(selectedDate!)
-                                : 'Select deadline',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Hours per day',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                    ),
-                    keyboardType: TextInputType.number,
-                    controller: TextEditingController(
-                      text: hoursPerDay?.toString() ?? '',
-                    ),
-                    onChanged: (value) {
-                      hoursPerDay = double.tryParse(value);
-                    },
-                  ),
-                ],
+          return CustomScrollView(
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              // Header
+              SliverToBoxAdapter(
+                child: _buildHeader(context, goal),
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+
+              // Progress Ring
+              SliverToBoxAdapter(
+                child: _buildProgressRing(context, progress, goal),
               ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context, {
-                    'name': titleController.text.trim(),
-                    'deadline': selectedDate,
-                    'hoursPerDay': hoursPerDay,
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+
+              // AI Insight Card
+              SliverToBoxAdapter(
+                child: _buildAIInsightCard(context, goal, progress),
+              ),
+
+              // Milestones Section
+              SliverToBoxAdapter(
+                child: _buildMilestonesSection(context, tasks, provider),
+              ),
+
+              // Add Task Section
+              if (_isAddingTask)
+                SliverToBoxAdapter(
+                  child: _buildAddTaskInput(context, provider),
                 ),
-                child: const Text('Save'),
+
+              // Bottom padding (accounts for nav bar)
+              SliverPadding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom + 100,
+                ),
               ),
             ],
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
-
-    if (result != null && mounted) {
-      final updatedGoal = goal.copyWith(
-        name: result['name'] as String,
-        targetDeadline: result['deadline'] as DateTime?,
-        hoursPerDay: result['hoursPerDay'] as double?,
-      );
-      await growthProvider.updateGoal(updatedGoal);
-    }
   }
 
-  Future<void> _deleteGoal() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: const Text('Delete Goal?'),
-        content: const Text('This will delete the goal and all its tasks. This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: LumioColors.error,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+  Widget _buildHeader(BuildContext context, Goal goal) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        LumioSpacing.md,
+        MediaQuery.of(context).padding.top + LumioSpacing.md,
+        LumioSpacing.md,
+        LumioSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: LumioColors.background(context).withOpacity(0.95),
+      ),
+      child: Row(
+        children: [
+          // Back button
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: LumioRadius.radiusFull,
+              ),
+              child: Icon(
+                Icons.arrow_back_rounded,
+                color: LumioColors.textPrimary(context),
+                size: 24,
               ),
             ),
-            child: const Text('Delete'),
+          ),
+
+          // Title
+          Expanded(
+            child: Center(
+              child: Text(
+                goal.name,
+                style: LumioTypography.titleMedium.copyWith(
+                  color: LumioColors.textPrimary(context),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+
+          // Settings / more options button
+          GestureDetector(
+            onTap: () => _showGoalOptionsSheet(context, goal),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Colors.transparent,
+              ),
+              child: Icon(
+                Icons.settings_outlined,
+                color: LumioColors.textPrimary(context),
+                size: 22,
+              ),
+            ),
           ),
         ],
       ),
     );
+  }
 
-    if (confirmed == true && mounted) {
-      await context.read<GrowthProvider>().deleteGoal(widget.goalId);
+  Widget _buildProgressRing(BuildContext context, double progress, Goal goal) {
+    final percentage = (progress * 100).round();
+    final dueText = goal.targetDeadline != null
+        ? 'On track to finish by ${DateFormat('MMM d').format(goal.targetDeadline!)}'
+        : 'No deadline set';
+
+    return Padding(
+      padding: EdgeInsets.all(LumioSpacing.screenHorizontal),
+      child: Column(
+        children: [
+          // Large progress ring
+          SizedBox(
+            width: 180,
+            height: 180,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Background ring
+                CustomPaint(
+                  size: const Size(180, 180),
+                  painter: _CircleProgressPainter(
+                    progress: 1.0,
+                    color: LumioColors.border(context),
+                    strokeWidth: 8,
+                  ),
+                ),
+                // Progress ring
+                CustomPaint(
+                  size: const Size(180, 180),
+                  painter: _CircleProgressPainter(
+                    progress: progress.clamp(0.0, 1.0),
+                    color: LumioColors.primary,
+                    strokeWidth: 8,
+                  ),
+                ),
+                // Center content
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '$percentage%',
+                      style: LumioTypography.displaySmall.copyWith(
+                        color: LumioColors.textPrimary(context),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'Complete',
+                      style: LumioTypography.labelMedium.copyWith(
+                        color: LumioColors.textSecondary(context),
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          SizedBox(height: LumioSpacing.md),
+
+          // Due text
+          Text(
+            dueText,
+            style: LumioTypography.bodyMedium.copyWith(
+              color: LumioColors.textSecondary(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAIInsightCard(BuildContext context, Goal goal, double progress) {
+    String insightText;
+    if (progress < 0.25) {
+      insightText = "You're just getting started! Let me help you break down this goal into manageable steps.";
+    } else if (progress < 0.5) {
+      insightText = "Great progress so far! You're building momentum. Keep up the consistency!";
+    } else if (progress < 0.75) {
+      insightText = "You're more than halfway there! This is where persistence pays off.";
+    } else {
+      insightText = "You're crushing it! Just a few more tasks and you'll reach your goal.";
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: LumioSpacing.screenHorizontal),
+      child: Container(
+        padding: EdgeInsets.all(LumioSpacing.lg),
+        decoration: BoxDecoration(
+          color: LumioColors.surface(context),
+          borderRadius: LumioRadius.card,
+          border: Border.all(
+            color: LumioColors.primary.withOpacity(0.2),
+            width: 1,
+          ),
+          boxShadow: LumioShadows.getSoft(context),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              LumioColors.primary.withOpacity(0.08),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: LumioColors.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    color: LumioColors.primary,
+                    size: 18,
+                  ),
+                ),
+                SizedBox(width: LumioSpacing.sm),
+                Text(
+                  'AI Insight',
+                  style: LumioTypography.labelMedium.copyWith(
+                    color: LumioColors.primary,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+
+            SizedBox(height: LumioSpacing.md),
+
+            // Insight text
+            Text(
+              insightText,
+              style: LumioTypography.bodyMedium.copyWith(
+                color: LumioColors.textSecondary(context),
+                height: 1.5,
+              ),
+            ),
+
+            SizedBox(height: LumioSpacing.md),
+
+            // Action button
+            GestureDetector(
+              onTap: () => _generateTasksWithAI(context),
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: LumioSpacing.md,
+                  vertical: LumioSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: LumioColors.primary,
+                  borderRadius: LumioRadius.radiusFull,
+                  boxShadow: [
+                    BoxShadow(
+                      color: LumioColors.primary.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Generate',
+                      style: LumioTypography.labelMedium.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMilestonesSection(BuildContext context, List<GoalTask> tasks, GrowthProvider provider) {
+    // Sort: incomplete first, completed at bottom
+    final sorted = [
+      ...tasks.where((t) => !t.isCompleted),
+      ...tasks.where((t) => t.isCompleted),
+    ];
+
+    return Padding(
+      padding: EdgeInsets.all(LumioSpacing.screenHorizontal),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Milestones',
+                style: LumioTypography.titleMedium.copyWith(
+                  color: LumioColors.textPrimary(context),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isAddingTask = !_isAddingTask;
+                  });
+                },
+                child: Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: LumioColors.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _isAddingTask ? Icons.close_rounded : Icons.add_rounded,
+                    color: LumioColors.primary,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          SizedBox(height: LumioSpacing.md),
+
+          // Tasks container
+          Container(
+            padding: EdgeInsets.all(LumioSpacing.lg),
+            decoration: BoxDecoration(
+              color: LumioColors.surface(context),
+              borderRadius: LumioRadius.card,
+              border: Border.all(
+                color: LumioColors.border(context),
+                width: 1,
+              ),
+              boxShadow: LumioShadows.getSoft(context),
+            ),
+            child: tasks.isEmpty
+                ? _buildEmptyTasksState(context)
+                : Column(
+                    children: sorted
+                        .map((task) => _buildTaskItem(context, task, provider))
+                        .toList(),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaskItem(BuildContext context, GoalTask task, GrowthProvider provider) {
+    final isCompleted = task.isCompleted;
+    final hasSubtasks = task.subtasks.isNotEmpty;
+    final isExpanded = _expandedTasks.contains(task.id);
+    final isAddingSubtask = _addingSubtaskForTaskId == task.id;
+
+    final completedSubtasks = task.subtasks.where((s) => s.isCompleted).length;
+
+    return Dismissible(
+      key: ValueKey('task_${task.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: EdgeInsets.symmetric(vertical: LumioSpacing.sm),
+        decoration: BoxDecoration(
+          color: LumioColors.error,
+          borderRadius: LumioRadius.taskItem,
+        ),
+        child: const Icon(Icons.delete_rounded, color: Colors.white, size: 22),
+      ),
+      confirmDismiss: (_) async {
+        HapticFeedback.mediumImpact();
+        return true;
+      },
+      onDismissed: (_) => provider.deleteTask(task.id),
+      child: Padding(
+      padding: EdgeInsets.symmetric(vertical: LumioSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Main task card
+          Container(
+            padding: EdgeInsets.all(LumioSpacing.md),
+            decoration: BoxDecoration(
+              color: LumioColors.background(context),
+              borderRadius: LumioRadius.taskItem,
+              border: Border.all(
+                color: isCompleted
+                    ? LumioColors.primary.withOpacity(0.2)
+                    : LumioColors.border(context).withOpacity(0.5),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Checkbox — tap to toggle completion
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.mediumImpact();
+                        if (isCompleted) {
+                          provider.uncompleteTask(task.id);
+                        } else {
+                          provider.completeTask(task.id);
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: isCompleted ? LumioColors.primary : Colors.transparent,
+                            borderRadius: LumioRadius.radiusXS,
+                            border: isCompleted
+                                ? null
+                                : Border.all(color: LumioColors.border(context), width: 2),
+                          ),
+                          child: isCompleted
+                              ? Icon(Icons.check_rounded, color: Colors.white, size: 14)
+                              : null,
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(width: LumioSpacing.md),
+
+                    // Task title + deadline — tap to edit inline
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _editingTaskId == task.id
+                              ? TextField(
+                                  controller: _inlineTaskController,
+                                  autofocus: true,
+                                  style: LumioTypography.bodyMedium.copyWith(
+                                    color: LumioColors.textPrimary(context),
+                                  ),
+                                  decoration: InputDecoration(
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                    isDense: true,
+                                  ),
+                                  onSubmitted: (v) => _saveInlineTaskEdit(task, provider, v),
+                                  onTapOutside: (_) => _saveInlineTaskEdit(
+                                      task, provider, _inlineTaskController.text),
+                                )
+                              : GestureDetector(
+                                  onTap: () => setState(() {
+                                    _editingTaskId = task.id;
+                                    _inlineTaskController.text = task.title;
+                                  }),
+                                  child: Text(
+                                    task.title,
+                                    style: LumioTypography.bodyMedium.copyWith(
+                                      color: isCompleted
+                                          ? LumioColors.textSecondary(context)
+                                          : LumioColors.textPrimary(context),
+                                      decoration: isCompleted ? TextDecoration.lineThrough : null,
+                                    ),
+                                  ),
+                                ),
+                          if (task.scheduledDate != null) ...[
+                            const SizedBox(height: 4),
+                            GestureDetector(
+                              onTap: () => _editTaskDeadline(task, provider),
+                              child: _buildDeadlineBadge(context, task.scheduledDate!),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    // Subtask count + expand toggle
+                    if (hasSubtasks) ...[
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            if (isExpanded) {
+                              _expandedTasks.remove(task.id);
+                            } else {
+                              _expandedTasks.add(task.id);
+                            }
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: LumioColors.primary.withOpacity(0.1),
+                            borderRadius: LumioRadius.phaseBadge,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$completedSubtasks/${task.subtasks.length}',
+                                style: LumioTypography.labelSmall.copyWith(
+                                  color: LumioColors.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              Icon(
+                                isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                                color: LumioColors.primary,
+                                size: 14,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: LumioSpacing.xs),
+                    ],
+
+                    // Add subtask button
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (isAddingSubtask) {
+                            _addingSubtaskForTaskId = null;
+                            _newSubtaskController.clear();
+                          } else {
+                            _addingSubtaskForTaskId = task.id;
+                            _expandedTasks.add(task.id);
+                          }
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: Icon(
+                          Icons.add_circle_outline_rounded,
+                          color: isAddingSubtask
+                              ? LumioColors.primary
+                              : LumioColors.textTertiary(context),
+                          size: 18,
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(width: LumioSpacing.xs),
+
+                    // More options
+                    GestureDetector(
+                      onTap: () => _showTaskOptions(context, task, provider),
+                      child: Icon(
+                        Icons.more_horiz_rounded,
+                        color: LumioColors.textTertiary(context),
+                        size: 20,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Inline add-subtask input
+                if (isAddingSubtask) ...[
+                  SizedBox(height: LumioSpacing.sm),
+                  _buildAddSubtaskInput(context, task, provider),
+                ],
+              ],
+            ),
+          ),
+
+          // Subtasks list (shown when expanded)
+          if (isExpanded && task.subtasks.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.only(left: LumioSpacing.xl + 4),
+              child: Column(
+                children: task.subtasks
+                    .map((s) => _buildSubtaskItem(context, s, task, provider))
+                    .toList(),
+              ),
+            ),
+        ],
+      ),
+      ), // end Dismissible child Padding
+    );
+  }
+
+  Widget _buildSubtaskItem(
+    BuildContext context,
+    GoalTask subtask,
+    GoalTask parentTask,
+    GrowthProvider provider,
+  ) {
+    final isCompleted = subtask.isCompleted;
+
+    return Dismissible(
+      key: ValueKey('subtask_${subtask.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 12),
+        margin: const EdgeInsets.only(top: 6),
+        decoration: BoxDecoration(
+          color: LumioColors.error.withOpacity(0.12),
+          borderRadius: LumioRadius.taskItem,
+        ),
+        child: Icon(Icons.delete_rounded, color: LumioColors.error, size: 18),
+      ),
+      confirmDismiss: (_) async {
+        HapticFeedback.lightImpact();
+        return true;
+      },
+      onDismissed: (_) {
+        final newSubtasks = parentTask.subtasks.where((s) => s.id != subtask.id).toList();
+        provider.updateTask(parentTask.copyWith(subtasks: newSubtasks));
+      },
+      child: Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Timeline connector dot
+          Container(
+            width: 6,
+            height: 6,
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: isCompleted
+                  ? LumioColors.primary
+                  : LumioColors.border(context),
+              shape: BoxShape.circle,
+            ),
+          ),
+
+          // Subtask checkbox
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              final updated = subtask.copyWith(isCompleted: !isCompleted);
+              final newSubtasks = parentTask.subtasks
+                  .map((s) => s.id == subtask.id ? updated : s)
+                  .toList();
+              provider.updateTask(parentTask.copyWith(subtasks: newSubtasks));
+            },
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: isCompleted ? LumioColors.primary : Colors.transparent,
+                borderRadius: LumioRadius.radiusXS,
+                border: isCompleted
+                    ? null
+                    : Border.all(color: LumioColors.border(context), width: 1.5),
+              ),
+              child: isCompleted
+                  ? Icon(Icons.check_rounded, color: Colors.white, size: 10)
+                  : null,
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // Subtask title — tap to edit inline
+          Expanded(
+            child: _editingSubtaskId == subtask.id
+                ? TextField(
+                    controller: _inlineSubtaskController,
+                    autofocus: true,
+                    style: LumioTypography.bodySmall.copyWith(
+                      color: LumioColors.textSecondary(context),
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                      isDense: true,
+                    ),
+                    onSubmitted: (v) =>
+                        _saveInlineSubtaskEdit(subtask, parentTask, provider, v),
+                    onTapOutside: (_) => _saveInlineSubtaskEdit(
+                        subtask, parentTask, provider, _inlineSubtaskController.text),
+                  )
+                : GestureDetector(
+                    onTap: () => setState(() {
+                      _editingSubtaskId = subtask.id;
+                      _inlineSubtaskController.text = subtask.title;
+                    }),
+                    child: Text(
+                      subtask.title,
+                      style: LumioTypography.bodySmall.copyWith(
+                        color: isCompleted
+                            ? LumioColors.textTertiary(context)
+                            : LumioColors.textSecondary(context),
+                        decoration: isCompleted ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                  ),
+          ),
+
+        ],
+      ),
+      ), // end Dismissible child Padding
+    );
+  }
+
+  Widget _buildAddSubtaskInput(
+    BuildContext context,
+    GoalTask parentTask,
+    GrowthProvider provider,
+  ) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: LumioSpacing.sm, vertical: 6),
+      decoration: BoxDecoration(
+        color: LumioColors.surface(context),
+        borderRadius: LumioRadius.taskItem,
+        border: Border.all(color: LumioColors.primary.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.subdirectory_arrow_right_rounded,
+              size: 14, color: LumioColors.textTertiary(context)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: TextField(
+              controller: _newSubtaskController,
+              autofocus: true,
+              style: LumioTypography.bodySmall.copyWith(
+                color: LumioColors.textPrimary(context),
+              ),
+              decoration: InputDecoration(
+                hintText: 'Add subtask...',
+                hintStyle: LumioTypography.bodySmall.copyWith(
+                  color: LumioColors.textTertiary(context),
+                ),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+              ),
+              onSubmitted: (value) =>
+                  _addSubtask(context, parentTask, provider, value.trim()),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _addSubtask(
+                context, parentTask, provider, _newSubtaskController.text.trim()),
+            child: Icon(Icons.add_circle_rounded,
+                color: LumioColors.primary, size: 20),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _addingSubtaskForTaskId = null;
+                _newSubtaskController.clear();
+              });
+            },
+            child: Icon(Icons.close_rounded,
+                size: 16, color: LumioColors.textTertiary(context)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeadlineBadge(BuildContext context, DateTime date) {
+    final overdue = date.isBefore(DateTime.now());
+    final color = overdue ? LumioColors.error : LumioColors.info;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: LumioRadius.phaseBadge,
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.event_rounded, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            DateFormat('MMM d').format(date),
+            style: LumioTypography.labelSmall.copyWith(color: color, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 3),
+          Icon(Icons.edit_rounded, size: 9, color: color.withOpacity(0.7)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addSubtask(
+    BuildContext context,
+    GoalTask parentTask,
+    GrowthProvider provider,
+    String title,
+  ) async {
+    if (title.isEmpty) return;
+
+    final newSubtask = GoalTask(
+      id: DateTime.now().millisecondsSinceEpoch,
+      goalId: parentTask.goalId,
+      title: title,
+      description: '',
+      createdAt: DateTime.now(),
+      indentLevel: 1,
+      order: parentTask.subtasks.length,
+    );
+
+    final updatedTask = parentTask.copyWith(
+      subtasks: [...parentTask.subtasks, newSubtask],
+    );
+    await provider.updateTask(updatedTask);
+
+    setState(() {
+      _addingSubtaskForTaskId = null;
+      _newSubtaskController.clear();
+      _expandedTasks.add(parentTask.id);
+    });
+  }
+
+  Widget _buildEmptyTasksState(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.all(LumioSpacing.xl),
+      child: Column(
+        children: [
+          Icon(
+            Icons.checklist_rounded,
+            color: LumioColors.textTertiary(context),
+            size: 48,
+          ),
+          SizedBox(height: LumioSpacing.md),
+          Text(
+            'No tasks yet',
+            style: LumioTypography.titleSmall.copyWith(
+              color: LumioColors.textSecondary(context),
+            ),
+          ),
+          SizedBox(height: LumioSpacing.xs),
+          Text(
+            'Add tasks or let AI generate them',
+            style: LumioTypography.bodySmall.copyWith(
+              color: LumioColors.textTertiary(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddTaskInput(BuildContext context, GrowthProvider provider) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: LumioSpacing.screenHorizontal),
+      child: Container(
+        padding: EdgeInsets.all(LumioSpacing.md),
+        decoration: BoxDecoration(
+          color: LumioColors.surface(context),
+          borderRadius: LumioRadius.card,
+          border: Border.all(color: LumioColors.primary.withOpacity(0.3)),
+          boxShadow: LumioShadows.getSoft(context),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _newTaskController,
+                autofocus: true,
+                style: LumioTypography.bodyMedium.copyWith(
+                  color: LumioColors.textPrimary(context),
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Add a new task...',
+                  hintStyle: LumioTypography.bodyMedium.copyWith(
+                    color: LumioColors.textTertiary(context),
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                onSubmitted: (value) => _addTask(context, provider),
+              ),
+            ),
+            GestureDetector(
+              onTap: () => _addTask(context, provider),
+              child: Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: LumioColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRescheduleButton(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).padding.bottom + 90,
+      ),
+      child: GestureDetector(
+        onTap: () => _showRescheduleSheet(context),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            color: LumioColors.surface(context),
+            borderRadius: LumioRadius.radiusFull,
+            border: Border.all(
+              color: LumioColors.border(context),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.calendar_month_rounded,
+                color: LumioColors.primary,
+                size: 20,
+              ),
+              SizedBox(width: LumioSpacing.sm),
+              Text(
+                'Reschedule Goal',
+                style: LumioTypography.titleSmall.copyWith(
+                  color: LumioColors.textPrimary(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper methods
+
+  double _calculateProgress(List<GoalTask> tasks) {
+    if (tasks.isEmpty) return 0;
+    int total = 0;
+    int completed = 0;
+
+    void count(List<GoalTask> list) {
+      for (var t in list) {
+        total++;
+        if (t.isCompleted) completed++;
+        if (t.subtasks.isNotEmpty) count(t.subtasks);
+      }
+    }
+
+    count(tasks);
+    return total > 0 ? completed / total : 0;
+  }
+
+  Future<void> _addTask(BuildContext context, GrowthProvider provider) async {
+    final title = _newTaskController.text.trim();
+    if (title.isEmpty) return;
+
+    final task = GoalTask(
+      id: DateTime.now().millisecondsSinceEpoch,
+      goalId: widget.goalId,
+      title: title,
+      description: '',
+      createdAt: DateTime.now(),
+      estimatedHours: 0.5,
+    );
+
+    await provider.createTask(task);
+
+    setState(() {
+      _newTaskController.clear();
+      _isAddingTask = false;
+    });
+  }
+
+  Future<void> _saveInlineTaskEdit(GoalTask task, GrowthProvider provider, String value) async {
+    final trimmed = value.trim();
+    setState(() => _editingTaskId = null);
+    if (trimmed.isNotEmpty && trimmed != task.title) {
+      await provider.updateTask(task.copyWith(title: trimmed));
+    }
+  }
+
+  Future<void> _saveInlineSubtaskEdit(
+    GoalTask subtask,
+    GoalTask parentTask,
+    GrowthProvider provider,
+    String value,
+  ) async {
+    final trimmed = value.trim();
+    setState(() => _editingSubtaskId = null);
+    if (trimmed.isNotEmpty && trimmed != subtask.title) {
+      final updatedSubtask = subtask.copyWith(title: trimmed);
+      final newSubtasks = parentTask.subtasks
+          .map((s) => s.id == subtask.id ? updatedSubtask : s)
+          .toList();
+      await provider.updateTask(parentTask.copyWith(subtasks: newSubtasks));
+    }
+  }
+
+  void _showTaskOptions(BuildContext context, GoalTask task, GrowthProvider provider) {
+    final goal = provider.goals.firstWhere(
+      (g) => g.id == widget.goalId,
+      orElse: () => Goal(id: -1, name: '', createdAt: DateTime.now()),
+    );
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: LumioColors.surface(context),
+          borderRadius: LumioRadius.bottomSheet,
+        ),
+        padding: EdgeInsets.all(LumioSpacing.lg),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: LumioColors.border(context),
+                    borderRadius: LumioRadius.radiusFull,
+                  ),
+                ),
+              ),
+              SizedBox(height: LumioSpacing.lg),
+
+              // Task name header
+              Padding(
+                padding: EdgeInsets.only(bottom: LumioSpacing.sm),
+                child: Text(
+                  task.title,
+                  style: LumioTypography.titleSmall.copyWith(
+                    color: LumioColors.textPrimary(context),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+
+              Divider(color: LumioColors.border(context)),
+              SizedBox(height: LumioSpacing.xs),
+
+              // Edit option
+              _buildOptionTile(
+                context,
+                icon: Icons.edit_rounded,
+                color: LumioColors.primary,
+                label: 'Edit Task',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _editingTaskId = task.id;
+                    _inlineTaskController.text = task.title;
+                  });
+                },
+              ),
+
+              // Change deadline
+              _buildOptionTile(
+                context,
+                icon: Icons.event_rounded,
+                color: LumioColors.info,
+                label: 'Change Deadline',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _editTaskDeadline(task, provider);
+                },
+              ),
+
+              // Generate subtasks with AI
+              _buildOptionTile(
+                context,
+                icon: Icons.auto_awesome_rounded,
+                color: LumioColors.warning,
+                label: 'Generate Subtasks with AI',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _generateSubtasksForTaskWithAI(context, task, provider, goal.name);
+                },
+              ),
+
+              // Delete option
+              _buildOptionTile(
+                context,
+                icon: Icons.delete_rounded,
+                color: LumioColors.error,
+                label: 'Delete Task',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  provider.deleteTask(task.id);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOptionTile(
+    BuildContext context, {
+    required IconData icon,
+    required Color color,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: LumioRadius.radiusMD,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: LumioSpacing.sm, vertical: LumioSpacing.sm),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: LumioRadius.radiusMD,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            SizedBox(width: LumioSpacing.md),
+            Text(
+              label,
+              style: LumioTypography.bodyMedium.copyWith(
+                color: color == LumioColors.error ? LumioColors.error : LumioColors.textPrimary(context),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _generateSubtasksForTaskWithAI(
+    BuildContext context,
+    GoalTask task,
+    GrowthProvider provider,
+    String goalName,
+  ) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: false,
+      builder: (context) => const AILoadingDialog(message: 'Generating subtasks with AI...'),
+    );
+
+    try {
+      final gptService = PrivacyGptService();
+      final subtaskData = await gptService.generateSubtasksForTask(
+        goalName,
+        task.title,
+        taskDescription: task.description,
+      );
+
+      if (mounted) Navigator.pop(context);
+
+      if (subtaskData.isNotEmpty) {
+        final newSubtasks = subtaskData.asMap().entries.map((entry) {
+          final s = entry.value;
+          return GoalTask(
+            id: DateTime.now().millisecondsSinceEpoch + entry.key + 1,
+            goalId: task.goalId,
+            title: s['title'] as String? ?? 'Subtask',
+            description: s['description'] as String? ?? '',
+            createdAt: DateTime.now(),
+            indentLevel: 1,
+            order: task.subtasks.length + entry.key,
+          );
+        }).toList();
+
+        final updatedTask = task.copyWith(
+          subtasks: [...task.subtasks, ...newSubtasks],
+        );
+        await provider.updateTask(updatedTask);
+
+        setState(() => _expandedTasks.add(task.id));
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Generated ${newSubtasks.length} subtasks!'),
+              backgroundColor: LumioColors.success,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: LumioRadius.radiusMD),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
       if (mounted) {
-        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating subtasks: $e'),
+            backgroundColor: LumioColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
 
-  Future<void> _openGoalSettings() async {
-    final growthProvider = context.read<GrowthProvider>();
-    final goal = growthProvider.goals.firstWhere((g) => g.id == widget.goalId);
 
-    final newSettings = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => GoalSettingsScreen(
-          initialSettings: goal.settings,
+  Future<void> _editTaskDeadline(GoalTask task, GrowthProvider provider) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: task.scheduledDate ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+    );
+
+    if (picked != null && mounted) {
+      await provider.updateTask(task.copyWith(scheduledDate: picked));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Date updated to ${DateFormat('MMM d').format(picked)}'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: LumioRadius.radiusMD),
+        ),
+      );
+    }
+  }
+
+  void _showRescheduleSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.all(LumioSpacing.lg),
+        decoration: BoxDecoration(
+          color: LumioColors.surface(context),
+          borderRadius: LumioRadius.bottomSheet,
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: LumioColors.border(context),
+                  borderRadius: LumioRadius.radiusFull,
+                ),
+              ),
+              SizedBox(height: LumioSpacing.lg),
+              Text(
+                'Reschedule Goal',
+                style: LumioTypography.titleLarge.copyWith(
+                  color: LumioColors.textPrimary(context),
+                ),
+              ),
+              SizedBox(height: LumioSpacing.md),
+              Text(
+                'This will automatically redistribute all remaining tasks based on the new deadline.',
+                textAlign: TextAlign.center,
+                style: LumioTypography.bodyMedium.copyWith(
+                  color: LumioColors.textSecondary(context),
+                ),
+              ),
+              SizedBox(height: LumioSpacing.xl),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await _selectNewDeadline(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: LumioColors.primary,
+                    padding: EdgeInsets.symmetric(vertical: LumioSpacing.md),
+                    shape: RoundedRectangleBorder(borderRadius: LumioRadius.button),
+                  ),
+                  child: Text(
+                    'Choose New Deadline',
+                    style: LumioTypography.ctaButton.copyWith(color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectNewDeadline(BuildContext context) async {
+    final provider = context.read<GrowthProvider>();
+    final goal = provider.goals.firstWhere((g) => g.id == widget.goalId);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: goal.targetDeadline ?? DateTime.now().add(const Duration(days: 30)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+    );
+
+    if (picked != null && mounted) {
+      // Update goal deadline
+      await provider.updateGoal(goal.copyWith(targetDeadline: picked));
+
+      // Note: Task rescheduling would be handled by provider
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Goal rescheduled to ${DateFormat('MMM d, y').format(picked)}'),
+          backgroundColor: LumioColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: LumioRadius.radiusMD),
+        ),
+      );
+    }
+  }
+
+  void _showGoalOptionsSheet(BuildContext context, Goal goal) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      useRootNavigator: false,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: LumioColors.surface(context),
+          borderRadius: LumioRadius.bottomSheet,
+        ),
+        padding: EdgeInsets.all(LumioSpacing.lg),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: LumioColors.border(context),
+                    borderRadius: LumioRadius.radiusFull,
+                  ),
+                ),
+              ),
+              SizedBox(height: LumioSpacing.lg),
+
+              // Edit Goal
+              _buildOptionTile(
+                context,
+                icon: Icons.edit_rounded,
+                color: LumioColors.primary,
+                label: 'Edit Goal',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _editGoal(context);
+                },
+              ),
+
+              // Notification Settings
+              _buildOptionTile(
+                context,
+                icon: Icons.notifications_outlined,
+                color: LumioColors.info,
+                label: 'Notification Settings',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final provider = context.read<GrowthProvider>();
+                  final updatedSettings = await Navigator.of(context).push<GoalSettings>(
+                    MaterialPageRoute(
+                      builder: (_) => GoalSettingsScreen(initialSettings: goal.settings),
+                    ),
+                  );
+                  if (updatedSettings != null && mounted) {
+                    await provider.updateGoal(goal.copyWith(settings: updatedSettings));
+                  }
+                },
+              ),
+
+              Divider(color: LumioColors.border(context), height: LumioSpacing.lg),
+
+              // Delete Goal
+              _buildOptionTile(
+                context,
+                icon: Icons.delete_rounded,
+                color: LumioColors.error,
+                label: 'Delete Goal',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDeleteGoal(context, goal);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteGoal(BuildContext context, Goal goal) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      useRootNavigator: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: LumioColors.surface(context),
+        shape: RoundedRectangleBorder(borderRadius: LumioRadius.dialog),
+        title: Text('Delete Goal', style: LumioTypography.titleMedium.copyWith(color: LumioColors.error)),
+        content: Text(
+          'Delete "${goal.name}"? This will remove all tasks and cannot be undone.',
+          style: LumioTypography.bodyMedium.copyWith(color: LumioColors.textSecondary(context)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: TextStyle(color: LumioColors.textSecondary(context))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: LumioColors.error,
+              shape: RoundedRectangleBorder(borderRadius: LumioRadius.button),
+            ),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && mounted) {
+      final provider = context.read<GrowthProvider>();
+      await provider.deleteGoal(goal.id);
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _editGoal(BuildContext context) async {
+    final provider = context.read<GrowthProvider>();
+    final goal = provider.goals.firstWhere((g) => g.id == widget.goalId);
+
+    final titleController = TextEditingController(text: goal.name);
+    DateTime? selectedDate = goal.targetDeadline;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: LumioColors.surface(context),
+          shape: RoundedRectangleBorder(borderRadius: LumioRadius.dialog),
+          title: Text('Edit Goal', style: LumioTypography.titleLarge),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Goal Name',
+                    border: OutlineInputBorder(borderRadius: LumioRadius.input),
+                  ),
+                ),
+                SizedBox(height: LumioSpacing.md),
+                InkWell(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate ?? DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                    );
+                    if (date != null) {
+                      setState(() => selectedDate = date);
+                    }
+                  },
+                  child: Container(
+                    padding: EdgeInsets.all(LumioSpacing.md),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: LumioColors.border(context)),
+                      borderRadius: LumioRadius.input,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today_rounded, size: 20, color: LumioColors.primary),
+                        SizedBox(width: LumioSpacing.sm),
+                        Text(
+                          selectedDate != null
+                              ? DateFormat('MMM d, y').format(selectedDate!)
+                              : 'Select deadline',
+                          style: LumioTypography.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context, {
+                  'name': titleController.text.trim(),
+                  'deadline': selectedDate,
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: LumioColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: LumioRadius.button),
+              ),
+              child: Text('Save'),
+            ),
+          ],
         ),
       ),
     );
 
-    if (newSettings != null && mounted) {
-      final updatedGoal = goal.copyWith(settings: newSettings);
-      await growthProvider.updateGoal(updatedGoal);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('✓ Goal settings updated'),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
+    if (result != null && mounted) {
+      await provider.updateGoal(goal.copyWith(
+        name: result['name'] as String,
+        targetDeadline: result['deadline'] as DateTime?,
+      ));
     }
   }
 
-  Future<void> _generateTasksWithAI() async {
-    // Check premium
+  Future<void> _generateTasksWithAI(BuildContext context) async {
     final premiumService = PremiumService();
     if (!await premiumService.isPremium()) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: const Text('Premium Feature'),
-            content: const Text('AI task generation is a premium feature. Upgrade to unlock!'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  // Navigate to premium screen
-                },
-                child: const Text('Upgrade'),
-              ),
-            ],
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: LumioColors.surface(context),
+          shape: RoundedRectangleBorder(borderRadius: LumioRadius.dialog),
+          title: Text('Premium Feature', style: LumioTypography.titleLarge),
+          content: Text(
+            'AI task generation is a premium feature. Upgrade to unlock!',
+            style: LumioTypography.bodyMedium,
           ),
-        );
-      }
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Close'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(backgroundColor: LumioColors.primary),
+              child: Text('Upgrade'),
+            ),
+          ],
+        ),
+      );
       return;
     }
 
-    // Show modern loading dialog
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AILoadingDialog(
-          message: 'Generating tasks with AI...',
-        ),
-      );
-    }
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: false,
+      builder: (context) => const AILoadingDialog(message: 'Generating tasks...'),
+    );
 
     try {
-      final growthProvider = context.read<GrowthProvider>();
-      final goal = growthProvider.goals.firstWhere((g) => g.id == widget.goalId);
+      final provider = context.read<GrowthProvider>();
+      final goal = provider.goals.firstWhere((g) => g.id == widget.goalId);
 
       final gptService = PrivacyGptService();
       final result = await gptService.generateDetailedRoadmap(
@@ -442,14 +1698,9 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
         hoursPerDay: goal.hoursPerDay ?? 2.0,
       );
 
-      if (mounted) {
-        Navigator.pop(context); // Close loading
-      }
-
+      int savedCount = 0;
       if (result != null && result['tasks'] != null) {
         final tasks = result['tasks'] as List;
-
-        // Calculate distributed dates for tasks based on goal deadline
         final goalDeadline = goal.targetDeadline ?? DateTime.now().add(const Duration(days: 30));
         final now = DateTime.now();
         final totalDays = goalDeadline.difference(now).inDays;
@@ -457,22 +1708,25 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
 
         for (var i = 0; i < tasks.length; i++) {
           final taskData = tasks[i];
+          final daysFromNow = (daysPerTask * (i + 1)).round();
+          var scheduledDate = now.add(Duration(days: daysFromNow));
+          if (scheduledDate.isAfter(goalDeadline)) scheduledDate = goalDeadline;
 
-          // Calculate scheduled date for this task (distribute evenly)
-          DateTime scheduledDate;
-          if (taskData['scheduledDate'] != null) {
-            // Use AI-provided date if available
-            scheduledDate = DateTime.parse(taskData['scheduledDate']);
-          } else {
-            // Distribute tasks evenly from now to deadline
-            final daysFromNow = (daysPerTask * (i + 1)).round();
-            scheduledDate = now.add(Duration(days: daysFromNow));
-
-            // Ensure it doesn't exceed goal deadline
-            if (scheduledDate.isAfter(goalDeadline)) {
-              scheduledDate = goalDeadline;
-            }
-          }
+          // Parse nested subtasks from AI response
+          final subtaskData = taskData['subtasks'] as List? ?? [];
+          final subtasks = subtaskData.asMap().entries.map((entry) {
+            final s = entry.value as Map<String, dynamic>;
+            return GoalTask(
+              id: DateTime.now().millisecondsSinceEpoch + i * 1000 + entry.key + 1,
+              goalId: widget.goalId,
+              title: s['title'] ?? 'Subtask',
+              description: s['description'] ?? '',
+              estimatedHours: (s['estimatedHours'] ?? 0.5).toDouble(),
+              createdAt: DateTime.now(),
+              indentLevel: 1,
+              order: entry.key,
+            );
+          }).toList();
 
           final task = GoalTask(
             id: DateTime.now().millisecondsSinceEpoch + i,
@@ -483,2177 +1737,85 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
             priority: taskData['priority'] ?? 'medium',
             scheduledDate: scheduledDate,
             createdAt: DateTime.now(),
+            subtasks: subtasks,
           );
-          await growthProvider.createTask(task);
-        }
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✨ Generated ${tasks.length} tasks!'),
-              backgroundColor: LumioColors.success,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
+          await provider.createTask(task);
+          savedCount++;
         }
       }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Close loading
+
+      // Close dialog AFTER all tasks are saved
+      if (mounted) Navigator.pop(context);
+
+      if (mounted && savedCount > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: LumioColors.error,
+            content: Text('Generated $savedCount tasks with subtasks!'),
+            backgroundColor: LumioColors.success,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: LumioRadius.radiusMD),
           ),
         );
-      }
-    }
-  }
-
-  void _startAddingTask() {
-    setState(() {
-      _isAddingTask = true;
-      _newTaskTitleController.clear();
-      _newTaskDescController.clear();
-      _newTaskDate = null;
-      _newTaskPriority = 'medium';
-    });
-
-    // Scroll to bottom after build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent + 500, // Extra space for new form
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  Future<void> _saveNewTask() async {
-    if (_newTaskTitleController.text.trim().isEmpty) return;
-
-    final task = GoalTask(
-      id: DateTime.now().millisecondsSinceEpoch,
-      goalId: widget.goalId,
-      title: _newTaskTitleController.text.trim(),
-      description: _newTaskDescController.text.trim(),
-      priority: _newTaskPriority,
-      scheduledDate: _newTaskDate,
-      createdAt: DateTime.now(),
-    );
-
-    await context.read<GrowthProvider>().createTask(task);
-
-    setState(() {
-      _isAddingTask = false;
-      _newTaskTitleController.clear();
-      _newTaskDescController.clear();
-      _newTaskDate = null;
-      _newTaskPriority = 'medium';
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('✓ Task added'),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-    }
-  }
-
-  void _cancelAddingTask() {
-    setState(() {
-      _isAddingTask = false;
-      _newTaskTitleController.clear();
-      _newTaskDescController.clear();
-      _newTaskDate = null;
-      _newTaskPriority = 'medium';
-    });
-  }
-
-  Future<void> _generateSubtasksForTask(GoalTask task) async {
-    // Check premium
-    final premiumService = PremiumService();
-    if (!await premiumService.isPremium()) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: const Text('Premium Feature'),
-            content: const Text('AI subtask generation is a premium feature. Upgrade to unlock!'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not generate tasks. Try again.'),
+            behavior: SnackBarBehavior.floating,
           ),
         );
-      }
-      return;
-    }
-
-    // Show modern loading dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AILoadingDialog(
-        message: 'Generating subtasks...',
-      ),
-    );
-
-    try {
-      final gptService = PrivacyGptService();
-      // Use breakDownTask to generate subtasks
-      final result = await gptService.breakDownTask(task.title);
-
-      if (mounted) {
-        Navigator.pop(context); // Close loading
-      }
-
-      if (result != null && result.isNotEmpty) {
-        final updatedSubtasks = result.map((st) {
-          return GoalTask(
-            id: DateTime.now().millisecondsSinceEpoch + result.indexOf(st),
-            goalId: widget.goalId,
-            title: st['title'] ?? st['name'] ?? 'Subtask',
-            description: st['description'] ?? '',
-            estimatedHours: (st['estimatedHours'] ?? 0.5).toDouble(),
-            priority: st['priority'] ?? task.priority,
-            createdAt: DateTime.now(),
-          );
-        }).toList();
-
-        final updatedTask = task.copyWith(subtasks: updatedSubtasks);
-        await context.read<GrowthProvider>().updateTask(updatedTask);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✨ Generated ${result.length} subtasks!'),
-              backgroundColor: LumioColors.success,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
       }
     } catch (e) {
+      if (mounted) Navigator.pop(context);
       if (mounted) {
-        Navigator.pop(context); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error generating subtasks: $e'),
+            content: Text('Error generating tasks: $e'),
             backgroundColor: LumioColors.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
           ),
         );
       }
     }
   }
+}
 
-  void _showTaskMenu(GoalTask task) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: Icon(Icons.auto_awesome, color: Colors.purple),
-              title: const Text('Generate Subtasks (AI)'),
-              onTap: () {
-                Navigator.pop(context);
-                _generateSubtasksForTask(task);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.add_task, color: LumioColors.primary),
-              title: const Text('Add Subtask'),
-              onTap: () {
-                Navigator.pop(context);
-                setState(() {
-                  _addingSubtaskParentId = task.id;
-                  _inlineSubtaskController.clear();
-                });
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.delete_rounded, color: LumioColors.error),
-              title: const Text('Delete Task'),
-              onTap: () async {
-                final provider = context.read<GrowthProvider>(); // Capture context safely
-                Navigator.pop(context);
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    title: const Text('Delete Task?'),
-                    content: Text('Delete "${task.title}"?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: LumioColors.error,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('Delete'),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed == true) {
-                  await provider.deleteTask(task.id);
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+/// Custom painter for circular progress
+class _CircleProgressPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final double strokeWidth;
 
-  String _getProgressStatus(double progress, DateTime? deadline) {
-    if (deadline == null) return 'IN PROGRESS';
-    final daysLeft = deadline.difference(DateTime.now()).inDays;
-    if (progress >= 0.9) return 'ALMOST DONE';
-    if (daysLeft < 0) return 'OVERDUE';
-    if (daysLeft < 7 && progress < 0.5) return 'AT RISK';
-    return 'ON TRACK';
-  }
-
-  Color _getProgressColor(double progress) {
-    if (progress >= 0.75) return LumioColors.success;
-    if (progress >= 0.5) return LumioColors.primary;
-    if (progress >= 0.25) return LumioColors.info;
-    return LumioColors.textSecondaryLight;
-  }
-
-  // Determine local image asset based on goal name/category
-  String _getLocalImage(String goalName) {
-    final lower = goalName.toLowerCase();
-    if (lower.contains('health') || lower.contains('fitness') || lower.contains('gym') || lower.contains('diet') || lower.contains('workout')) {
-      return 'assets/images/goals/health_fitness.svg';
-    }
-    if (lower.contains('finance') || lower.contains('money') || lower.contains('wealth') || lower.contains('save') || lower.contains('budget')) {
-      return 'assets/images/goals/finance_wealth.svg';
-    }
-    if (lower.contains('career') || lower.contains('job') || lower.contains('work') || lower.contains('business') || lower.contains('promotion')) {
-      return 'assets/images/goals/career_growth.svg';
-    }
-    if (lower.contains('learn') || lower.contains('skill') || lower.contains('read') || lower.contains('personal') || lower.contains('growth')) {
-      return 'assets/images/goals/personal_dev.svg';
-    }
-    return 'assets/images/goals/default_goal.svg';
-  }
-
-  // Theme-aware colors
-  static const Color _tealAccent = Color(0xFF4DB6AC);
-  static const Color _orangeAccent = Color(0xFFFF7043);
-
-  // Get theme-aware colors
-  Color _getBgColor(bool isDark) => isDark ? const Color(0xFF0D0D0D) : Colors.grey.shade50;
-  Color _getCardBgColor(bool isDark) => isDark ? const Color(0xFF1A1A1A) : Colors.white;
-  Color _getSubtaskBgColor(bool isDark) => isDark ? const Color(0xFF252525) : Colors.grey.shade100;
-  Color _getTextPrimaryColor(bool isDark) => isDark ? const Color(0xFFE0E0E0) : Colors.grey.shade900;
-  Color _getTextSecondaryColor(bool isDark) => isDark ? const Color(0xFF808080) : Colors.grey.shade600;
-  Color _getBorderColor(bool isDark) => isDark ? Colors.white10 : Colors.grey.shade300;
+  _CircleProgressPainter({
+    required this.progress,
+    required this.color,
+    required this.strokeWidth,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - strokeWidth) / 2;
 
-    return Scaffold(
-      backgroundColor: _getBgColor(isDark),
-      appBar: AppBar(
-        title: Text(
-          'My Plan',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: _getTextPrimaryColor(isDark),
-            fontSize: 20,
-          ),
-        ),
-        backgroundColor: _getBgColor(isDark),
-        elevation: 0,
-        iconTheme: IconThemeData(color: _getTextPrimaryColor(isDark)),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.tune_rounded, color: _getTextSecondaryColor(isDark)),
-            onPressed: _openGoalSettings,
-            tooltip: 'Settings',
-          ),
-          IconButton(
-            icon: Icon(Icons.bar_chart_rounded, color: _getTextSecondaryColor(isDark)),
-            onPressed: () => _editGoal(context),
-            tooltip: 'Stats',
-          ),
-        ],
-      ),
-      body: Consumer<GrowthProvider>(
-        builder: (context, growthProvider, child) {
-          final goal = growthProvider.goals.firstWhere(
-            (g) => g.id == widget.goalId,
-            orElse: () => throw Exception('Goal not found'),
-          );
-          final tasks = growthProvider.getTasksForGoal(widget.goalId);
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
 
-          // Calculate progress (counting only top-level tasks)
-          int totalTasksCount = tasks.length;
-          int completedTasksCount = tasks.where((t) => t.isCompleted).length;
+    const startAngle = -math.pi / 2;
+    final sweepAngle = 2 * math.pi * progress;
 
-          final progress = totalTasksCount > 0 ? completedTasksCount / totalTasksCount : 0.0;
-
-          return ReorderableListView(
-            proxyDecorator: (child, index, animation) {
-              return AnimatedBuilder(
-                animation: animation,
-                builder: (BuildContext context, Widget? child) {
-                  final double animValue = Curves.easeInOut.transform(animation.value);
-                  final double elevation = lerpDouble(0, 6, animValue)!;
-                  return Material(
-                    elevation: elevation,
-                    color: Colors.transparent,
-                    shadowColor: Colors.black.withOpacity(0.2),
-                    child: child,
-                  );
-                },
-                child: child,
-              );
-            },
-            onReorder: (oldIndex, newIndex) {
-              // Adjust index because of the header item (index 0)
-              if (oldIndex == 0 || newIndex == 0) return; // Cannot move header
-              
-              // Map list logic considering header is index 0
-              int taskOldIndex = oldIndex - 1;
-              int taskNewIndex = newIndex - 1;
-              
-              if (taskOldIndex < taskNewIndex) {
-                // taskNewIndex -= 1; // Handled by provider logic usually, but keep standard reorder logic
-              }
-              
-              growthProvider.reorderTasks(widget.goalId, taskOldIndex, taskNewIndex);
-            },
-            header: Padding(
-              padding: const EdgeInsets.all(LumioSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                   // Hero Image
-                   // Hero Image with Title Overlay
-                    Stack(
-                      children: [
-                        // Image (Network or Local SVG)
-                        Container(
-                          height: 200,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            color: LumioColors.primary.withOpacity(0.1),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: goal.imageUrl != null && goal.imageUrl!.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: goal.imageUrl!,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Center(child: CircularProgressIndicator(color: LumioColors.primary)),
-                                    errorWidget: (context, url, error) => _buildLocalSvgPlaceholder(goal.name),
-                                  )
-                                : _buildLocalSvgPlaceholder(goal.name),
-                          ),
-                        )
-                        .animate()
-                        .fadeIn(duration: 600.ms),
-
-                        // Gradient Overlay for Readability
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withOpacity(0.7),
-                                ],
-                                stops: const [0.6, 1.0],
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Goal Title Overlay
-                        Positioned(
-                          bottom: 16,
-                          left: 16,
-                          right: 16,
-                          child: Text(
-                            goal.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              shadows: [
-                                Shadow(offset: Offset(0, 1), blurRadius: 4, color: Colors.black54),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-                    // Progress Section with Gradient
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            _getProgressColor(progress).withOpacity(0.15),
-                            _getProgressColor(progress).withOpacity(0.05),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _getProgressColor(progress).withOpacity(0.3),
-                          width: 2,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: _getProgressColor(progress),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  progress >= 0.9 ? Icons.celebration_rounded : Icons.trending_up_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Progress: ${(progress * 100).toInt()}% ${_getProgressStatus(progress, goal.targetDeadline)}',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                        color: _getProgressColor(progress),
-                                      ),
-                                    ),
-                                    if (goal.targetDeadline != null) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Due: ${DateFormat('MMM d, y').format(goal.targetDeadline!)}',
-                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          AnimatedProgressBar(
-                            progress: progress,
-                            height: 8,
-                            backgroundColor: Colors.grey.shade200,
-                            progressColor: _getProgressColor(progress),
-                            showPercentage: false,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: LumioSpacing.lg),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _generateTasksWithAI,
-                            icon: const Icon(Icons.auto_awesome),
-                            label: const Text('AI Generate'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: LumioColors.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _startAddingTask,
-                            icon: const Icon(Icons.add_circle_outline),
-                            label: const Text('Add Task'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: LumioColors.primary,
-                              side: BorderSide(color: LumioColors.primary, width: 2),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: LumioSpacing.lg),
-                    Text(
-                      'Tasks',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: _getTextPrimaryColor(isDark),
-                      ),
-                    ),
-                    const SizedBox(height: LumioSpacing.md),
-
-                    if (_isAddingTask)
-                        _buildInlineTaskForm(isDark),
-                ],
-              ),
-            ),
-            children: [
-              for (int i = 0; i < tasks.length; i++)
-                _buildTimelineTaskCard(context, tasks[i], i, growthProvider, isDark, isLast: i == tasks.length - 1)
-            ],
-          );
-        },
-      ),
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepAngle,
+      false,
+      paint,
     );
   }
 
-  Widget _buildTimelineTaskCard(
-    BuildContext context,
-    GoalTask task,
-    int index,
-    GrowthProvider growthProvider,
-    bool isDark, {
-    bool isLast = false,
-  }) {
-    // Calculate subtask progress
-    final subtaskProgress = task.subtasks.isEmpty
-        ? 0.0
-        : task.subtasks.where((s) => s.isCompleted).length / task.subtasks.length;
-
-    return Padding(
-      key: ValueKey('task_${task.id}'),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Dismissible(
-        key: Key('dismiss_task_${task.id}'),
-        direction: DismissDirection.endToStart,
-        background: Container(
-          alignment: Alignment.centerRight,
-          padding: const EdgeInsets.only(right: 20),
-          decoration: BoxDecoration(
-            color: LumioColors.error,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Icon(Icons.delete_rounded, color: Colors.white, size: 28),
-        ),
-        confirmDismiss: (direction) async {
-           return await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                 backgroundColor: _getCardBgColor(isDark),
-                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                 title: Text("Delete Task?", style: TextStyle(color: _getTextPrimaryColor(isDark))),
-                 content: Text('Delete "${task.title}"?', style: TextStyle(color: _getTextSecondaryColor(isDark))),
-                 actions: [
-                   TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
-                   TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Delete", style: TextStyle(color: Colors.red))),
-                 ],
-              )
-           );
-        },
-        onDismissed: (direction) {
-           growthProvider.deleteTask(task.id);
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: _getCardBgColor(isDark),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _getBorderColor(isDark)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header: Checkbox + Title + Menu
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 16, 8, 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Checkbox/Completion indicator
-                    GestureDetector(
-                      onTap: () async {
-                        HapticFeedback.mediumImpact();
-                        if (task.isCompleted) {
-                          await growthProvider.uncompleteTask(task.id);
-                        } else {
-                          await growthProvider.completeTask(task.id);
-                        }
-                      },
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        margin: const EdgeInsets.only(right: 12, top: 2),
-                        decoration: BoxDecoration(
-                          color: task.isCompleted
-                              ? _tealAccent.withOpacity(0.2)
-                              : (isDark ? Colors.white10 : Colors.grey.shade200),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: task.isCompleted ? _tealAccent : (isDark ? Colors.white24 : Colors.grey.shade400),
-                            width: 2,
-                          ),
-                        ),
-                        child: task.isCompleted
-                            ? const Icon(Icons.check_rounded, size: 18, color: _tealAccent)
-                            : Icon(Icons.flag_outlined, size: 16, color: _getTextSecondaryColor(isDark)),
-                      ),
-                    ),
-
-                    Expanded(
-                      child: _editingTaskId == task.id
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                TextField(
-                                  controller: _editTitleControllers[task.id],
-                                  decoration: InputDecoration(
-                                    labelText: 'Title',
-                                    labelStyle: TextStyle(color: _getTextSecondaryColor(isDark)),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                    filled: true,
-                                    fillColor: _getSubtaskBgColor(isDark),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  ),
-                                  style: TextStyle(fontWeight: FontWeight.w600, color: _getTextPrimaryColor(isDark)),
-                                  autofocus: true,
-                                ),
-                                const SizedBox(height: 8),
-                                TextField(
-                                  controller: _editDescControllers[task.id],
-                                  decoration: InputDecoration(
-                                    labelText: 'Description (optional)',
-                                    labelStyle: TextStyle(color: _getTextSecondaryColor(isDark)),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                    filled: true,
-                                    fillColor: _getSubtaskBgColor(isDark),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  ),
-                                  style: TextStyle(color: _getTextPrimaryColor(isDark)),
-                                  maxLines: 2,
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () => _cancelEditingTask(task.id),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: _getTextSecondaryColor(isDark),
-                                          side: BorderSide(color: _getTextSecondaryColor(isDark)),
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
-                                        ),
-                                        child: const Text('Cancel', style: TextStyle(fontSize: 12)),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed: () => _saveEditedTask(task, growthProvider),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: _tealAccent,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
-                                        ),
-                                        child: const Text('Save', style: TextStyle(fontSize: 12)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            )
-                          : GestureDetector(
-                              onTap: () => _startEditingTask(task),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    task.title,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-                                      color: task.isCompleted ? _getTextSecondaryColor(isDark) : _getTextPrimaryColor(isDark),
-                                    ),
-                                  ),
-                                  if (task.description.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      task.description,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: _getTextSecondaryColor(isDark),
-                                      ),
-                                    ),
-                                  ]
-                                ],
-                              ),
-                            ),
-                    ),
-
-                    // Three-dot menu
-                    IconButton(
-                      icon: Icon(Icons.more_horiz, color: _getTextSecondaryColor(isDark)),
-                      onPressed: () => _showTaskMenu(task),
-                    ),
-                  ],
-                ),
-              ),
-                      
-              // Subtasks section
-              if (task.subtasks.isNotEmpty || _addingSubtaskParentId == task.id)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: _getSubtaskBgColor(isDark),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        ...task.subtasks.map((sub) => _buildInlineSubtask(context, sub, task, growthProvider, isDark)).toList(),
-
-                        // Inline Add Subtask Input
-                        if (_addingSubtaskParentId == task.id)
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _inlineSubtaskController,
-                                    autofocus: true,
-                                    style: TextStyle(color: _getTextPrimaryColor(isDark), fontSize: 14),
-                                    decoration: InputDecoration(
-                                      hintText: 'Enter subtask name...',
-                                      hintStyle: TextStyle(color: _getTextSecondaryColor(isDark)),
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(color: _getBorderColor(isDark)),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(color: _getBorderColor(isDark)),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: const BorderSide(color: _tealAccent),
-                                      ),
-                                      filled: true,
-                                      fillColor: _getCardBgColor(isDark),
-                                    ),
-                                    onSubmitted: (_) async {
-                                      if (_inlineSubtaskController.text.trim().isNotEmpty) {
-                                        final newSub = GoalTask(
-                                          id: DateTime.now().millisecondsSinceEpoch,
-                                          goalId: widget.goalId,
-                                          title: _inlineSubtaskController.text.trim(),
-                                          description: '',
-                                          estimatedHours: 0.5,
-                                          priority: task.priority,
-                                          createdAt: DateTime.now(),
-                                        );
-                                        final updatedSubtasks = [...task.subtasks, newSub];
-                                        await growthProvider.updateTask(task.copyWith(subtasks: updatedSubtasks));
-                                        _inlineSubtaskController.clear();
-                                      }
-                                    },
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.check_circle, color: _tealAccent),
-                                  onPressed: () async {
-                                    if (_inlineSubtaskController.text.trim().isNotEmpty) {
-                                      final newSub = GoalTask(
-                                        id: DateTime.now().millisecondsSinceEpoch,
-                                        goalId: widget.goalId,
-                                        title: _inlineSubtaskController.text.trim(),
-                                        description: '',
-                                        estimatedHours: 0.5,
-                                        priority: task.priority,
-                                        createdAt: DateTime.now(),
-                                      );
-                                      final updatedSubtasks = [...task.subtasks, newSub];
-                                      await growthProvider.updateTask(task.copyWith(subtasks: updatedSubtasks));
-                                      _inlineSubtaskController.clear();
-                                    }
-                                  },
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.cancel, color: _getTextSecondaryColor(isDark)),
-                                  onPressed: () {
-                                    setState(() {
-                                      _addingSubtaskParentId = null;
-                                      _inlineSubtaskController.clear();
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // Footer with progress bar
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          (task.frequency != 'one-time' && task.frequency != null)
-                              ? Icons.repeat_rounded
-                              : Icons.subdirectory_arrow_right_rounded,
-                          size: 16,
-                          color: _getTextSecondaryColor(isDark),
-                        ),
-                        if (task.scheduledDate != null) ...[
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () => _editTaskDeadline(task, growthProvider),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: _tealAccent.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.calendar_today, size: 12, color: _tealAccent),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    DateFormat('MMM d, y').format(task.scheduledDate!),
-                                    style: TextStyle(fontSize: 12, color: _tealAccent, fontWeight: FontWeight.w500),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ] else ...[
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () => _editTaskDeadline(task, growthProvider),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: _getTextSecondaryColor(isDark).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: _getTextSecondaryColor(isDark).withOpacity(0.3), style: BorderStyle.solid),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.add, size: 12, color: _getTextSecondaryColor(isDark)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Add date',
-                                    style: TextStyle(fontSize: 12, color: _getTextSecondaryColor(isDark)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Progress bar at bottom
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: subtaskProgress,
-                        minHeight: 4,
-                        backgroundColor: isDark ? Colors.white10 : Colors.grey.shade300,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          task.isCompleted ? _tealAccent : _tealAccent.withOpacity(0.7),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  @override
+  bool shouldRepaint(covariant _CircleProgressPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.color != color;
   }
-
-  Widget _buildInlineSubtask(BuildContext context, GoalTask subtask, GoalTask parentTask, GrowthProvider provider, bool isDark) {
-    return Dismissible(
-      key: ValueKey('subtask_${subtask.id}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        decoration: BoxDecoration(
-          color: LumioColors.error.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.delete_rounded, color: LumioColors.error, size: 20),
-      ),
-      confirmDismiss: (direction) async {
-        return await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: _getCardBgColor(isDark),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Text("Delete Subtask?", style: TextStyle(color: _getTextPrimaryColor(isDark))),
-            content: Text('Delete "${subtask.title}"?', style: TextStyle(color: _getTextSecondaryColor(isDark))),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
-              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Delete", style: TextStyle(color: Colors.red))),
-            ],
-          )
-        );
-      },
-      onDismissed: (direction) async {
-        final updatedSubtasks = parentTask.subtasks.where((st) => st.id != subtask.id).toList();
-        await provider.updateTask(parentTask.copyWith(subtasks: updatedSubtasks));
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: _getCardBgColor(isDark),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _getBorderColor(isDark)),
-        ),
-        child: Row(
-          children: [
-            InkWell(
-              onTap: () async {
-                final updatedSubtasks = parentTask.subtasks.map((s) {
-                  if (s.id == subtask.id) {
-                    return s.copyWith(isCompleted: !s.isCompleted);
-                  }
-                  return s;
-                }).toList();
-                provider.updateTask(parentTask.copyWith(subtasks: updatedSubtasks));
-              },
-              child: Icon(
-                subtask.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                size: 18,
-                color: subtask.isCompleted ? _tealAccent : _getTextSecondaryColor(isDark),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _editingSubtaskId == subtask.id
-                  ? Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _inlineSubtaskController,
-                            autofocus: true,
-                            style: TextStyle(color: _getTextPrimaryColor(isDark), fontSize: 14),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(vertical: 4),
-                              border: InputBorder.none,
-                            ),
-                            onSubmitted: (value) async {
-                              if (value.trim().isNotEmpty) {
-                                final updatedSubtasks = parentTask.subtasks.map((s) {
-                                  if (s.id == subtask.id) return s.copyWith(title: value.trim());
-                                  return s;
-                                }).toList();
-                                await provider.updateTask(parentTask.copyWith(subtasks: updatedSubtasks));
-                                setState(() => _editingSubtaskId = null);
-                                _inlineSubtaskController.clear();
-                              }
-                            },
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.check, size: 18, color: _tealAccent),
-                          onPressed: () async {
-                            if (_inlineSubtaskController.text.trim().isNotEmpty) {
-                              final updatedSubtasks = parentTask.subtasks.map((s) {
-                                if (s.id == subtask.id) return s.copyWith(title: _inlineSubtaskController.text.trim());
-                                return s;
-                              }).toList();
-                              await provider.updateTask(parentTask.copyWith(subtasks: updatedSubtasks));
-                              setState(() => _editingSubtaskId = null);
-                              _inlineSubtaskController.clear();
-                            }
-                          },
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.close, size: 18, color: _getTextSecondaryColor(isDark)),
-                          onPressed: () {
-                            setState(() => _editingSubtaskId = null);
-                            _inlineSubtaskController.clear();
-                          },
-                        ),
-                      ],
-                    )
-                  : GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _editingSubtaskId = subtask.id;
-                          _inlineSubtaskController.text = subtask.title;
-                        });
-                      },
-                      child: Text(
-                        subtask.title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          decoration: subtask.isCompleted ? TextDecoration.lineThrough : null,
-                          color: subtask.isCompleted ? _getTextSecondaryColor(isDark) : _getTextPrimaryColor(isDark),
-                          ),
-                       ),
-                     ),
-            ),
-         ],
-       ),
-       ),
-     );
-  }
-
-  Widget _buildLocalSvgPlaceholder(String goalName) {
-    return SvgPicture.asset(
-      _getLocalImage(goalName),
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: 200,
-      placeholderBuilder: (BuildContext context) => Center(child: CircularProgressIndicator(color: LumioColors.primary)),
-    );
-  }
-
-  // Helper to build inline form
-  Widget _buildInlineTaskForm(bool isDark) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _getCardBgColor(isDark),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _tealAccent.withOpacity(0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'New Task',
-            style: TextStyle(
-              color: _tealAccent,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _newTaskTitleController,
-            style: TextStyle(color: _getTextPrimaryColor(isDark)),
-            decoration: InputDecoration(
-              hintText: "Enter task name...",
-              hintStyle: TextStyle(color: _getTextSecondaryColor(isDark)),
-              filled: true,
-              fillColor: _getSubtaskBgColor(isDark),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: _getBorderColor(isDark)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: _getBorderColor(isDark)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: _tealAccent),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _cancelAddingTask,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _getTextSecondaryColor(isDark),
-                    side: BorderSide(color: _getTextSecondaryColor(isDark)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text("Cancel"),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _saveNewTask,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _tealAccent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text("Add Task"),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  Widget _buildStatusBadge(GoalTask task) {
-    String status;
-    Color color;
-    IconData icon;
-
-    if (task.isCompleted) {
-      status = 'Completed';
-      color = LumioColors.success;
-      icon = Icons.check_circle;
-    } else if (task.scheduledDate == null) {
-      status = 'Upcoming';
-      color = Colors.blue;
-      icon = Icons.schedule;
-    } else if (task.scheduledDate!.isBefore(DateTime.now())) {
-      status = 'Overdue';
-      color = LumioColors.error;
-      icon = Icons.warning_rounded;
-    } else if (task.scheduledDate!.difference(DateTime.now()).inDays <= 1) {
-      status = 'In Progress';
-      color = LumioColors.primary;
-      icon = Icons.play_circle_filled;
-    } else {
-      status = 'Upcoming';
-      color = Colors.blue;
-      icon = Icons.schedule;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            status,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTaskCard(
-    BuildContext context,
-    GoalTask task,
-    int index,
-    GrowthProvider growthProvider,
-  ) {
-    final theme = Theme.of(context);
-
-    return Dismissible(
-      key: Key('task_${task.id}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: LumioColors.error,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        child: const Icon(
-          Icons.delete_rounded,
-          color: Colors.white,
-          size: 28,
-        ),
-      ),
-      confirmDismiss: (direction) async {
-        return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: const Text('Delete Task?'),
-            content: Text('Delete "${task.title}"?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: LumioColors.error,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        ) ?? false;
-      },
-      onDismissed: (direction) async {
-        await growthProvider.deleteTask(task.id);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Task deleted'),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: task.isCompleted
-                ? Colors.grey.shade200
-                : LumioColors.primary.withOpacity(0.3),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              // Checkbox - ONLY way to mark complete
-              GestureDetector(
-                onTap: () async {
-                  HapticFeedback.mediumImpact();
-                  if (task.isCompleted) {
-                    await growthProvider.uncompleteTask(task.id);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Task unmarked'),
-                          duration: const Duration(seconds: 1),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      );
-                    }
-                  } else {
-                    final message = await growthProvider.completeTask(task.id);
-                    if (mounted && message != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(message),
-                          backgroundColor: LumioColors.success,
-                          duration: const Duration(seconds: 2),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      );
-                    }
-                  }
-                },
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: task.isCompleted
-                          ? LumioColors.success
-                          : LumioColors.primary,
-                      width: 2.5,
-                    ),
-                    color: task.isCompleted
-                        ? LumioColors.success
-                        : Colors.transparent,
-                  ),
-                  child: task.isCompleted
-                      ? const Icon(
-                          Icons.check_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        )
-                      : null,
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // Task Title & Description - Tap to edit or show edit fields
-              Expanded(
-                child: _editingTaskId == task.id
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          TextField(
-                            controller: _editTitleControllers[task.id],
-                            decoration: InputDecoration(
-                              labelText: 'Title',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                            autofocus: true,
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _editDescControllers[task.id],
-                            decoration: InputDecoration(
-                              labelText: 'Description (optional)',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                            maxLines: 2,
-                          ),
-                          const SizedBox(height: 8),
-                          // Date picker
-                          InkWell(
-                            onTap: () async {
-                              final date = await showDatePicker(
-                                context: context,
-                                initialDate: _editDates[task.id] ?? DateTime.now(),
-                                firstDate: DateTime.now(),
-                                lastDate: DateTime.now().add(const Duration(days: 365)),
-                              );
-                              if (date != null) {
-                                setState(() => _editDates[task.id] = date);
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: LumioColors.borderLight),
-                                borderRadius: BorderRadius.circular(8),
-                                color: Colors.grey.shade50,
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.calendar_today, size: 16, color: LumioColors.primary),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _editDates[task.id] != null
-                                        ? DateFormat('MMM d, y').format(_editDates[task.id]!)
-                                        : 'Set date',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                  const Spacer(),
-                                  if (_editDates[task.id] != null)
-                                    IconButton(
-                                      icon: Icon(Icons.clear, size: 14),
-                                      onPressed: () => setState(() => _editDates[task.id] = null),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          // Save/Cancel buttons
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _cancelEditingTask(task.id),
-                                  child: const Text('Cancel', style: TextStyle(fontSize: 12)),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () => _saveEditedTask(task, growthProvider),
-                                  child: const Text('Save', style: TextStyle(fontSize: 12)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: LumioColors.primary,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      )
-                    : GestureDetector(
-                        onTap: () => _startEditingTask(task),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              task.title,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                decoration: task.isCompleted
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                                color: task.isCompleted
-                                    ? LumioColors.textSecondaryLight
-                                    : LumioColors.textPrimaryLight,
-                              ),
-                            ),
-                            if (task.description.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                task.description,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: LumioColors.textSecondaryLight,
-                                  decoration: task.isCompleted
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-              ),
-
-              // Menu Button
-              IconButton(
-                icon: Icon(
-                  Icons.more_vert_rounded,
-                  color: LumioColors.textSecondaryLight,
-                ),
-                onPressed: () => _showTaskMenu(task),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Bottom Row: Status, Date, Priority
-          Row(
-            children: [
-              _buildStatusBadge(task),
-              const SizedBox(width: 8),
-              if (task.scheduledDate != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                      Text(
-                        DateFormat('MMM d').format(task.scheduledDate!),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              const Spacer(),
-              if (task.isMilestone)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.amber.shade300),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.flag_rounded, size: 14, color: Colors.amber.shade700),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Milestone',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.amber.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-
-          // Subtasks section with add button
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.subdirectory_arrow_right,
-                      size: 16,
-                      color: LumioColors.primary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      task.subtasks.isEmpty
-                          ? 'Subtasks'
-                          : '${task.subtasks.length} Subtasks',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: LumioColors.primary,
-                      ),
-                    ),
-                    const Spacer(),
-                    // Add Subtask Button
-                    GestureDetector(
-                      onTap: () => _showAddSubtaskDialog(task, growthProvider),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: LumioColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: LumioColors.primary.withOpacity(0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.add_rounded,
-                              size: 16,
-                              color: LumioColors.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Add',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: LumioColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (task.subtasks.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  // Show ALL subtasks
-                  ...task.subtasks.map((subtask) => _buildSubtaskItem(subtask, task, growthProvider)),
-                ],
-              ],
-            ),
-          ),
-        ],
-        ),
-      ),
-    )
-        .animate()
-        .fadeIn(duration: 400.ms, delay: (50 * index).ms)
-        .slideX(begin: 0.1, duration: 400.ms, curve: Curves.easeOutCubic);
-  }
-
-  Widget _buildSubtaskItem(GoalTask subtask, GoalTask parentTask, GrowthProvider growthProvider) {
-    return Dismissible(
-      key: Key('subtask_${subtask.id}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: LumioColors.error,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        child: const Icon(
-          Icons.delete_rounded,
-          color: Colors.white,
-          size: 22,
-        ),
-      ),
-      confirmDismiss: (direction) async {
-        return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: const Text('Delete Subtask?'),
-            content: Text('Delete "${subtask.title}"?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: LumioColors.error,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        ) ?? false;
-      },
-      onDismissed: (direction) async {
-        // Remove subtask from parent task
-        final updatedSubtasks = parentTask.subtasks
-            .where((st) => st.id != subtask.id)
-            .toList();
-        final updatedParentTask = parentTask.copyWith(subtasks: updatedSubtasks);
-        await growthProvider.updateTask(updatedParentTask);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Subtask deleted'),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: subtask.isCompleted
-                ? Colors.grey.shade200
-                : LumioColors.primary.withOpacity(0.2),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Subtask Checkbox
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: GestureDetector(
-                onTap: () async {
-                  HapticFeedback.lightImpact();
-                  // Toggle subtask completion
-                  final updatedSubtask = subtask.copyWith(isCompleted: !subtask.isCompleted);
-                  final updatedSubtasks = parentTask.subtasks.map((st) {
-                    return st.id == subtask.id ? updatedSubtask : st;
-                  }).toList();
-                  final updatedParentTask = parentTask.copyWith(subtasks: updatedSubtasks);
-                  await growthProvider.updateTask(updatedParentTask);
-                },
-                child: Icon(
-                  subtask.isCompleted
-                      ? Icons.check_circle
-                      : Icons.circle_outlined,
-                  size: 20,
-                  color: subtask.isCompleted
-                      ? LumioColors.success
-                      : Colors.grey.shade400,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Subtask Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Subtask Title - Tap to edit
-                  GestureDetector(
-                    onTap: () => _showSubtaskEditDialog(subtask, parentTask, growthProvider),
-                    child: Text(
-                      subtask.title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: subtask.isCompleted
-                            ? Colors.grey.shade500
-                            : Colors.grey.shade800,
-                        decoration: subtask.isCompleted
-                            ? TextDecoration.lineThrough
-                            : null,
-                      ),
-                    ),
-                  ),
-
-                  // Subtask Date - Tap to edit
-                  if (subtask.scheduledDate != null) ...[
-                    const SizedBox(height: 6),
-                    GestureDetector(
-                      onTap: () => _showSubtaskEditDialog(subtask, parentTask, growthProvider),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.calendar_today,
-                              size: 10,
-                              color: Colors.blue.shade700,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              DateFormat('MMM d, y').format(subtask.scheduledDate!),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.blue.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showSubtaskEditDialog(
-    GoalTask subtask,
-    GoalTask parentTask,
-    GrowthProvider growthProvider,
-  ) async {
-    final titleController = TextEditingController(text: subtask.title);
-    DateTime? selectedDate = subtask.scheduledDate;
-
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setState) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: Row(
-              children: [
-                Icon(Icons.edit_note_rounded, color: LumioColors.primary),
-                const SizedBox(width: 8),
-                const Text('Edit Subtask', style: TextStyle(fontWeight: FontWeight.w700)),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  TextField(
-                    controller: titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Subtask Title',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                    ),
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Date picker
-                  InkWell(
-                    onTap: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate ?? DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (date != null) {
-                        setState(() => selectedDate = date);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: LumioColors.borderLight),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey.shade50,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.calendar_today, size: 20, color: LumioColors.primary),
-                          const SizedBox(width: 8),
-                          Text(
-                            selectedDate != null
-                                ? DateFormat('MMM d, y').format(selectedDate!)
-                                : 'Set date (optional)',
-                            style: TextStyle(
-                              color: selectedDate != null ? Colors.black87 : Colors.grey.shade600,
-                            ),
-                          ),
-                          const Spacer(),
-                          if (selectedDate != null)
-                            IconButton(
-                              icon: Icon(Icons.clear, size: 18, color: Colors.grey.shade600),
-                              onPressed: () => setState(() => selectedDate = null),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context, {
-                    'title': titleController.text.trim(),
-                    'date': selectedDate,
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (result != null && mounted) {
-      final updatedSubtask = subtask.copyWith(
-        title: result['title'] as String,
-        scheduledDate: result['date'] as DateTime?,
-      );
-      final updatedSubtasks = parentTask.subtasks.map((st) {
-        return st.id == subtask.id ? updatedSubtask : st;
-      }).toList();
-      final updatedParentTask = parentTask.copyWith(subtasks: updatedSubtasks);
-      await growthProvider.updateTask(updatedParentTask);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('✓ Subtask updated'),
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _showAddSubtaskDialog(
-    GoalTask parentTask,
-    GrowthProvider growthProvider,
-  ) async {
-    final titleController = TextEditingController();
-    DateTime? selectedDate;
-
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setState) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: Row(
-              children: [
-                Icon(Icons.add_task_rounded, color: LumioColors.primary),
-                const SizedBox(width: 8),
-                const Text('Add Subtask', style: TextStyle(fontWeight: FontWeight.w700)),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  TextField(
-                    controller: titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Subtask Title',
-                      hintText: 'e.g., Research competitors',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                    ),
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Date picker
-                  InkWell(
-                    onTap: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate ?? DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (date != null) {
-                        setState(() => selectedDate = date);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: LumioColors.borderLight),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey.shade50,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.calendar_today, size: 20, color: LumioColors.primary),
-                          const SizedBox(width: 8),
-                          Text(
-                            selectedDate != null
-                                ? DateFormat('MMM d, y').format(selectedDate!)
-                                : 'Set date (optional)',
-                            style: TextStyle(
-                              color: selectedDate != null ? Colors.black87 : Colors.grey.shade600,
-                            ),
-                          ),
-                          const Spacer(),
-                          if (selectedDate != null)
-                            IconButton(
-                              icon: Icon(Icons.clear, size: 18, color: Colors.grey.shade600),
-                              onPressed: () => setState(() => selectedDate = null),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (titleController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Please enter a subtask title'),
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                  Navigator.pop(context, {
-                    'title': titleController.text.trim(),
-                    'date': selectedDate,
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: LumioColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Add'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (result != null && mounted) {
-      // Create new subtask
-      final newSubtask = GoalTask(
-        id: DateTime.now().millisecondsSinceEpoch,
-        goalId: parentTask.goalId,
-        title: result['title'] as String,
-        description: '',
-        scheduledDate: result['date'] as DateTime?,
-        createdAt: DateTime.now(),
-        priority: parentTask.priority,
-      );
-
-      // Add to parent task's subtasks
-      final updatedSubtasks = [...parentTask.subtasks, newSubtask];
-      final updatedParentTask = parentTask.copyWith(subtasks: updatedSubtasks);
-      await growthProvider.updateTask(updatedParentTask);
-
-      if (mounted) {
-        HapticFeedback.mediumImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('✓ Subtask added'),
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-
-
-
-
-  // Helper to build inline form (simplified)
-
 }

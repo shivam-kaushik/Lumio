@@ -188,18 +188,32 @@ class MainNavigatorState extends State<MainNavigator>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
-    return Scaffold(
-      backgroundColor: LumioColors.background(context),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        final currentNavigator = _navigatorKeys[_currentIndex].currentState;
+        if (currentNavigator?.canPop() == true) {
+          currentNavigator?.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: LumioColors.background(context),
+        body: IndexedStack(
+          index: _currentIndex,
+          children: List.generate(
+            _pages.length,
+            (i) => Navigator(
+              key: _navigatorKeys[i],
+              onGenerateRoute: (settings) => MaterialPageRoute(
+                builder: (context) => _pages[i],
+              ),
+            ),
+          ),
+        ),
+        bottomNavigationBar: _buildBottomNavBar(context),
+        extendBody: true,
       ),
-      bottomNavigationBar: _buildBottomNavBar(context),
-      extendBody: true,
-      // FAB removed from home screen - using center navigation button instead
     );
   }
 
@@ -209,24 +223,24 @@ class MainNavigatorState extends State<MainNavigator>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => QuickTaskInputSheet(
-        onSubmit: (title, date, priority, tags, repeat, location) async {
+        onSubmit: (title, date, priority, tags, repeat) async {
           // Close the sheet first
           Navigator.pop(sheetContext);
-          
+
           if (title.isEmpty) return;
 
           try {
             // Use parentContext which is still valid
             final provider = parentContext.read<GrowthProvider>();
-            
+
             // Find or Create 'Inbox' Goal
             Goal? inboxGoal;
-            
+
             // Check if goals are loaded, otherwise load them
             if (provider.goals.isEmpty) {
                 await provider.loadGrowthData();
             }
-            
+
             try {
               inboxGoal = provider.goals.firstWhere((g) => g.name == 'Inbox', orElse: () => Goal(id: -1, name: 'temp', createdAt: DateTime.now()));
             } catch (_) { }
@@ -238,7 +252,7 @@ class MainNavigatorState extends State<MainNavigator>
             } else {
               goalId = inboxGoal.id;
             }
-            
+
             debugPrint('📥 Using Inbox Goal ID: $goalId for new task');
 
             // Create Task
@@ -246,14 +260,13 @@ class MainNavigatorState extends State<MainNavigator>
               id: 0, // Placeholder
               goalId: goalId,
               title: title,
-              description: tags.join(' '), 
+              description: tags.join(' '),
               createdAt: DateTime.now(),
               scheduledDate: date,
               priority: priority,
-              frequency: repeat ?? 'one-time', 
-              suggestedLocation: location ?? 'any', 
+              frequency: repeat ?? 'one-time',
               isCompleted: false,
-              estimatedHours: 0.5, 
+              estimatedHours: 0.5,
               order: 0,
               indentLevel: 0,
               subtasks: [],

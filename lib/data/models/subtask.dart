@@ -6,7 +6,6 @@ class Task {
   final String description;
   final String frequency; // 'daily', 'weekly', 'monthly', 'one-time'
   final String suggestedTime; // 'morning', 'afternoon', 'evening', 'any'
-  final String suggestedLocation; // 'home', 'office', 'coffee_shop', 'any'
   final String priority; // 'high', 'medium', 'low'
   final double? estimatedHours; // Estimated hours to complete
   final List<String> dependencies; // IDs or titles of dependent tasks
@@ -20,7 +19,6 @@ class Task {
     required this.description,
     this.frequency = 'weekly',
     this.suggestedTime = 'any',
-    this.suggestedLocation = 'any',
     this.priority = 'medium',
     this.estimatedHours,
     this.dependencies = const [],
@@ -35,14 +33,13 @@ class Task {
     return Task(
       title: map['title'] as String? ?? '',
       description: map['description'] as String? ?? '',
-      frequency: map['estimatedFrequency'] as String? ?? 
+      frequency: map['estimatedFrequency'] as String? ??
                  map['frequency'] as String? ?? 'weekly',
       suggestedTime: map['suggestedTime'] as String? ?? 'any',
-      suggestedLocation: map['suggestedLocation'] as String? ?? 'any',
       priority: map['priority'] as String? ?? 'medium',
-      estimatedHours: map['estimatedHours'] != null 
-          ? (map['estimatedHours'] is double 
-              ? map['estimatedHours'] as double 
+      estimatedHours: map['estimatedHours'] != null
+          ? (map['estimatedHours'] is double
+              ? map['estimatedHours'] as double
               : (map['estimatedHours'] as num).toDouble())
           : null,
       dependencies: map['dependencies'] != null
@@ -67,7 +64,6 @@ class Task {
       'description': description,
       'frequency': frequency,
       'suggestedTime': suggestedTime,
-      'suggestedLocation': suggestedLocation,
       'priority': priority,
       'estimatedHours': estimatedHours,
       'dependencies': dependencies,
@@ -86,7 +82,6 @@ class Task {
     String? description,
     String? frequency,
     String? suggestedTime,
-    String? suggestedLocation,
     String? priority,
     double? estimatedHours,
     List<String>? dependencies,
@@ -100,7 +95,6 @@ class Task {
       description: description ?? this.description,
       frequency: frequency ?? this.frequency,
       suggestedTime: suggestedTime ?? this.suggestedTime,
-      suggestedLocation: suggestedLocation ?? this.suggestedLocation,
       priority: priority ?? this.priority,
       estimatedHours: estimatedHours ?? this.estimatedHours,
       dependencies: dependencies ?? this.dependencies,

@@ -75,7 +75,6 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           priority: goalTask.priority,
           frequency: goalTask.frequency,
           suggestedTime: goalTask.suggestedTime,
-          suggestedLocation: goalTask.suggestedLocation,
           estimatedHours: goalTask.estimatedHours,
           isMilestone: goalTask.isMilestone,
           motivationAnchor: goalTask.motivationAnchor,
@@ -334,14 +333,13 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
         priority: task.priority,
         frequency: task.frequency,
         suggestedTime: task.suggestedTime,
-        suggestedLocation: task.suggestedLocation,
         isMilestone: task.isMilestone,
         motivationAnchor: task.motivationAnchor,
         scheduledDate: scheduledDateTime,
         phaseId: phaseId,
         createdAt: DateTime.now(),
       );
-      
+
       _scheduledTasks[finalDate]!.add(goalTask);
       
       // Update cumulative hours for next iteration (only for auto-scheduled tasks)
@@ -863,14 +861,13 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
             priority: task.priority,
             frequency: task.frequency,
             suggestedTime: task.suggestedTime,
-            suggestedLocation: task.suggestedLocation,
             isMilestone: task.isMilestone,
             motivationAnchor: task.motivationAnchor,
             scheduledDate: newDateTime,
             phaseId: phaseId,
             createdAt: DateTime.now(),
           );
-          
+
           _scheduledTasks[dateKey]!.add(goalTask);
         });
       }

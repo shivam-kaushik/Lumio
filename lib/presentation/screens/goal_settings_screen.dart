@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme.dart';
 import '../../data/models/goal_settings.dart';
 
 class GoalSettingsScreen extends StatefulWidget {
@@ -63,9 +63,12 @@ class _GoalSettingsScreenState extends State<GoalSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
+    final textPrimary = LumioColors.textPrimary(context);
+    final textSecondary = LumioColors.textSecondary(context);
+    // Clears main tab bar + elevated center FAB + home indicator (nested tab Navigator).
+    final bottomClearance =
+        LumioSpacing.md + 96 + MediaQuery.paddingOf(context).bottom;
+
     return PopScope(
       canPop: _allowPop,
       onPopInvoked: (didPop) {
@@ -75,41 +78,79 @@ class _GoalSettingsScreenState extends State<GoalSettingsScreen> {
         _saveAndPop();
       },
       child: Scaffold(
-        backgroundColor: isDark ? Colors.black : Colors.grey[50], // Consistent background
+        backgroundColor: LumioColors.background(context),
         appBar: AppBar(
-          title: const Text("Goal Settings"),
-          backgroundColor: Colors.transparent, // match Unified Editor
+          title: Text(
+            'Goal Settings',
+            style: LumioTypography.titleLarge.copyWith(color: textPrimary),
+          ),
+          backgroundColor: LumioColors.background(context),
+          surfaceTintColor: Colors.transparent,
           elevation: 0,
+          iconTheme: IconThemeData(color: textPrimary),
           leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : Colors.black),
+            icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () {
-              // Handle AppBar back button explicitly to trigger PopScope logic or call save directly
-              // Calling maybePop will trigger PopScope
               Navigator.of(context).maybePop();
             },
           ),
           actions: [
             TextButton(
               onPressed: _saveCompete,
-              child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
-            )
+              child: Text(
+                'Save',
+                style: LumioTypography.labelLarge.copyWith(
+                  color: LumioColors.primary,
+                ),
+              ),
+            ),
           ],
         ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        body: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+            LumioSpacing.md,
+            LumioSpacing.sm,
+            LumioSpacing.md,
+            bottomClearance,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // 1. Enable Toggle
-            SwitchListTile.adaptive(
-              title: const Text("Enable Notifications", style: TextStyle(fontWeight: FontWeight.bold)),
-              value: _enableNotifications,
-              onChanged: (val) => setState(() => _enableNotifications = val),
-              activeColor: AppTheme.primaryColor,
-              contentPadding: EdgeInsets.zero,
+            SwitchTheme(
+              data: SwitchThemeData(
+                trackOutlineColor: WidgetStateProperty.resolveWith(
+                  (states) => states.contains(WidgetState.selected)
+                      ? LumioColors.primary
+                      : LumioColors.border(context),
+                ),
+                trackColor: WidgetStateProperty.resolveWith(
+                  (states) => states.contains(WidgetState.selected)
+                      ? LumioColors.primary
+                      : LumioColors.surface(context),
+                ),
+                thumbColor: WidgetStateProperty.resolveWith(
+                  (states) => states.contains(WidgetState.selected)
+                      ? Colors.white
+                      : textSecondary,
+                ),
+              ),
+              child: SwitchListTile.adaptive(
+                title: Text(
+                  'Enable Notifications',
+                  style: LumioTypography.titleSmall.copyWith(
+                    color: textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                value: _enableNotifications,
+                onChanged: (val) => setState(() => _enableNotifications = val),
+                contentPadding: EdgeInsets.zero,
+              ),
             ),
-            const Divider(),
-            const SizedBox(height: 16),
+            Divider(color: LumioColors.border(context)),
+            const SizedBox(height: LumioSpacing.md),
 
             // Only show others if enabled
             AnimatedOpacity(
@@ -121,14 +162,20 @@ class _GoalSettingsScreenState extends State<GoalSettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 2. Notification Time
-                    _buildSectionHeader("Default Time"),
+                    _buildSectionHeader(context, 'Default Time'),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(
-                        _notificationTime.format(context), 
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.normal),
+                        _notificationTime.format(context),
+                        style: LumioTypography.headlineSmall.copyWith(
+                          color: textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      trailing: const Icon(Icons.access_time_rounded),
+                      trailing: const Icon(
+                        Icons.access_time_rounded,
+                        color: LumioColors.primary,
+                      ),
                       onTap: () async {
                         final picked = await showTimePicker(
                           context: context, 
@@ -139,41 +186,62 @@ class _GoalSettingsScreenState extends State<GoalSettingsScreen> {
                         }
                       },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: LumioSpacing.lg),
 
                     // 3. Frequency
-                    _buildSectionHeader("Frequency"),
+                    _buildSectionHeader(context, 'Frequency'),
                     Wrap(
-                      spacing: 8,
+                      spacing: LumioSpacing.sm,
+                      runSpacing: LumioSpacing.sm,
                       children: NotificationFrequency.values.map((f) {
+                        final selected = _frequency == f;
                         return ChoiceChip(
                           label: Text(_frequencyName(f)),
-                          selected: _frequency == f,
-                          onSelected: (selected) {
-                            if (selected) setState(() => _frequency = f);
+                          selected: selected,
+                          onSelected: (sel) {
+                            if (sel) setState(() => _frequency = f);
                           },
-                          selectedColor: AppTheme.primaryColor.withOpacity(0.2),
-                          labelStyle: TextStyle(
-                            color: _frequency == f ? AppTheme.primaryColor : (isDark ? Colors.white : Colors.black),
-                            fontWeight: _frequency == f ? FontWeight.bold : FontWeight.normal,
+                          selectedColor: LumioColors.primaryLight,
+                          backgroundColor: LumioColors.surface(context),
+                          side: BorderSide(
+                            color: selected
+                                ? LumioColors.primary
+                                : LumioColors.border(context),
+                          ),
+                          labelStyle: LumioTypography.labelMedium.copyWith(
+                            color: selected
+                                ? LumioColors.primary
+                                : textPrimary,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w500,
                           ),
                         );
                       }).toList(),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: LumioSpacing.lg),
 
                     // 4. Alerts Timing
-                    _buildSectionHeader("When to Alert"),
+                    _buildSectionHeader(context, 'When to Alert'),
                     ...AlertTiming.values.map((t) {
                       return RadioListTile<AlertTiming>(
-                        title: Text(_timingName(t)),
+                        title: Text(
+                          _timingName(t),
+                          style: LumioTypography.bodyLarge.copyWith(
+                            color: textPrimary,
+                          ),
+                        ),
                         value: t,
                         groupValue: _alertTiming,
                         onChanged: (val) {
                           if (val != null) setState(() => _alertTiming = val);
                         },
                         contentPadding: EdgeInsets.zero,
-                        activeColor: AppTheme.primaryColor,
+                        fillColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.selected)
+                              ? LumioColors.primary.withValues(alpha: 0.12)
+                              : null,
+                        ),
+                        activeColor: LumioColors.primary,
                       );
                     }),
                     
@@ -203,24 +271,34 @@ class _GoalSettingsScreenState extends State<GoalSettingsScreen> {
                          ),
                        ),
                     
-                    const SizedBox(height: 24),
+                    const SizedBox(height: LumioSpacing.lg),
 
                     // 5. Tone
-                    _buildSectionHeader("Notification Tone"),
+                    _buildSectionHeader(context, 'Notification Tone'),
                     Wrap(
-                      spacing: 8,
+                      spacing: LumioSpacing.sm,
+                      runSpacing: LumioSpacing.sm,
                       children: NotificationTone.values.map((t) {
+                        final selected = _tone == t;
                         return ChoiceChip(
                           label: Text(_toneName(t)),
-                          selected: _tone == t,
-                          onSelected: (selected) {
-                            if (selected) setState(() => _tone = t);
+                          selected: selected,
+                          onSelected: (sel) {
+                            if (sel) setState(() => _tone = t);
                           },
-                          // Reusing similar styling
-                          selectedColor: Colors.purple.withOpacity(0.2), // Different color for variety
-                           labelStyle: TextStyle(
-                            color: _tone == t ? Colors.purple : (isDark ? Colors.white : Colors.black),
-                            fontWeight: _tone == t ? FontWeight.bold : FontWeight.normal,
+                          selectedColor: LumioColors.primaryLight,
+                          backgroundColor: LumioColors.surface(context),
+                          side: BorderSide(
+                            color: selected
+                                ? LumioColors.primary
+                                : LumioColors.border(context),
+                          ),
+                          labelStyle: LumioTypography.labelMedium.copyWith(
+                            color: selected
+                                ? LumioColors.primary
+                                : textPrimary,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w500,
                           ),
                         );
                       }).toList(),
@@ -228,24 +306,22 @@ class _GoalSettingsScreenState extends State<GoalSettingsScreen> {
                   ],
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),
     ),
-  );
+    );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: LumioSpacing.sm),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
+        style: LumioTypography.labelMedium.copyWith(
           letterSpacing: 1.2,
-          color: Colors.grey,
+          color: LumioColors.textSecondary(context),
         ),
       ),
     );
