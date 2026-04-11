@@ -26,6 +26,7 @@ import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/welcome_screen.dart';
 import 'presentation/navigation/main_navigator.dart';
 import 'core/services/motivational_engine.dart'; // Add import
+import 'core/services/iap_service.dart';
 
 /// Background task callback for Workmanager
 /// Executes context monitoring and reminder triggering in background
@@ -97,6 +98,11 @@ void main() async {
     debugPrint('⚠️ Firebase initialization error: $e');
     debugPrint('⚠️ Make sure you have configured Firebase for your platform');
   }
+
+  // Start IAP purchase stream early (Google Play + App Store); avoids missing updates before UI opens.
+  IAPService().initialize().catchError((Object e, StackTrace st) {
+    debugPrint('⚠️ IAP initialize error: $e');
+  });
 
   // Load environment variables
   try {

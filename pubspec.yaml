@@ -61,6 +61,8 @@ dependencies:
   http: ^1.2.0
   flutter_dotenv: ^5.1.0
   in_app_purchase: ^3.2.3
+  # Direct dependency for iOS StoreKit additions (sync, receipt refresh) used by IAPService.
+  in_app_purchase_storekit: ^0.4.7
 
 dev_dependencies:
   flutter_test:
