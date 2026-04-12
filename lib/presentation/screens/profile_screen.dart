@@ -13,6 +13,7 @@ import 'login_screen.dart';
 import 'recent_notifications_screen.dart';
 import 'premium_subscription_screen.dart';
 import '../widgets/avatar_widget.dart';
+import '../widgets/lumio_main_tab_header.dart';
 import 'avatar_editor_screen.dart';
 
 /// Profile screen based on Stitch AI mockup
@@ -104,16 +105,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildStickyHeader(BuildContext context) {
     return SliverAppBar(
       pinned: true,
-      backgroundColor: LumioColors.background(context).withOpacity(0.9),
+      backgroundColor: LumioColors.background(context).withValues(alpha: 0.95),
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       automaticallyImplyLeading: false,
       title: Text(
         'Profile',
-        style: LumioTypography.titleLarge.copyWith(
-          color: LumioColors.textPrimary(context),
-        ),
+        style: lumioMainTabTitleTextStyle(context),
       ),
       centerTitle: false,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Divider(
+          height: 1,
+          thickness: 1,
+          color: LumioColors.border(context),
+        ),
+      ),
       actions: [
         IconButton(
           icon: Icon(

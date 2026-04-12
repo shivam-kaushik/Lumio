@@ -6,7 +6,7 @@ import '../providers/growth_provider.dart';
 import '../theme/theme.dart';
 import 'animated_goal_creation_screen.dart';
 import 'goal_details_screen.dart';
-import 'recent_notifications_screen.dart';
+import '../widgets/lumio_main_tab_header.dart';
 import '../../data/models/goal.dart';
 import '../../data/models/goal_task.dart';
 
@@ -248,99 +248,17 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(
-        LumioSpacing.screenHorizontal,
-        MediaQuery.of(context).padding.top + LumioSpacing.md,
-        LumioSpacing.screenHorizontal,
-        LumioSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: LumioColors.background(context).withOpacity(0.95),
-        border: Border(
-          bottom: BorderSide(
-            color: LumioColors.border(context),
-            width: 1,
-          ),
-        ),
-      ),
+      padding: lumioMainTabHeaderPadding(context),
+      decoration: lumioMainTabHeaderDecoration(context),
       child: Row(
         children: [
-          // Menu button
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              Scaffold.of(context).openDrawer();
-            },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: LumioRadius.radiusFull,
-              ),
-              child: Icon(
-                Icons.menu_rounded,
-                color: LumioColors.textPrimary(context),
-                size: 24,
-              ),
-            ),
-          ),
-
-          SizedBox(width: LumioSpacing.md),
-
-          // Title
           Expanded(
             child: Text(
               'My Goals',
-              style: LumioTypography.headlineSmall.copyWith(
-                color: LumioColors.textPrimary(context),
-                fontWeight: FontWeight.w700,
-              ),
+              style: lumioMainTabTitleTextStyle(context),
             ),
           ),
-
-          // Notifications
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const RecentNotificationsScreen(),
-                ),
-              );
-            },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: LumioRadius.radiusFull,
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(
-                    Icons.notifications_outlined,
-                    color: LumioColors.textPrimary(context),
-                    size: 24,
-                  ),
-                  // Badge
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: LumioColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          const LumioHeaderNotificationButton(),
         ],
       ),
     );

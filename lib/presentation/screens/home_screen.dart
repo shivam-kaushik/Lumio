@@ -10,10 +10,9 @@ import '../theme/theme.dart';
 
 import '../../data/models/goal.dart';
 import '../../data/models/goal_task.dart';
-import '../navigation/main_navigator.dart';
-import 'chat_screen.dart';
-import 'recent_notifications_screen.dart';
 import 'goals_screen.dart';
+import '../widgets/lumio_main_tab_header.dart';
+import '../widgets/quick_task_input_sheet.dart';
 
 /// Stitch-style Home Screen
 /// Features: Profile header, week calendar, active goals, today's actions, activity chart
@@ -34,13 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<ReminderProvider>().loadReminders();
       context.read<GrowthProvider>().loadGrowthData();
     });
-  }
-
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
   }
 
   String _getUserName() {
@@ -121,8 +113,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader(BuildContext context, int streak, int level) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: EdgeInsets.fromLTRB(
         LumioSpacing.screenHorizontal,
@@ -257,53 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           SizedBox(width: LumioSpacing.sm),
 
-          // Notification button
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const RecentNotificationsScreen(),
-                ),
-              );
-            },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: LumioColors.surface(context),
-                shape: BoxShape.circle,
-                boxShadow: LumioShadows.getSoft(context),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(
-                    Icons.notifications_outlined,
-                    color: LumioColors.textPrimary(context),
-                    size: 22,
-                  ),
-                  // Notification badge
-                  Positioned(
-                    top: 8,
-                    right: 10,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: LumioColors.badge,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: LumioColors.surface(context),
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          const LumioHeaderNotificationButton(),
         ],
       ),
     );
@@ -384,12 +328,20 @@ class _HomeScreenState extends State<HomeScreen> {
                             ? LumioColors.primary
                             : LumioColors.surface(context),
                         shape: BoxShape.circle,
+                        border: isToday && !isSelected
+                            ? Border.all(
+                                color: LumioColors.primary.withValues(alpha: 0.45),
+                                width: 2,
+                              )
+                            : null,
                         boxShadow: isSelected
-                            ? [BoxShadow(
-                                color: LumioColors.primary.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              )]
+                            ? [
+                                BoxShadow(
+                                  color: LumioColors.primary.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
                             : LumioShadows.getSoft(context),
                       ),
                       child: Center(
@@ -680,6 +632,80 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showQuickTaskSheetForSelectedDate(BuildContext context) {
+    final sheetDate = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+    );
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => QuickTaskInputSheet(
+        initialDate: sheetDate,
+        onSubmit: (title, date, priority, tags, repeat) async {
+          Navigator.pop(sheetContext);
+          if (title.isEmpty) return;
+
+          try {
+            final growth = context.read<GrowthProvider>();
+            if (growth.goals.isEmpty) {
+              await growth.loadGrowthData();
+            }
+
+            Goal? inboxGoal;
+            try {
+              inboxGoal = growth.goals.firstWhere(
+                (g) => g.name == 'Inbox',
+                orElse: () => Goal(id: -1, name: 'temp', createdAt: DateTime.now()),
+              );
+            } catch (_) {}
+
+            final int goalId;
+            if (inboxGoal == null || inboxGoal.id == -1) {
+              goalId = await growth.createGoal('Inbox');
+            } else {
+              goalId = inboxGoal.id;
+            }
+
+            final scheduledDate = date ?? sheetDate;
+            final newTask = GoalTask(
+              id: 0,
+              goalId: goalId,
+              title: title,
+              description: tags.join(' '),
+              createdAt: DateTime.now(),
+              scheduledDate: scheduledDate,
+              priority: priority,
+              frequency: repeat ?? 'one-time',
+              isCompleted: false,
+              estimatedHours: 0.5,
+              order: 0,
+              indentLevel: 0,
+              subtasks: [],
+            );
+
+            await growth.createTask(newTask);
+
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Task added to Inbox 📥')),
+              );
+            }
+          } catch (e) {
+            debugPrint('Error adding task from home: $e');
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Could not add task: $e')),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
   Widget _buildTodayActionsSection(BuildContext context, List<GoalTask> tasks, GrowthProvider provider) {
     final isToday = _isSameDay(_selectedDate, DateTime.now());
     final sectionTitle = isToday
@@ -692,21 +718,62 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                sectionTitle,
-                style: LumioTypography.titleMedium.copyWith(
-                  color: LumioColors.textPrimary(context),
+              Expanded(
+                child: Text(
+                  sectionTitle,
+                  style: LumioTypography.titleMedium.copyWith(
+                    color: LumioColors.textPrimary(context),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (tasks.isNotEmpty)
+              if (tasks.isNotEmpty) ...[
+                SizedBox(width: LumioSpacing.sm),
                 Text(
                   '${tasks.where((t) => t.isCompleted).length}/${tasks.length} done',
                   style: LumioTypography.bodySmall.copyWith(
                     color: LumioColors.textSecondary(context),
                   ),
                 ),
+              ],
+              SizedBox(width: LumioSpacing.sm),
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _showQuickTaskSheetForSelectedDate(context);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: LumioColors.primary,
+                    borderRadius: LumioRadius.radiusFull,
+                    boxShadow: [
+                      BoxShadow(
+                        color: LumioColors.primary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.add_rounded, color: Colors.white, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Add Task',
+                        style: LumioTypography.labelMedium.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
 
@@ -901,13 +968,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildWeeklyActivityChart(BuildContext context, GrowthProvider provider) {
     // Generate sample activity data based on completed tasks
     final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
     // Calculate activity for each day (simplified)
     final activities = List.generate(7, (index) {
-      final date = startOfWeek.add(Duration(days: index));
-      // For now, generate some placeholder data
+      // For now, generate some placeholder data (wire to completed tasks later).
       if (index == now.weekday - 1) return 1.0; // Today - full
       return (index * 0.15 + 0.2).clamp(0.1, 0.8);
     });

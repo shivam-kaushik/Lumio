@@ -7,6 +7,7 @@ import '../theme/theme.dart';
 import '../../data/models/goal_task.dart';
 import '../../data/models/goal.dart';
 import 'goal_details_screen.dart';
+import '../widgets/lumio_main_tab_header.dart';
 
 /// Lumio-themed Calendar screen showing all tasks with deadlines across all goals
 class SubtasksCalendarScreen extends StatefulWidget {
@@ -88,23 +89,15 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(
-        LumioSpacing.screenHorizontal,
-        MediaQuery.of(context).padding.top + LumioSpacing.md,
-        LumioSpacing.screenHorizontal,
-        LumioSpacing.sm,
-      ),
+      padding: lumioMainTabHeaderPadding(context),
+      decoration: lumioMainTabHeaderDecoration(context),
       child: Row(
         children: [
           Text(
             'Calendar',
-            style: LumioTypography.headlineSmall.copyWith(
-              color: LumioColors.textPrimary(context),
-              fontWeight: FontWeight.w700,
-            ),
+            style: lumioMainTabTitleTextStyle(context),
           ),
           const Spacer(),
-          // Today button
           GestureDetector(
             onTap: () {
               HapticFeedback.lightImpact();
@@ -119,7 +112,7 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
                 vertical: LumioSpacing.xs,
               ),
               decoration: BoxDecoration(
-                color: LumioColors.primary.withOpacity(0.12),
+                color: LumioColors.primary.withValues(alpha: 0.12),
                 borderRadius: LumioRadius.filterButton,
               ),
               child: Text(
@@ -131,6 +124,8 @@ class _SubtasksCalendarScreenState extends State<SubtasksCalendarScreen> {
               ),
             ),
           ),
+          SizedBox(width: LumioSpacing.sm),
+          const LumioHeaderNotificationButton(),
         ],
       ),
     );
