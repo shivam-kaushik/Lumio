@@ -13,6 +13,7 @@ import '../../data/models/reminder.dart' hide TimeOfDay;
 import '../../core/services/privacy_gpt_service.dart';
 import '../../core/services/permission_service.dart';
 import '../../core/services/premium_service.dart';
+import 'premium_subscription_screen.dart';
 import 'roadmap_management_screen.dart';
 
 /// Screen for planning and editing goal tasks with calendar view
@@ -586,9 +587,10 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
     final isPremium = await premiumService.isPremium();
     
     if (!isPremium) {
+      final parentContext = context;
       final upgrade = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (dialogContext) => AlertDialog(
           title: const Row(
             children: [
               Icon(Icons.star, color: Colors.amber),
@@ -601,18 +603,13 @@ class _GoalPlanningScreenState extends State<GoalPlanningScreen>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
-                // TODO: Implement premium upgrade flow
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Premium upgrade coming soon! You can add tasks manually.'),
-                  ),
-                );
-                Navigator.pop(context, false);
+                Navigator.pop(dialogContext, false);
+                openPremiumPaywall(parentContext);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.amber,

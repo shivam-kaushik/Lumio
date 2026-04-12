@@ -710,24 +710,20 @@ class _UnifiedGoalEditorScreenState extends State<UnifiedGoalEditorScreen> {
        }
   }
 
-  void _showPremiumLock(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
+  void _showPremiumLock(BuildContext parentContext) {
+    showDialog<void>(
+      context: parentContext,
+      builder: (dialogContext) => AlertDialog(
         title: const Row(children: [Icon(Icons.lock, color: Colors.orange), SizedBox(width: 8), Text("Premium Feature")]),
         content: const Text("AI-powered task generation is available for Premium users only. Upgrade to unlock!"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Maybe Later")),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Maybe Later")),
           ElevatedButton(
             onPressed: () {
-               Navigator.pop(context);
-               Navigator.of(context).push(
-                 MaterialPageRoute(
-                   builder: (context) => const PremiumSubscriptionScreen(),
-                 ),
-               );
-            }, 
-            child: const Text("Upgrade Now")
+              Navigator.pop(dialogContext);
+              openPremiumPaywall(parentContext);
+            },
+            child: const Text("Upgrade Now"),
           ),
         ],
       ),

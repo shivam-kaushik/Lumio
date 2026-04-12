@@ -10,7 +10,7 @@ import '../theme/theme.dart';
 
 import '../../data/models/goal.dart';
 import '../../data/models/goal_task.dart';
-import 'goals_screen.dart';
+import 'animated_goal_creation_screen.dart';
 import '../widgets/lumio_main_tab_header.dart';
 import '../widgets/quick_task_input_sheet.dart';
 
@@ -387,10 +387,11 @@ class _HomeScreenState extends State<HomeScreen> {
               GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  // Navigate to goal creation
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const GoalsScreen()),
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      fullscreenDialog: true,
+                      builder: (_) => const AnimatedGoalCreationScreen(),
+                    ),
                   );
                 },
                 child: Container(

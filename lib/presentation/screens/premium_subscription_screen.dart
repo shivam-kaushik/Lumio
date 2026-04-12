@@ -266,3 +266,13 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen> {
     );
   }
 }
+
+/// Opens the subscription / plan purchase screen (used from premium-gated dialogs).
+Future<void> openPremiumPaywall(BuildContext context) {
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(
+      builder: (_) => const PremiumSubscriptionScreen(),
+    ),
+  );
+}
+

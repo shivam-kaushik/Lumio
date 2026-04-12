@@ -14,6 +14,7 @@ import '../../core/services/adaptive_rescheduling_service.dart';
 import '../../core/services/premium_service.dart';
 import '../../core/services/privacy_gpt_service.dart';
 import 'goal_settings_screen.dart';
+import 'premium_subscription_screen.dart';
 
 /// Stitch-style Goal Details Screen
 /// Features: Large progress ring, AI insights, milestones timeline
@@ -1653,10 +1654,12 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
   Future<void> _generateTasksWithAI(BuildContext context) async {
     final premiumService = PremiumService();
     if (!await premiumService.isPremium()) {
-      showDialog(
+      if (!mounted) return;
+      final parentContext = context;
+      await showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: LumioColors.surface(context),
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: LumioColors.surface(dialogContext),
           shape: RoundedRectangleBorder(borderRadius: LumioRadius.dialog),
           title: Text('Premium Feature', style: LumioTypography.titleLarge),
           content: Text(
@@ -1665,11 +1668,14 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: Text('Close'),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                openPremiumPaywall(parentContext);
+              },
               style: ElevatedButton.styleFrom(backgroundColor: LumioColors.primary),
               child: Text('Upgrade'),
             ),

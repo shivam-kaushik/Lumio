@@ -1032,12 +1032,9 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const PremiumSubscriptionScreen(),
-                      ),
-                    ).then((_) => _checkPremium());
+                  onPressed: () async {
+                    await openPremiumPaywall(context);
+                    if (mounted) _checkPremium();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: LumioColors.primary,
