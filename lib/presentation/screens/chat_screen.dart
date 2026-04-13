@@ -82,6 +82,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   void _showTopicSelector() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _buildTopicSheet(),
     );
@@ -906,6 +907,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? const Color(0xFF2D261E) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1A150F);
+    final maxSheetHeight = MediaQuery.of(context).size.height * 0.75;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -913,56 +915,66 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
         color: backgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[400],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            "Select Topic",
-            style: TextStyle(
-              color: textColor,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...List.generate(_topics.length, (index) {
-            final topic = _topics[index];
-            final isSelected = topic == _selectedTopic;
-            return ListTile(
-              onTap: () {
-                setState(() => _selectedTopic = topic);
-                Navigator.pop(context);
-              },
-              leading: Icon(
-                isSelected ? Icons.check_circle : Icons.circle_outlined,
-                color: isSelected ? LumioColors.primary : Colors.grey,
-              ),
-              title: Text(
-                topic,
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      child: SafeArea(
+        top: false,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxSheetHeight),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 20),
+              Text(
+                "Select Topic",
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            );
-          }),
-          SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
-        ],
+              const SizedBox(height: 16),
+              Flexible(
+                child: ListView.builder(
+                  itemCount: _topics.length,
+                  itemBuilder: (context, index) {
+                    final topic = _topics[index];
+                    final isSelected = topic == _selectedTopic;
+                    return ListTile(
+                      onTap: () {
+                        setState(() => _selectedTopic = topic);
+                        Navigator.pop(context);
+                      },
+                      leading: Icon(
+                        isSelected ? Icons.check_circle : Icons.circle_outlined,
+                        color: isSelected ? LumioColors.primary : Colors.grey,
+                      ),
+                      title: Text(
+                        topic,
+                        style: TextStyle(
+                          color: textColor,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+            ],
+          ),
+        ),
       ),
     );
   }
