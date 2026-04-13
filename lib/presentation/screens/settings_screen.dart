@@ -1,6 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'dart:io' show Platform;
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../core/services/external_url_service.dart';
 import '../../core/services/permission_service.dart';
 import '../providers/theme_provider.dart';
 import '../providers/growth_provider.dart';
@@ -17,6 +20,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObserver {
   final PermissionService _permissionService = PermissionService();
+  static final Uri _privacyPolicyUri = Uri.parse('https://unique-belekoy-787152.netlify.app/');
+
   bool _notificationsEnabled = false;
   bool _exactAlarmEnabled = false;
   bool _microphoneEnabled = false;
@@ -107,7 +112,8 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                             subtitle: Text('Show your customized avatar in the app', style: LumioTypography.bodySmall.copyWith(color: LumioColors.textSecondary(context))),
                             value: provider.showAvatarInProfile,
                             onChanged: (val) => provider.toggleProfileImageSource(val),
-                            activeColor: LumioColors.primary,
+                            activeThumbColor: LumioColors.surface(context),
+                            activeTrackColor: LumioColors.primary,
                           ),
                           if (provider.showAvatarInProfile) ...[
                             Divider(height: 1, color: LumioColors.border(context)),
@@ -156,8 +162,17 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                       ),
                       trailing: Icon(Icons.chevron_right_rounded, color: LumioColors.textSecondary(context)),
                       onTap: () async {
-                        final granted = await _permissionService.ensureNotificationPermission(context, rationale: 'Notifications are required to deliver reminders.');
-                        if (granted && mounted) _refreshStatuses();
+                        final allowed = await _permissionService.hasNotificationPermission();
+                        if (!context.mounted) return;
+                        if (allowed) {
+                          await _permissionService.openSettings();
+                        } else {
+                          await _permissionService.ensureNotificationPermission(
+                            context,
+                            rationale: 'Notifications are required to deliver reminders.',
+                          );
+                        }
+                        if (mounted) await _refreshStatuses();
                       },
                     ),
                   ),
@@ -169,27 +184,45 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                   _LumioCard(
                     child: Column(
                       children: [
+                        if (Platform.isAndroid) ...[
+                          _PermissionTile(
+                            icon: Icons.schedule_rounded,
+                            label: 'Exact Alarms',
+                            subtitle: _exactAlarmEnabled ? 'Enabled for precise reminders' : 'Disabled — reminders may be delayed',
+                            enabled: _exactAlarmEnabled,
+                            onManage: () async {
+                              final hasExact = await _permissionService.hasExactAlarmPermission();
+                              if (!context.mounted) return;
+                              if (hasExact) {
+                                await _permissionService.openExactAlarmSettingsScreen();
+                              } else {
+                                await _permissionService.ensureExactAlarmPermission(
+                                  context,
+                                  rationale: 'Exact alarms are needed for precise reminder delivery.',
+                                );
+                              }
+                              if (mounted) await _refreshStatuses();
+                            },
+                          ),
+                          Divider(height: 1, color: LumioColors.border(context)),
+                        ],
                         _PermissionTile(
-                          context: context,
-                          icon: Icons.schedule_rounded,
-                          label: 'Exact Alarms',
-                          subtitle: _exactAlarmEnabled ? 'Enabled for precise reminders' : 'Disabled — reminders may be delayed',
-                          enabled: _exactAlarmEnabled,
-                          onManage: () async {
-                            final granted = await _permissionService.ensureExactAlarmPermission(context, rationale: 'Exact alarms are needed for precise reminder delivery.');
-                            if (granted && mounted) _refreshStatuses();
-                          },
-                        ),
-                        Divider(height: 1, color: LumioColors.border(context)),
-                        _PermissionTile(
-                          context: context,
                           icon: Icons.mic_rounded,
                           label: 'Microphone',
                           subtitle: _microphoneEnabled ? 'Enabled for voice input' : 'Disabled',
                           enabled: _microphoneEnabled,
                           onManage: () async {
-                            final granted = await _permissionService.ensureMicrophonePermission(context, rationale: 'Microphone is needed for voice input when creating reminders.');
-                            if (granted && mounted) _refreshStatuses();
+                            final hasMic = await _permissionService.hasMicrophonePermission();
+                            if (!context.mounted) return;
+                            if (hasMic) {
+                              await _permissionService.openSettings();
+                            } else {
+                              await _permissionService.ensureMicrophonePermission(
+                                context,
+                                rationale: 'Microphone is needed for voice input when creating reminders.',
+                              );
+                            }
+                            if (mounted) await _refreshStatuses();
                           },
                         ),
                       ],
@@ -201,59 +234,28 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                   _SectionLabel(label: 'App Settings'),
                   const SizedBox(height: LumioSpacing.sm),
                   _LumioCard(
-                    child: Column(
-                      children: [
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: LumioSpacing.md),
-                          leading: Icon(Icons.settings_applications_rounded, color: LumioColors.textPrimary(context)),
-                          title: Text('System Settings', style: LumioTypography.bodyMedium.copyWith(color: LumioColors.textPrimary(context), fontWeight: FontWeight.w600)),
-                          subtitle: Text('Open device settings', style: LumioTypography.bodySmall.copyWith(color: LumioColors.textSecondary(context))),
-                          trailing: Icon(Icons.open_in_new_rounded, size: 18, color: LumioColors.textSecondary(context)),
-                          onTap: () => _permissionService.openSettings(),
-                        ),
-                        Divider(height: 1, color: LumioColors.border(context)),
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: LumioSpacing.md),
-                          leading: Icon(Icons.storage_rounded, color: LumioColors.textPrimary(context)),
-                          title: Text('Data & Storage', style: LumioTypography.bodyMedium.copyWith(color: LumioColors.textPrimary(context), fontWeight: FontWeight.w600)),
-                          subtitle: Text('Manage app data and cache', style: LumioTypography.bodySmall.copyWith(color: LumioColors.textSecondary(context))),
-                          trailing: Icon(Icons.chevron_right_rounded, color: LumioColors.textSecondary(context)),
-                          onTap: () => _showDataManagementDialog(context),
-                        ),
-                      ],
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: LumioSpacing.md),
+                      leading: Icon(Icons.settings_applications_rounded, color: LumioColors.textPrimary(context)),
+                      title: Text('System Settings', style: LumioTypography.bodyMedium.copyWith(color: LumioColors.textPrimary(context), fontWeight: FontWeight.w600)),
+                      subtitle: Text('Open Lumio in Android / iOS settings', style: LumioTypography.bodySmall.copyWith(color: LumioColors.textSecondary(context))),
+                      trailing: Icon(Icons.open_in_new_rounded, size: 18, color: LumioColors.textSecondary(context)),
+                      onTap: () => _permissionService.openSettings(),
                     ),
                   ),
                   const SizedBox(height: LumioSpacing.lg),
 
-                  // About
-                  _SectionLabel(label: 'About'),
+                  // Legal
+                  _SectionLabel(label: 'Legal'),
                   const SizedBox(height: LumioSpacing.sm),
                   _LumioCard(
-                    child: Column(
-                      children: [
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: LumioSpacing.md),
-                          leading: Icon(Icons.info_outline_rounded, color: LumioColors.textPrimary(context)),
-                          title: Text('App Version', style: LumioTypography.bodyMedium.copyWith(color: LumioColors.textPrimary(context), fontWeight: FontWeight.w600)),
-                          subtitle: Text('1.0.0', style: LumioTypography.bodySmall.copyWith(color: LumioColors.textSecondary(context))),
-                        ),
-                        Divider(height: 1, color: LumioColors.border(context)),
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: LumioSpacing.md),
-                          leading: Icon(Icons.description_rounded, color: LumioColors.textPrimary(context)),
-                          title: Text('Privacy Policy', style: LumioTypography.bodyMedium.copyWith(color: LumioColors.textPrimary(context), fontWeight: FontWeight.w600)),
-                          trailing: Icon(Icons.open_in_new_rounded, size: 18, color: LumioColors.textSecondary(context)),
-                          onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Privacy policy coming soon'))),
-                        ),
-                        Divider(height: 1, color: LumioColors.border(context)),
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: LumioSpacing.md),
-                          leading: Icon(Icons.description_rounded, color: LumioColors.textPrimary(context)),
-                          title: Text('Terms of Service', style: LumioTypography.bodyMedium.copyWith(color: LumioColors.textPrimary(context), fontWeight: FontWeight.w600)),
-                          trailing: Icon(Icons.open_in_new_rounded, size: 18, color: LumioColors.textSecondary(context)),
-                          onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Terms of service coming soon'))),
-                        ),
-                      ],
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: LumioSpacing.md),
+                      leading: Icon(Icons.privacy_tip_outlined, color: LumioColors.textPrimary(context)),
+                      title: Text('Privacy Policy', style: LumioTypography.bodyMedium.copyWith(color: LumioColors.textPrimary(context), fontWeight: FontWeight.w600)),
+                      subtitle: Text('How Lumio uses your data', style: LumioTypography.bodySmall.copyWith(color: LumioColors.textSecondary(context))),
+                      trailing: Icon(Icons.open_in_new_rounded, size: 18, color: LumioColors.textSecondary(context)),
+                      onTap: () => _openPrivacyPolicy(context),
                     ),
                   ),
                 ],
@@ -265,20 +267,30 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     );
   }
 
-  void _showDataManagementDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: LumioColors.surface(context),
-        shape: RoundedRectangleBorder(borderRadius: LumioRadius.card),
-        title: Text('Data & Storage', style: LumioTypography.titleMedium.copyWith(color: LumioColors.textPrimary(context))),
-        content: Text('Data management features coming soon. You can clear app data from system settings.', style: TextStyle(color: LumioColors.textSecondary(context))),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
-          TextButton(onPressed: () { Navigator.pop(context); _permissionService.openSettings(); }, child: const Text('Open Settings')),
-        ],
-      ),
-    );
+  Future<void> _openPrivacyPolicy(BuildContext context) async {
+    try {
+      await ExternalUrlService.openUrl(_privacyPolicyUri.toString());
+    } on PlatformException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message ?? 'Could not open the privacy policy link.'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: LumioColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open link: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: LumioColors.error,
+          ),
+        );
+      }
+    }
   }
 
   void _showThemeDialog(BuildContext context, ThemeProvider themeProvider) {
@@ -296,7 +308,12 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             _themeOption(context, themeProvider, ThemeMode.system, 'System Default', Icons.settings_brightness_rounded),
           ],
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel'))],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: TextStyle(color: LumioColors.primary)),
+          ),
+        ],
       ),
     );
   }
@@ -365,7 +382,6 @@ class _LumioCard extends StatelessWidget {
 }
 
 class _PermissionTile extends StatelessWidget {
-  final BuildContext context;
   final IconData icon;
   final String label;
   final String subtitle;
@@ -373,7 +389,6 @@ class _PermissionTile extends StatelessWidget {
   final VoidCallback onManage;
 
   const _PermissionTile({
-    required this.context,
     required this.icon,
     required this.label,
     required this.subtitle,
@@ -382,22 +397,23 @@ class _PermissionTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext ctx) {
+  Widget build(BuildContext context) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: LumioSpacing.md),
       leading: Icon(icon, color: LumioColors.textPrimary(context)),
       title: Text(label, style: LumioTypography.bodyMedium.copyWith(color: LumioColors.textPrimary(context), fontWeight: FontWeight.w600)),
       subtitle: Text(subtitle, style: LumioTypography.bodySmall.copyWith(color: enabled ? LumioColors.success : LumioColors.textSecondary(context))),
-      trailing: GestureDetector(
-        onTap: onManage,
-        child: Container(
+      trailing: OutlinedButton(
+        onPressed: onManage,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: LumioColors.textPrimary(context),
+          side: BorderSide(color: LumioColors.border(context)),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            border: Border.all(color: LumioColors.border(context)),
-            borderRadius: LumioRadius.radiusSM,
-          ),
-          child: Text('Manage', style: LumioTypography.labelSmall.copyWith(color: LumioColors.textPrimary(context), fontWeight: FontWeight.w600)),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: RoundedRectangleBorder(borderRadius: LumioRadius.radiusSM),
         ),
+        child: Text('Manage', style: LumioTypography.labelSmall.copyWith(fontWeight: FontWeight.w600)),
       ),
     );
   }

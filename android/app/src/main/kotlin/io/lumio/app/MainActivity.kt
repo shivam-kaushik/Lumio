@@ -49,6 +49,23 @@ class MainActivity: FlutterActivity() {
                     requestDisableBatteryOptimization()
                     result.success(null)
                 }
+                "openExternalUrl" -> {
+                    val url = call.arguments as? String
+                    if (url.isNullOrBlank()) {
+                        result.error("invalid_args", "Missing url", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        applicationContext.startActivity(intent)
+                        result.success(null)
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainActivity", "openExternalUrl: ${e.message}")
+                        result.error("launch_failed", e.message, null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
@@ -277,16 +294,31 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    private fun openAppDetailsSettings() {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error opening app details: ${e.message}")
+        }
+    }
+
     private fun openExactAlarmSettings() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
-                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.parse("package:$packageName")
+                }
                 startActivity(intent)
             } catch (e: Exception) {
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                intent.data = Uri.parse("package:$packageName")
-                startActivity(intent)
+                android.util.Log.e("MainActivity", "Exact alarm settings intent failed: ${e.message}")
+                openAppDetailsSettings()
             }
+        } else {
+            // Pre-Android 12: no SCHEDULE_EXACT_ALARM UI; send user to app details.
+            openAppDetailsSettings()
         }
     }
 

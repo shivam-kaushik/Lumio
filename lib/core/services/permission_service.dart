@@ -327,4 +327,18 @@ class PermissionService {
   Future<bool> openSettings() async {
     return await openAppSettings();
   }
+
+  /// Android: exact-alarm grant UI when available, otherwise app details. iOS: app settings.
+  Future<void> openExactAlarmSettingsScreen() async {
+    if (Platform.isIOS) {
+      await openAppSettings();
+      return;
+    }
+    try {
+      await _platform.invokeMethod<void>('openExactAlarmSettings');
+    } catch (e) {
+      debugPrint('Error opening exact alarm settings: $e');
+      await openAppSettings();
+    }
+  }
 }

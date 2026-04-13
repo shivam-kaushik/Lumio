@@ -27,6 +27,41 @@ import FirebaseCore
     }
     
     GeneratedPluginRegistrant.register(with: self)
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    let ok = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+
+    // Window / root FlutterViewController may not exist until after this run loop tick.
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self,
+            let controller = self.window?.rootViewController as? FlutterViewController else {
+        return
+      }
+      let channel = FlutterMethodChannel(
+        name: "io.lumio.app/permissions",
+        binaryMessenger: controller.binaryMessenger
+      )
+      channel.setMethodCallHandler { call, result in
+        switch call.method {
+        case "openExternalUrl":
+          guard let urlString = call.arguments as? String,
+                let url = URL(string: urlString) else {
+            result(FlutterError(code: "invalid_args", message: "Missing url", details: nil))
+            return
+          }
+          UIApplication.shared.open(url, options: [:]) { success in
+            DispatchQueue.main.async {
+              if success {
+                result(nil)
+              } else {
+                result(FlutterError(code: "launch_failed", message: "Could not open URL", details: nil))
+              }
+            }
+          }
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+
+    return ok
   }
 }
