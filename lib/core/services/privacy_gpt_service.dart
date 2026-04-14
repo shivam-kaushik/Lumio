@@ -919,7 +919,7 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
         Uri.parse(_baseUrl),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer \$apiKey',
+          'Authorization': 'Bearer $apiKey',
         },
         body: jsonEncode({
           'model': _model,
@@ -939,7 +939,7 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
         return _fallbackConversationLogic(history);
       }
     } catch (e) {
-      debugPrint('GPT Conversation Error: \$e');
+      debugPrint('GPT Conversation Error: $e');
       return _fallbackConversationLogic(history);
     }
   }
