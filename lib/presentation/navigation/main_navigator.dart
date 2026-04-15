@@ -172,14 +172,6 @@ class MainNavigatorState extends State<MainNavigator>
             ),
           );
         },
-        onStartHandsFree: () {
-          Navigator.pop(context);
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const ChatScreen(), // Navigate to ChatScreen
-            ),
-          );
-        },
       ),
     );
   }
@@ -550,14 +542,12 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
   final VoidCallback onCreateGoal;
   final VoidCallback onPlanDay;
   final VoidCallback onStartChat;
-  final VoidCallback onStartHandsFree;
 
   const _CreateOptionsBottomSheet({
     required this.onCreateTask,
     required this.onCreateGoal,
     required this.onPlanDay,
     required this.onStartChat,
-    required this.onStartHandsFree,
   });
 
   @override
@@ -618,18 +608,10 @@ class _CreateOptionsBottomSheet extends StatelessWidget {
               SizedBox(height: LumioSpacing.sm),
               _CreateOptionTile(
                 icon: Icons.chat_bubble_rounded,
-                title: 'Chat with Coach',
-                subtitle: 'Type to plan goals and tasks',
+                title: 'AI Chat',
+                subtitle: 'Type or speak to plan goals and tasks',
                 color: LumioColors.primary,
                 onTap: onStartChat,
-              ),
-              SizedBox(height: LumioSpacing.sm),
-              _CreateOptionTile(
-                icon: Icons.mic_rounded,
-                title: 'Hands-Free Mode',
-                subtitle: 'Voice-guided goal planning',
-                color: LumioColors.categoryPersonal,
-                onTap: onStartHandsFree,
               ),
               SizedBox(height: LumioSpacing.md),
             ],

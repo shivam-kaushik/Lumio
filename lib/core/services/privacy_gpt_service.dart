@@ -1020,12 +1020,71 @@ Keep questions SHORT, DIRECT, and CONVERSATIONAL (spoken by TTS).
         actionData: data['action_data'],
       );
     } catch (e) {
-      // If parsing fails, treat entire content as a question
+      // If parsing fails, try to infer action from plain-text confirmations.
+      final inferred = _inferActionFromPlainText(content);
+      if (inferred != null) return inferred;
+
+      return ConversationResponse(responseText: content, isAction: false);
+    }
+  }
+
+  ConversationResponse? _inferActionFromPlainText(String content) {
+    final text = content.trim();
+    final lower = text.toLowerCase();
+
+    final goalSignals = [
+      'created your goal',
+      'created a goal',
+      'goal created',
+      'i\'ve created your goal',
+    ];
+    if (goalSignals.any(lower.contains)) {
+      String goalName = 'New Goal';
+      final quoted = RegExp("['\\\"]([^'\\\"]{2,80})['\\\"]").firstMatch(text);
+      if (quoted != null) {
+        goalName = quoted.group(1) ?? goalName;
+      } else {
+        final forMatch = RegExp(r'goal\s+(.+?)(?:\s+with|\s+by|\.|$)', caseSensitive: false)
+            .firstMatch(text);
+        if (forMatch != null && (forMatch.group(1) ?? '').trim().isNotEmpty) {
+          goalName = forMatch.group(1)!.trim();
+        }
+      }
+
       return ConversationResponse(
-        responseText: content,
-        isAction: false,
+        responseText: text,
+        isAction: true,
+        actionType: 'CREATE_GOAL',
+        actionData: {
+          'goal': goalName,
+          'tasks': <Map<String, dynamic>>[],
+        },
       );
     }
+
+    final taskSignals = [
+      'added',
+      'task created',
+      'created task',
+      'added to your tasks',
+      'added to your list',
+    ];
+    if (taskSignals.any(lower.contains)) {
+      String taskTitle = 'New Task';
+      final quoted = RegExp("['\\\"]([^'\\\"]{2,80})['\\\"]").firstMatch(text);
+      if (quoted != null) {
+        taskTitle = quoted.group(1) ?? taskTitle;
+      }
+
+      return ConversationResponse(
+        responseText: text,
+        isAction: true,
+        actionType: 'CREATE_TASK',
+        actionData: {'title': taskTitle},
+      );
+    }
+
+    return null;
   }
 
   Future<List<Map<String, dynamic>>> breakDownTask(String taskTitle) async {

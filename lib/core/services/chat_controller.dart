@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../services/text_to_speech_service.dart';
 import '../services/privacy_gpt_service.dart';
@@ -15,6 +17,7 @@ enum ChatState {
 }
 
 class ChatController extends ChangeNotifier {
+  static const String _historyStorageKey = 'chat_conversation_history_v1';
   late final stt.SpeechToText _speech;
   late final TextToSpeechService _tts;
   late final PrivacyGptService _gpt;
@@ -36,11 +39,24 @@ class ChatController extends ChangeNotifier {
   String _currentTranscript = '';
   final List<ChatMessage> _messages = [];
   final List<Map<String, String>> _conversationHistory = []; // For GPT context
+  final List<Map<String, dynamic>> _savedConversations = [];
+  String _activeConversationId = DateTime.now().millisecondsSinceEpoch.toString();
   
   // Getters
   ChatState get state => _state;
   String get currentTranscript => _currentTranscript;
   List<ChatMessage> get messages => List.unmodifiable(_messages);
+  List<Map<String, dynamic>> get savedConversations => List.unmodifiable(_savedConversations);
+  String get activeConversationId => _activeConversationId;
+  String get activeConversationTitle {
+    final match = _savedConversations
+        .where((c) => c['id'] == _activeConversationId)
+        .toList();
+    if (match.isNotEmpty) {
+      return (match.first['title'] ?? 'New Conversation').toString();
+    }
+    return 'New Conversation';
+  }
 
   bool _isInitialized = false;
 
@@ -61,9 +77,12 @@ class ChatController extends ChangeNotifier {
         debugPrint('STT not available');
     }
     
-    // Add initial greeting
-    _addMessage(ChatMessage.ai("Hi! What goal are you working on today?"));
-    _addToHistory('assistant', "Hi! What goal are you working on today?");
+    await _loadSavedConversations();
+
+    if (_messages.isEmpty) {
+      _addMessage(ChatMessage.ai('Hi! What goal are you working on today?'));
+      _addToHistory('assistant', 'Hi! What goal are you working on today?');
+    }
   }
 
   // --- Input Methods ---
@@ -157,11 +176,129 @@ class ChatController extends ChangeNotifier {
 
   void _addMessage(ChatMessage msg) {
       _messages.add(msg);
+      unawaited(_saveActiveConversation());
       notifyListeners();
   }
 
   void _addToHistory(String role, String content) {
       _conversationHistory.add({'role': role, 'content': content});
+  }
+
+  Future<void> loadConversation(String conversationId) async {
+    final conversation = _savedConversations.where((c) => c['id'] == conversationId).toList();
+    if (conversation.isEmpty) return;
+
+    _activeConversationId = conversationId;
+    _messages.clear();
+    _conversationHistory.clear();
+
+    final msgs = (conversation.first['messages'] as List<dynamic>? ?? []);
+    for (final item in msgs) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final senderRaw = (map['sender'] ?? 'ai').toString();
+      final sender = senderRaw == 'user'
+          ? ChatSender.user
+          : senderRaw == 'system'
+              ? ChatSender.system
+              : ChatSender.ai;
+
+      _messages.add(
+        ChatMessage(
+          id: (map['id'] ?? DateTime.now().microsecondsSinceEpoch.toString()).toString(),
+          text: (map['text'] ?? '').toString(),
+          sender: sender,
+          timestamp: DateTime.tryParse((map['timestamp'] ?? '').toString()) ?? DateTime.now(),
+          isAction: map['isAction'] == true,
+          actionType: map['actionType']?.toString(),
+          actionData: map['actionData'] is Map
+              ? Map<String, dynamic>.from(map['actionData'] as Map)
+              : null,
+        ),
+      );
+
+      if (sender == ChatSender.user) {
+        _conversationHistory.add({'role': 'user', 'content': (map['text'] ?? '').toString()});
+      } else {
+        _conversationHistory.add({'role': 'assistant', 'content': (map['text'] ?? '').toString()});
+      }
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> startNewConversation() async {
+    _activeConversationId = DateTime.now().millisecondsSinceEpoch.toString();
+    _messages.clear();
+    _conversationHistory.clear();
+    _addMessage(ChatMessage.ai('Hi! What goal are you working on today?'));
+    _addToHistory('assistant', 'Hi! What goal are you working on today?');
+    await _saveActiveConversation();
+    notifyListeners();
+  }
+
+  Future<void> _loadSavedConversations() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_historyStorageKey);
+    if (raw == null || raw.isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      _savedConversations
+        ..clear()
+        ..addAll(decoded.map((e) => Map<String, dynamic>.from(e as Map)));
+
+      if (_savedConversations.isNotEmpty) {
+        final latest = _savedConversations.first;
+        final id = (latest['id'] ?? '').toString();
+        if (id.isNotEmpty) {
+          await loadConversation(id);
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load chat history: $e');
+    }
+  }
+
+  Future<void> _saveActiveConversation() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final title = _deriveConversationTitle();
+    final now = DateTime.now().toIso8601String();
+    final payload = <String, dynamic>{
+      'id': _activeConversationId,
+      'title': title,
+      'updatedAt': now,
+      'messages': _messages.map((m) {
+        return <String, dynamic>{
+          'id': m.id,
+          'text': m.text,
+          'sender': m.sender.name,
+          'timestamp': m.timestamp.toIso8601String(),
+          'isAction': m.isAction,
+          'actionType': m.actionType,
+          'actionData': m.actionData,
+        };
+      }).toList(),
+    };
+
+    _savedConversations.removeWhere((c) => c['id'] == _activeConversationId);
+    _savedConversations.insert(0, payload);
+    if (_savedConversations.length > 30) {
+      _savedConversations.removeRange(30, _savedConversations.length);
+    }
+
+    await prefs.setString(_historyStorageKey, jsonEncode(_savedConversations));
+  }
+
+  String _deriveConversationTitle() {
+    for (final m in _messages) {
+      if (m.sender == ChatSender.user && m.text.trim().isNotEmpty) {
+        final t = m.text.trim();
+        return t.length > 40 ? '${t.substring(0, 40)}...' : t;
+      }
+    }
+    return 'New Conversation';
   }
 
   void disposeHelper() {

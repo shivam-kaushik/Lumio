@@ -5,8 +5,10 @@ import '../../core/services/chat_controller.dart';
 import '../models/chat_message.dart';
 import '../theme/theme.dart';
 import '../../core/services/premium_service.dart';
-import 'unified_goal_editor_screen.dart';
 import 'premium_subscription_screen.dart';
+import '../providers/growth_provider.dart';
+import '../../data/models/goal_task.dart';
+import 'goals_screen.dart';
 
 class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key});
@@ -31,22 +33,14 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
+  final Set<String> _executedActionMessageIds = <String>{};
   bool? _isPremium;
-  String _selectedTopic = "Personal Growth";
 
   final List<Map<String, dynamic>> _quickActions = [
     {'icon': Icons.list_alt, 'label': 'Outline modules'},
     {'icon': Icons.person_search, 'label': 'Define persona'},
     {'icon': Icons.lightbulb_outline, 'label': 'Brainstorm'},
     {'icon': Icons.schedule, 'label': 'Plan schedule'},
-  ];
-
-  final List<String> _topics = [
-    "Personal Growth",
-    "Career Goals",
-    "Health & Fitness",
-    "Learning",
-    "Relationships",
   ];
 
   @override
@@ -79,12 +73,12 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     }
   }
 
-  void _showTopicSelector() {
+  void _showConversationSelector(ChatController controller) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _buildTopicSheet(),
+      builder: (context) => _buildConversationSheet(controller),
     );
   }
 
@@ -103,6 +97,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
 
     // Auto-scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    _executePendingActions(controller.messages);
 
     if (_isPremium == null) {
       return Scaffold(
@@ -121,7 +116,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
         child: Column(
           children: [
             // Header
-            _buildHeader(context, isDark, textColor, subtleColor, surfaceColor, dividerColor),
+            _buildHeader(context, controller, isDark, textColor, subtleColor, surfaceColor, dividerColor),
 
             // Chat List
             Expanded(
@@ -166,8 +161,254 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     );
   }
 
+  void _executePendingActions(List<ChatMessage> messages) {
+    final pendingActions = messages
+        .where((m) => m.isAction && !_executedActionMessageIds.contains(m.id))
+        .toList();
+    if (pendingActions.isEmpty) return;
+    for (final action in pendingActions) {
+      _executedActionMessageIds.add(action.id);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      for (final msg in pendingActions) {
+        if (!mounted) return;
+        await _persistActionMessage(msg);
+      }
+    });
+  }
+
+  Future<void> _persistActionMessage(ChatMessage msg) async {
+    final actionType = (msg.actionType ?? '').toUpperCase();
+    final growth = context.read<GrowthProvider>();
+    final actionData = msg.actionData ?? <String, dynamic>{};
+
+    try {
+      if (actionType.contains('TASK')) {
+        await _createTaskFromAction(growth, actionData);
+      } else if (actionType.contains('GOAL')) {
+        await _createGoalFromAction(growth, actionData);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save AI action: $e')),
+      );
+    }
+  }
+
+  Future<void> _createTaskFromAction(
+    GrowthProvider growth,
+    Map<String, dynamic> actionData,
+  ) async {
+    final rawTitle = (actionData['title'] ?? actionData['task'] ?? '').toString().trim();
+    if (rawTitle.isEmpty) return;
+
+    final goalId = await _ensureInboxGoalId(growth);
+    final task = GoalTask(
+      id: 0,
+      goalId: goalId,
+      title: rawTitle,
+      description: (actionData['description'] ?? '').toString(),
+      createdAt: DateTime.now(),
+      priority: _normalizePriority(actionData['priority']),
+      frequency: _normalizeFrequency(actionData['frequency']),
+      isCompleted: false,
+      estimatedHours: 0.5,
+      order: 0,
+      indentLevel: 0,
+      subtasks: [],
+    );
+
+    await growth.createTask(task);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Task added: '$rawTitle'")),
+    );
+  }
+
+  Future<void> _createGoalFromAction(
+    GrowthProvider growth,
+    Map<String, dynamic> actionData,
+  ) async {
+    final goalName = _deriveGoalNameFromContext(actionData);
+    if (goalName.isEmpty) return;
+
+    DateTime? targetDeadline;
+    final deadlineRaw = actionData['deadline']?.toString();
+    if (deadlineRaw != null && deadlineRaw.isNotEmpty) {
+      targetDeadline = DateTime.tryParse(deadlineRaw);
+    }
+
+    final goalId = await growth.createGoal(
+      goalName,
+      targetDeadline: targetDeadline,
+    );
+
+    final tasksData = actionData['tasks'];
+    if (tasksData is List) {
+      for (final taskItem in tasksData) {
+        if (taskItem is! Map) continue;
+        final map = Map<String, dynamic>.from(taskItem);
+        final title = (map['title'] ?? '').toString().trim();
+        if (title.isEmpty) continue;
+
+        await growth.createTask(
+          GoalTask(
+            id: 0,
+            goalId: goalId,
+            title: title,
+            description: (map['description'] ?? '').toString(),
+            createdAt: DateTime.now(),
+            priority: _normalizePriority(map['priority']),
+            frequency: _normalizeFrequency(map['frequency']),
+            isCompleted: false,
+            estimatedHours: 1.0,
+            order: 0,
+            indentLevel: 0,
+            subtasks: [],
+          ),
+        );
+      }
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Goal created: '$goalName'")),
+    );
+  }
+
+  String _deriveGoalNameFromContext(Map<String, dynamic> actionData) {
+    final rawGoal = (actionData['goal'] ?? actionData['title'] ?? '').toString();
+    final sanitizedRaw = _sanitizeGoalCandidate(rawGoal);
+    if (_isMeaningfulGoalName(sanitizedRaw)) {
+      return sanitizedRaw;
+    }
+
+    final chat = context.read<ChatController>();
+    final userMessages = chat.messages
+        .where((m) => m.sender == ChatSender.user)
+        .map((m) => m.text)
+        .toList()
+        .reversed
+        .toList();
+
+    for (final message in userMessages) {
+      final candidate = _sanitizeGoalCandidate(message);
+      if (_isMeaningfulGoalName(candidate)) {
+        return candidate;
+      }
+    }
+
+    return 'New Goal';
+  }
+
+  String _sanitizeGoalCandidate(String input) {
+    if (input.trim().isEmpty) return '';
+    var text = input.trim();
+
+    // Remove common AI confirmation boilerplate when it leaks into title field.
+    final boilerplatePatterns = <RegExp>[
+      RegExp(r"^i[' ]?ve\s+created\s+your\s+goal\s+", caseSensitive: false),
+      RegExp(r'^great!\s*', caseSensitive: false),
+      RegExp(r'^create\s+(a\s+)?goal(\s+to)?\s+', caseSensitive: false),
+      RegExp(r'^set\s+(a\s+)?goal(\s+to)?\s+', caseSensitive: false),
+      RegExp(r'^i\s+want\s+to\s+', caseSensitive: false),
+      RegExp(r'^goal\s*(name|title)?\s*[:\-]\s*', caseSensitive: false),
+    ];
+    for (final p in boilerplatePatterns) {
+      text = text.replaceFirst(p, '');
+    }
+
+    // Trim trailing AI-like sentence fragments.
+    text = text
+        .replaceAll(RegExp(r"let'?s\s+do\s+this!?\.?", caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+with\s+a\s+deadline.*$', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+in\s+\d+\s+(day|days|week|weeks|month|months|year|years).*$',
+            caseSensitive: false), '')
+        .trim();
+
+    // Basic spelling cleanup for common goal words.
+    const corrections = <String, String>{
+      'buisness': 'business',
+      'busines': 'business',
+      'bussiness': 'business',
+      'acheive': 'achieve',
+      'achive': 'achieve',
+      'sucess': 'success',
+      'succes': 'success',
+    };
+
+    final words = text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).map((w) {
+      final lower = w.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+      if (corrections.containsKey(lower)) {
+        return corrections[lower]!;
+      }
+      return w;
+    }).toList();
+
+    text = words.join(' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    // Title case for display consistency.
+    final smallWords = {'a', 'an', 'and', 'or', 'to', 'of', 'the', 'for', 'in', 'on'};
+    final titled = text.split(' ').asMap().entries.map((entry) {
+      final i = entry.key;
+      final word = entry.value;
+      if (word.isEmpty) return word;
+      final lw = word.toLowerCase();
+      if (i > 0 && smallWords.contains(lw)) return lw;
+      return '${lw[0].toUpperCase()}${lw.substring(1)}';
+    }).join(' ');
+
+    return titled.trim();
+  }
+
+  bool _isMeaningfulGoalName(String name) {
+    final value = name.trim();
+    if (value.length < 4) return false;
+
+    final lower = value.toLowerCase();
+    final invalidFragments = [
+      'created your goal',
+      'great!',
+      'let\'s do this',
+      'new goal',
+      'goal created',
+      'i want to achieve this goal',
+    ];
+    if (invalidFragments.any(lower.contains)) return false;
+    return true;
+  }
+
+  Future<int> _ensureInboxGoalId(GrowthProvider growth) async {
+    if (growth.goals.isEmpty) {
+      await growth.loadGrowthData();
+    }
+
+    for (final goal in growth.goals) {
+      if (goal.name == 'Inbox') return goal.id;
+    }
+
+    return growth.createGoal('Inbox');
+  }
+
+  String _normalizePriority(dynamic value) {
+    final priority = value?.toString().toLowerCase() ?? 'medium';
+    if (priority == 'high' || priority == 'low') return priority;
+    return 'medium';
+  }
+
+  String _normalizeFrequency(dynamic value) {
+    final frequency = value?.toString().toLowerCase() ?? 'one-time';
+    if (frequency == 'daily' || frequency == 'weekly' || frequency == 'monthly') {
+      return frequency;
+    }
+    return 'one-time';
+  }
+
   Widget _buildHeader(
     BuildContext context,
+    ChatController controller,
     bool isDark,
     Color textColor,
     Color subtleColor,
@@ -202,16 +443,20 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                 ),
                 const SizedBox(height: 2),
                 GestureDetector(
-                  onTap: _showTopicSelector,
+                  onTap: () => _showConversationSelector(controller),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        _selectedTopic,
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
+                      Flexible(
+                        child: Text(
+                          controller.activeConversationTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -480,7 +725,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => UnifiedGoalEditorScreen(aiResult: msg.actionData!),
+              builder: (context) => const GoalsScreen(),
             ),
           );
         },
@@ -557,7 +802,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                     ),
                     SizedBox(width: 8),
                     Text(
-                      "Tap to Review Plan",
+                      'View in Goals',
                       style: TextStyle(
                         color: LumioColors.primary,
                         fontWeight: FontWeight.w600,
@@ -903,7 +1148,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     ).animate().slideY(begin: 1, end: 0, duration: 300.ms, curve: Curves.easeOut);
   }
 
-  Widget _buildTopicSheet() {
+  Widget _buildConversationSheet(ChatController controller) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? const Color(0xFF2D261E) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1A150F);
@@ -934,7 +1179,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
               ),
               const SizedBox(height: 20),
               Text(
-                "Select Topic",
+                'Conversation History',
                 style: TextStyle(
                   color: textColor,
                   fontSize: 20,
@@ -942,28 +1187,50 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                 ),
               ),
               const SizedBox(height: 16),
+              ListTile(
+                onTap: () async {
+                  await controller.startNewConversation();
+                  if (mounted) Navigator.pop(context);
+                },
+                leading: const Icon(Icons.add_comment_rounded, color: LumioColors.primary),
+                title: const Text('New conversation'),
+                subtitle: const Text('Start fresh with Lumio'),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(height: 8),
               Flexible(
                 child: ListView.builder(
-                  itemCount: _topics.length,
+                  itemCount: controller.savedConversations.length,
                   itemBuilder: (context, index) {
-                    final topic = _topics[index];
-                    final isSelected = topic == _selectedTopic;
+                    final conversation = controller.savedConversations[index];
+                    final conversationId = (conversation['id'] ?? '').toString();
+                    final title = (conversation['title'] ?? 'New Conversation').toString();
+                    final updatedAtRaw = (conversation['updatedAt'] ?? '').toString();
+                    final updatedAt = DateTime.tryParse(updatedAtRaw);
+                    final subtitle = updatedAt == null
+                        ? 'Saved chat'
+                        : 'Updated ${updatedAt.toLocal().toString().split('.').first}';
+                    final isSelected = conversationId == controller.activeConversationId;
                     return ListTile(
-                      onTap: () {
-                        setState(() => _selectedTopic = topic);
-                        Navigator.pop(context);
+                      onTap: () async {
+                        await controller.loadConversation(conversationId);
+                        if (!mounted) return;
+                        Navigator.of(this.context).pop();
                       },
                       leading: Icon(
                         isSelected ? Icons.check_circle : Icons.circle_outlined,
                         color: isSelected ? LumioColors.primary : Colors.grey,
                       ),
                       title: Text(
-                        topic,
+                        title,
                         style: TextStyle(
                           color: textColor,
                           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
+                      subtitle: Text(subtitle),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
