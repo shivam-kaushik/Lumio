@@ -41,6 +41,7 @@ class ChatController extends ChangeNotifier {
   final List<Map<String, String>> _conversationHistory = []; // For GPT context
   final List<Map<String, dynamic>> _savedConversations = [];
   String _activeConversationId = DateTime.now().millisecondsSinceEpoch.toString();
+  bool _hasUserMessageInActiveConversation = false;
   
   // Getters
   ChatState get state => _state;
@@ -60,7 +61,7 @@ class ChatController extends ChangeNotifier {
 
   bool _isInitialized = false;
 
-  Future<void> initialize() async {
+  Future<void> initialize({bool openFreshChat = false}) async {
     if (_isInitialized) return;
     
     await _permissions.requestMicrophonePermission();
@@ -78,6 +79,11 @@ class ChatController extends ChangeNotifier {
     }
     
     await _loadSavedConversations();
+
+    if (openFreshChat) {
+      await startNewConversation();
+      return;
+    }
 
     if (_messages.isEmpty) {
       _addMessage(ChatMessage.ai('Hi! What goal are you working on today?'));
@@ -176,7 +182,12 @@ class ChatController extends ChangeNotifier {
 
   void _addMessage(ChatMessage msg) {
       _messages.add(msg);
-      unawaited(_saveActiveConversation());
+      if (msg.sender == ChatSender.user) {
+        _hasUserMessageInActiveConversation = true;
+      }
+      if (_hasUserMessageInActiveConversation) {
+        unawaited(_saveActiveConversation());
+      }
       notifyListeners();
   }
 
@@ -191,6 +202,7 @@ class ChatController extends ChangeNotifier {
     _activeConversationId = conversationId;
     _messages.clear();
     _conversationHistory.clear();
+    _hasUserMessageInActiveConversation = false;
 
     final msgs = (conversation.first['messages'] as List<dynamic>? ?? []);
     for (final item in msgs) {
@@ -218,6 +230,7 @@ class ChatController extends ChangeNotifier {
       );
 
       if (sender == ChatSender.user) {
+        _hasUserMessageInActiveConversation = true;
         _conversationHistory.add({'role': 'user', 'content': (map['text'] ?? '').toString()});
       } else {
         _conversationHistory.add({'role': 'assistant', 'content': (map['text'] ?? '').toString()});
@@ -231,9 +244,30 @@ class ChatController extends ChangeNotifier {
     _activeConversationId = DateTime.now().millisecondsSinceEpoch.toString();
     _messages.clear();
     _conversationHistory.clear();
-    _addMessage(ChatMessage.ai('Hi! What goal are you working on today?'));
+    _hasUserMessageInActiveConversation = false;
+    _messages.add(ChatMessage.ai('Hi! What goal are you working on today?'));
     _addToHistory('assistant', 'Hi! What goal are you working on today?');
-    await _saveActiveConversation();
+    notifyListeners();
+  }
+
+  Future<void> deleteConversation(String conversationId) async {
+    _savedConversations.removeWhere((c) => c['id'] == conversationId);
+
+    if (_activeConversationId == conversationId) {
+      if (_savedConversations.isNotEmpty) {
+        final fallbackId = (_savedConversations.first['id'] ?? '').toString();
+        if (fallbackId.isNotEmpty) {
+          await loadConversation(fallbackId);
+        } else {
+          await startNewConversation();
+        }
+      } else {
+        await startNewConversation();
+      }
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_historyStorageKey, jsonEncode(_savedConversations));
     notifyListeners();
   }
 
@@ -261,6 +295,7 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> _saveActiveConversation() async {
+    if (!_hasUserMessageInActiveConversation) return;
     final prefs = await SharedPreferences.getInstance();
 
     final title = _deriveConversationTitle();

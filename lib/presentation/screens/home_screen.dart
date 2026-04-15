@@ -14,6 +14,7 @@ import 'animated_goal_creation_screen.dart';
 import '../widgets/lumio_main_tab_header.dart';
 import '../widgets/quick_task_input_sheet.dart';
 import '../widgets/chatbot/flow_chat_widget.dart';
+import 'goal_details_screen.dart';
 
 /// Stitch-style Home Screen
 /// Features: Profile header, week calendar, active goals, today's actions, activity chart
@@ -523,7 +524,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        // Navigate to goal details
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => GoalDetailsScreen(goalId: goal.id),
+          ),
+        );
       },
       child: Container(
         padding: EdgeInsets.all(LumioSpacing.lg),
@@ -876,7 +881,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        // Toggle task or show details
+        _showEditTaskSheet(context, task, provider);
       },
       child: Container(
         padding: EdgeInsets.all(LumioSpacing.md),
@@ -1157,6 +1162,222 @@ class _HomeScreenState extends State<HomeScreen> {
     final phaseNum = (completedCount / totalCount * 4).ceil();
     final phases = ['Getting Started', 'In Progress', 'Almost There', 'Final Push'];
     return 'Phase $phaseNum: ${phases[phaseNum - 1]}';
+  }
+
+  Future<void> _showEditTaskSheet(
+    BuildContext context,
+    GoalTask task,
+    GrowthProvider provider,
+  ) async {
+    String editedTitle = task.title;
+    String editedDescription = task.description;
+    DateTime? selectedDateTime = task.scheduledDate;
+    String selectedPriority = task.priority;
+    String selectedFrequency = task.frequency;
+
+    final result = await showModalBottomSheet<GoalTask>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Container(
+                margin: const EdgeInsets.only(top: 24),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                decoration: BoxDecoration(
+                  color: LumioColors.surface(context),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: LumioColors.border(context),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Edit Task',
+                        style: LumioTypography.titleMedium.copyWith(
+                          color: LumioColors.textPrimary(context),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        initialValue: editedTitle,
+                        onChanged: (value) => editedTitle = value,
+                        decoration: const InputDecoration(
+                          labelText: 'Task title',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        initialValue: editedDescription,
+                        onChanged: (value) => editedDescription = value,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedPriority,
+                        decoration: const InputDecoration(
+                          labelText: 'Priority',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'low', child: Text('Low')),
+                          DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                          DropdownMenuItem(value: 'high', child: Text('High')),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setModalState(() => selectedPriority = value);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedFrequency,
+                        decoration: const InputDecoration(
+                          labelText: 'Repeat',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'one-time', child: Text('One time')),
+                          DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                          DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
+                          DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setModalState(() => selectedFrequency = value);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Reminder date & time'),
+                        subtitle: Text(
+                          selectedDateTime == null
+                              ? 'Not set'
+                              : DateFormat('EEE, MMM d • h:mm a').format(selectedDateTime!),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              onPressed: () async {
+                                final now = DateTime.now();
+                                final initial = selectedDateTime ?? now;
+                                final pickedDate = await showDatePicker(
+                                  context: this.context,
+                                  initialDate: initial,
+                                  firstDate: DateTime(now.year - 1),
+                                  lastDate: DateTime(now.year + 5),
+                                  useRootNavigator: true,
+                                );
+                                if (pickedDate == null || !sheetContext.mounted) return;
+                                final currentTime = TimeOfDay.fromDateTime(initial);
+                                setModalState(
+                                  () => selectedDateTime = DateTime(
+                                    pickedDate.year,
+                                    pickedDate.month,
+                                    pickedDate.day,
+                                    currentTime.hour,
+                                    currentTime.minute,
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.calendar_today_outlined),
+                            ),
+                            IconButton(
+                              onPressed: () async {
+                                final initial = TimeOfDay.fromDateTime(
+                                  selectedDateTime ?? DateTime.now(),
+                                );
+                                final pickedTime = await showTimePicker(
+                                  context: this.context,
+                                  initialTime: initial,
+                                  useRootNavigator: true,
+                                );
+                                if (pickedTime == null || !sheetContext.mounted) return;
+                                final base = selectedDateTime ?? DateTime.now();
+                                setModalState(
+                                  () => selectedDateTime = DateTime(
+                                    base.year,
+                                    base.month,
+                                    base.day,
+                                    pickedTime.hour,
+                                    pickedTime.minute,
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.access_time_outlined),
+                            ),
+                            IconButton(
+                              onPressed: () => setModalState(() => selectedDateTime = null),
+                              icon: const Icon(Icons.clear),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            final updatedTitle = editedTitle.trim();
+                            if (updatedTitle.isEmpty) return;
+                            Navigator.of(sheetContext).pop(
+                              task.copyWith(
+                                title: updatedTitle,
+                                description: editedDescription.trim(),
+                                priority: selectedPriority,
+                                frequency: selectedFrequency,
+                                scheduledDate: selectedDateTime,
+                              ),
+                            );
+                          },
+                          child: const Text('Save Task'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null) return;
+    try {
+      await provider.updateTask(result);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task updated successfully')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update task: $e')),
+      );
+    }
   }
 
   void _showLevelProgressSheet(BuildContext context, int level) {

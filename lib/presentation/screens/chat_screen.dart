@@ -16,7 +16,7 @@ class ChatScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => ChatController()..initialize(),
+      create: (_) => ChatController()..initialize(openFreshChat: true),
       child: const _ChatScreenContent(),
     );
   }
@@ -201,16 +201,18 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     GrowthProvider growth,
     Map<String, dynamic> actionData,
   ) async {
-    final rawTitle = (actionData['title'] ?? actionData['task'] ?? '').toString().trim();
-    if (rawTitle.isEmpty) return;
+    final taskTitle = _deriveTaskTitleFromContext(actionData);
+    if (taskTitle.isEmpty) return;
 
     final goalId = await _ensureInboxGoalId(growth);
+    final scheduledDate = _deriveTaskScheduledDate(actionData);
     final task = GoalTask(
       id: 0,
       goalId: goalId,
-      title: rawTitle,
+      title: taskTitle,
       description: (actionData['description'] ?? '').toString(),
       createdAt: DateTime.now(),
+      scheduledDate: scheduledDate,
       priority: _normalizePriority(actionData['priority']),
       frequency: _normalizeFrequency(actionData['frequency']),
       isCompleted: false,
@@ -223,7 +225,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     await growth.createTask(task);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Task added: '$rawTitle'")),
+      SnackBar(content: Text("Task added: '$taskTitle'")),
     );
   }
 
@@ -404,6 +406,129 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
       return frequency;
     }
     return 'one-time';
+  }
+
+  String _deriveTaskTitleFromContext(Map<String, dynamic> actionData) {
+    final raw = (actionData['title'] ?? actionData['task'] ?? '').toString();
+    final cleanedRaw = _sanitizeTaskCandidate(raw);
+    if (_isMeaningfulTaskName(cleanedRaw)) return cleanedRaw;
+
+    final chat = context.read<ChatController>();
+    final userMessages = chat.messages
+        .where((m) => m.sender == ChatSender.user)
+        .map((m) => m.text)
+        .toList()
+        .reversed
+        .toList();
+
+    for (final msg in userMessages) {
+      final candidate = _sanitizeTaskCandidate(msg);
+      if (_isMeaningfulTaskName(candidate)) return candidate;
+    }
+
+    return 'New Task';
+  }
+
+  String _sanitizeTaskCandidate(String input) {
+    if (input.trim().isEmpty) return '';
+    var text = input.trim();
+
+    final boilerplatePatterns = <RegExp>[
+      RegExp(r"^i[' ]?ve\s+added\s+", caseSensitive: false),
+      RegExp(r'^added\s+', caseSensitive: false),
+      RegExp(r'^task\s+created[:\-]?\s*', caseSensitive: false),
+      RegExp(r'^create\s+(a\s+)?task(\s+for\s+today)?\s*(to)?\s*', caseSensitive: false),
+      RegExp(r'^add\s+(a\s+)?task(\s+for\s+today)?\s*(to)?\s*', caseSensitive: false),
+      RegExp(r'^remind me to\s+', caseSensitive: false),
+      RegExp(r'^i\s+need\s+to\s+', caseSensitive: false),
+    ];
+    for (final p in boilerplatePatterns) {
+      text = text.replaceFirst(p, '');
+    }
+
+    text = text
+        .replaceAll(RegExp(r'\bat\s+\d{1,2}([:.]\d{2})?\s*(a\.?m\.?|p\.?m\.?)?\b', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\b(today|tomorrow|tonight)\b', caseSensitive: false), '')
+        .replaceAll(RegExp(r"let'?s\s+do\s+this!?\.?", caseSensitive: false), '')
+        .replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    const corrections = <String, String>{
+      'buisness': 'business',
+      'recieve': 'receive',
+      'acheive': 'achieve',
+      'sucess': 'success',
+      'pary': 'party',
+      'partyy': 'party',
+      'tommorow': 'tomorrow',
+    };
+
+    final words = text.split(' ').where((w) => w.isNotEmpty).map((w) {
+      final lw = w.toLowerCase();
+      return corrections[lw] ?? lw;
+    }).toList();
+
+    final smallWords = {'a', 'an', 'and', 'or', 'to', 'of', 'the', 'for', 'in', 'on'};
+    return words.asMap().entries.map((entry) {
+      final i = entry.key;
+      final word = entry.value;
+      if (i > 0 && smallWords.contains(word)) return word;
+      return '${word[0].toUpperCase()}${word.substring(1)}';
+    }).join(' ');
+  }
+
+  bool _isMeaningfulTaskName(String name) {
+    final value = name.trim().toLowerCase();
+    if (value.length < 3) return false;
+    const bad = {'ve added', 'added', 'task created', 'new task', 'create a task'};
+    if (bad.contains(value)) return false;
+    return true;
+  }
+
+  DateTime? _deriveTaskScheduledDate(Map<String, dynamic> actionData) {
+    final explicit = actionData['scheduledDate']?.toString();
+    if (explicit != null && explicit.isNotEmpty) {
+      final parsed = DateTime.tryParse(explicit);
+      if (parsed != null) return parsed;
+    }
+
+    final chat = context.read<ChatController>();
+    final lastUserText = chat.messages
+        .where((m) => m.sender == ChatSender.user)
+        .map((m) => m.text)
+        .toList()
+        .reversed
+        .cast<String?>()
+        .firstWhere((m) => m != null && m.trim().isNotEmpty, orElse: () => null);
+
+    if (lastUserText == null) return null;
+    final lower = lastUserText.toLowerCase();
+    var baseDate = DateTime.now();
+    if (lower.contains('tomorrow')) {
+      baseDate = baseDate.add(const Duration(days: 1));
+    }
+
+    final timeMatch = RegExp(
+      r'\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b',
+      caseSensitive: false,
+    ).firstMatch(lower);
+
+    if (timeMatch != null) {
+      var hour = int.tryParse(timeMatch.group(1) ?? '0') ?? 0;
+      final minute = int.tryParse(timeMatch.group(2) ?? '0') ?? 0;
+      final period = (timeMatch.group(3) ?? '').toLowerCase();
+      final isPm = period.contains('p');
+      if (isPm && hour < 12) hour += 12;
+      if (!isPm && hour == 12) hour = 0;
+      return DateTime(baseDate.year, baseDate.month, baseDate.day, hour, minute);
+    }
+
+    if (lower.contains('today') || lower.contains('tomorrow') || lower.contains('tonight')) {
+      return DateTime(baseDate.year, baseDate.month, baseDate.day, 18, 0);
+    }
+
+    return null;
   }
 
   Widget _buildHeader(
@@ -1231,6 +1356,37 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                         ),
                       ),
                       subtitle: Text(subtitle),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        color: Colors.redAccent,
+                        tooltip: 'Delete chat',
+                        onPressed: () async {
+                          final shouldDelete = await showDialog<bool>(
+                                context: this.context,
+                                builder: (dialogContext) => AlertDialog(
+                                  title: const Text('Delete Chat'),
+                                  content: Text('Delete "$title"? This cannot be undone.'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(dialogContext).pop(false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.of(dialogContext).pop(true),
+                                      child: const Text(
+                                        'Delete',
+                                        style: TextStyle(color: Colors.redAccent),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ) ??
+                              false;
+
+                          if (!shouldDelete) return;
+                          await controller.deleteConversation(conversationId);
+                        },
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
