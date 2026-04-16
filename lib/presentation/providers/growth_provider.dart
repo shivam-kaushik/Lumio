@@ -272,9 +272,10 @@ class GrowthProvider with ChangeNotifier {
               }
           }
 
-          // 4. Determine Frequency
+          // 4. Determine effective frequency (Goal settings override task frequency)
+          final effectiveFrequency = _resolveEffectiveFrequency(currentTask, settings);
           DateTimeComponents? matchComponents;
-          switch (currentTask.frequency) {
+          switch (effectiveFrequency) {
               case 'daily': matchComponents = DateTimeComponents.time; break;
               case 'weekly': matchComponents = DateTimeComponents.dayOfWeekAndTime; break;
               case 'monthly': matchComponents = DateTimeComponents.dayOfMonthAndTime; break;
@@ -309,14 +310,14 @@ class GrowthProvider with ChangeNotifier {
           
           bool shouldSchedule = true;
           if (matchComponents == null) {
-              if (triggerTime.isBefore(DateTime.now())) {
-                  shouldSchedule = false;
-              }
+            // One-time notification must be in the future.
+            if (triggerTime.isBefore(DateTime.now())) {
+              shouldSchedule = false;
+            }
+          } else {
+            // For recurring notifications, always schedule from the next future occurrence.
+            triggerTime = _nextOccurrence(triggerTime, effectiveFrequency);
           }
-          // If recurring, we technically schedule it 'at the date', loops from there.
-          // If the date is past, but time is future, local_notifications handles it? 
-          // Best practice: Ensure 'triggerTime' is the NEXT occurrence if strict. 
-          // But 'zonedSchedule' with 'matchDateTimeComponents' usually handles "reverting to next" automatically.
 
           if (shouldSchedule) {
             final notificationId = currentTask.id % 2147483647;
@@ -361,6 +362,52 @@ class GrowthProvider with ChangeNotifier {
       default:
          return "Time for: ${task.title}";
     }
+  }
+
+  String _resolveEffectiveFrequency(GoalTask task, GoalSettings? settings) {
+    if (settings == null) return task.frequency;
+
+    switch (settings.frequency) {
+      case NotificationFrequency.daily:
+        return 'daily';
+      case NotificationFrequency.weekly:
+        return 'weekly';
+      case NotificationFrequency.monthly:
+        return 'monthly';
+      case NotificationFrequency.once:
+      case NotificationFrequency.deadline:
+      default:
+        return 'one-time';
+    }
+  }
+
+  DateTime _nextOccurrence(DateTime start, String frequency) {
+    final now = DateTime.now();
+    DateTime candidate = start;
+
+    while (!candidate.isAfter(now)) {
+      switch (frequency) {
+        case 'daily':
+          candidate = candidate.add(const Duration(days: 1));
+          break;
+        case 'weekly':
+          candidate = candidate.add(const Duration(days: 7));
+          break;
+        case 'monthly':
+          candidate = DateTime(
+            candidate.year,
+            candidate.month + 1,
+            candidate.day,
+            candidate.hour,
+            candidate.minute,
+          );
+          break;
+        default:
+          return candidate;
+      }
+    }
+
+    return candidate;
   }
 
   String _getNotificationBody(GoalTask task, Goal goal, GoalSettings? settings) {
