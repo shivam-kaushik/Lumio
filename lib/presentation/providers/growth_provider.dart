@@ -621,7 +621,7 @@ class GrowthProvider with ChangeNotifier {
         }
       }
       
-      loadGrowthData();
+      await loadGrowthData();
 
       // No motivational message on task completion
       return null;

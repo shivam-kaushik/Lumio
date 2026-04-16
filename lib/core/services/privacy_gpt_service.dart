@@ -932,7 +932,6 @@ Return ONLY the message text, no quotes, no JSON, just the motivational message.
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final content = data['choices'][0]['message']['content'] as String;
-        debugPrint('📥 GPT Raw Response: $content');
         return _parseGptResponse(content);
       } else {
         debugPrint('❌ GPT Error: ${response.statusCode} ${response.body}');

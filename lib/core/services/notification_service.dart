@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:flutter/widgets.dart';
@@ -9,7 +8,6 @@ import '../../data/repositories/firestore_reminder_repository.dart';
 import '../../data/repositories/firestore_growth_repository.dart';
 import '../../core/services/firestore_service.dart';
 import '../../data/models/context_event.dart';
-import 'package:cloud_firestore/cloud_firestore.dart' show FieldValue;
 import 'package:firebase_core/firebase_core.dart';
 import '../../firebase_options.dart';
 
@@ -23,6 +21,16 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+
+  static Map<String, dynamic>? _parsePayloadMap(String payload) {
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+    return null;
+  }
 
   /// Initialize notification service
   Future<void> initialize() async {
@@ -81,8 +89,8 @@ class NotificationService {
   void _onNotificationTapped(NotificationResponse response) async {
     final payload = response.payload;
     final actionId = response.actionId;
-    
-    debugPrint('Notification tapped (foreground): $payload, actionId: $actionId');
+
+    debugPrint('Notification tapped (foreground), actionId: $actionId');
 
     if (payload != null) {
       if (actionId == 'complete_action' && response.id != null) {
@@ -116,8 +124,8 @@ class NotificationService {
 
       final payload = response.payload;
       final actionId = response.actionId;
-      
-      debugPrint('🔔 Notification tapped (background): $payload, actionId: $actionId');
+
+      debugPrint('🔔 Notification tapped (background), actionId: $actionId');
 
       if (payload != null) {
         if (actionId == 'complete_action' && response.id != null) {
@@ -144,6 +152,7 @@ class NotificationService {
     debugPrint('⏰ Handling snooze action for notification $notificationId');
     
     final newScheduledTime = DateTime.now().add(const Duration(minutes: 15));
+    final payloadData = _parsePayloadMap(payload);
     
     // ============================================================
     // 1. IMMEDIATE UI RESPONSE (Cancel & Reschedule Local)
@@ -157,14 +166,10 @@ class NotificationService {
       // Parse basic data for display (safe parse)
       String title = "Snoozed Task";
       String body = "Snoozed for 15 minutes.";
-      try {
-        final data = jsonDecode(payload);
-        if (data is Map<String, dynamic>) {
-           if (data.containsKey('title')) title = data['title'] as String;
-           if (data.containsKey('body')) body = data['body'] as String;
-           // Append (Snoozed) if not present? Maybe not needed for clean UI.
-        }
-      } catch (_) {}
+      if (payloadData != null) {
+        if (payloadData['title'] is String) title = payloadData['title'] as String;
+        if (payloadData['body'] is String) body = payloadData['body'] as String;
+      }
 
       // Schedule new
       final newNotificationId = DateTime.now().millisecondsSinceEpoch % 2147483647;
@@ -186,17 +191,11 @@ class NotificationService {
     // 2. PERSISTENCE and LOGIC (Async/Background - Best Effort)
     // ============================================================
     try {
-      // Parse detailed payload
-      String? reminderId;
-      int? goalTaskId;
-      try {
-        final data = jsonDecode(payload);
-        if (data is Map<String, dynamic>) {
-          if (data.containsKey('reminder_id')) reminderId = data['reminder_id'] as String;
-          if (data.containsKey('task_id')) goalTaskId = data['task_id'] as int?; 
-        }
-      } catch (_) {
-        reminderId = payload; 
+      final goalTaskId = payloadData?['task_id'] is int ? payloadData!['task_id'] as int : null;
+      final goalId = payloadData?['goal_id'] is int ? payloadData!['goal_id'] as int : null;
+      if (goalTaskId == null || goalId == null) {
+        debugPrint('⚠️ Invalid snooze payload schema. Skipping data mutation.');
+        return;
       }
       
       // Check Firebase
@@ -209,25 +208,13 @@ class NotificationService {
           }
       }
 
-      // Update Firestore
-      if (goalTaskId != null || (reminderId != null && reminderId.startsWith('task_'))) {
-          final id = goalTaskId ?? int.tryParse(reminderId!.replaceFirst('task_', ''));
-          if (id != null) {
-             final firestore = FirestoreService();
-             // Just update, assume auth is okay or handle error
-             int? goalId;
-             try { final d = jsonDecode(payload); goalId = d['goal_id']; } catch(_){}
-             
-             if (goalId != null) {
-                 final tasksCollection = firestore.getTasksCollection(goalId.toString());
-                 if (tasksCollection != null) {
-                    tasksCollection.doc(id.toString()).update({
-                        'scheduledDate': newScheduledTime.toIso8601String(),
-                        'scheduled_date': newScheduledTime.toIso8601String(),
-                    }).catchError((e) => debugPrint('⚠️ Persistence update failed: $e'));
-                 }
-             }
-          }
+      final firestore = FirestoreService();
+      final tasksCollection = firestore.getTasksCollection(goalId.toString());
+      if (tasksCollection != null) {
+         tasksCollection.doc(goalTaskId.toString()).update({
+             'scheduledDate': newScheduledTime.toIso8601String(),
+             'scheduled_date': newScheduledTime.toIso8601String(),
+         }).catchError((e) => debugPrint('⚠️ Persistence update failed: $e'));
       }
     } catch (e) {
       debugPrint('⚠️ Logic/Persistence error in snooze: $e');
@@ -264,22 +251,19 @@ class NotificationService {
       }
 
       // Complete logic
-      String reminderId;
-      try {
-        final data = jsonDecode(payload);
-        reminderId = data['reminder_id'] as String;
-      } catch (e) {
-        reminderId = payload;
-      }
-      
-      if (reminderId.startsWith('task_')) {
-        final taskId = int.tryParse(reminderId.replaceFirst('task_', ''));
-        if (taskId != null) {
-          final growthRepo = FirestoreGrowthRepository();
-          await growthRepo.completeTask(taskId);
-          debugPrint('✅ Completed GoalTask $taskId (Firestore)');
-        }
+      final payloadData = _parsePayloadMap(payload);
+      final taskId = payloadData?['task_id'] is int ? payloadData!['task_id'] as int : null;
+      final reminderId = payloadData?['reminder_id'] is String ? payloadData!['reminder_id'] as String : null;
+
+      if (taskId != null) {
+        final growthRepo = FirestoreGrowthRepository();
+        await growthRepo.completeTask(taskId);
+        debugPrint('✅ Completed GoalTask $taskId (Firestore)');
       } else {
+         if (reminderId == null || reminderId.isEmpty) {
+           debugPrint('⚠️ Invalid complete payload schema.');
+           return;
+         }
          final reminderRepository = FirestoreReminderRepository();
          await reminderRepository.completeOccurrenceByNotificationId(notificationId);
       }
@@ -625,7 +609,7 @@ class NotificationService {
       autoCancel: true,
       ongoing: false,
       fullScreenIntent: false, 
-      visibility: NotificationVisibility.public,
+      visibility: NotificationVisibility.private,
       styleInformation: BigTextStyleInformation(
         body,
         htmlFormatBigText: true,

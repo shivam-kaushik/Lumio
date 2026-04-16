@@ -33,7 +33,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
-  final Set<String> _executedActionMessageIds = <String>{};
+  final Set<String> _actionPersistInProgress = <String>{};
   bool? _isPremium;
 
   final List<Map<String, dynamic>> _quickActions = [
@@ -123,18 +123,19 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                itemCount: controller.messages.length + (controller.state == ChatState.processing ? 1 : 0),
+                itemCount: 1 + controller.messages.length + (controller.state == ChatState.processing ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     // Date header
                     return _buildDateHeader(isDark);
                   }
-                  if (index == controller.messages.length) {
+                  final messageIndex = index - 1;
+                  if (messageIndex == controller.messages.length) {
                     return _buildThinkingIndicator(isDark, aiMessageBg, subtleColor);
                   }
                   return _buildMessage(
                     context,
-                    controller.messages[index],
+                    controller.messages[messageIndex],
                     isDark,
                     textColor,
                     aiMessageBg,
@@ -163,22 +164,26 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
 
   void _executePendingActions(List<ChatMessage> messages) {
     final pendingActions = messages
-        .where((m) => m.isAction && !_executedActionMessageIds.contains(m.id))
+        .where((m) => m.isAction && !context.read<ChatController>().isActionExecuted(m.id))
+        .where((m) => !_actionPersistInProgress.contains(m.id))
         .toList();
     if (pendingActions.isEmpty) return;
-    for (final action in pendingActions) {
-      _executedActionMessageIds.add(action.id);
-    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final controller = context.read<ChatController>();
       for (final msg in pendingActions) {
         if (!mounted) return;
-        await _persistActionMessage(msg);
+        _actionPersistInProgress.add(msg.id);
+        final success = await _persistActionMessage(msg);
+        _actionPersistInProgress.remove(msg.id);
+        if (success) {
+          await controller.markActionExecuted(msg.id);
+        }
       }
     });
   }
 
-  Future<void> _persistActionMessage(ChatMessage msg) async {
+  Future<bool> _persistActionMessage(ChatMessage msg) async {
     final actionType = (msg.actionType ?? '').toUpperCase();
     final growth = context.read<GrowthProvider>();
     final actionData = msg.actionData ?? <String, dynamic>{};
@@ -186,14 +191,18 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     try {
       if (actionType.contains('TASK')) {
         await _createTaskFromAction(growth, actionData);
+        return true;
       } else if (actionType.contains('GOAL')) {
         await _createGoalFromAction(growth, actionData);
+        return true;
       }
+      return false;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not save AI action: $e')),
       );
+      return false;
     }
   }
 

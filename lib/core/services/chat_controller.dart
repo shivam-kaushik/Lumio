@@ -40,6 +40,7 @@ class ChatController extends ChangeNotifier {
   final List<ChatMessage> _messages = [];
   final List<Map<String, String>> _conversationHistory = []; // For GPT context
   final List<Map<String, dynamic>> _savedConversations = [];
+  final Set<String> _executedActionMessageIds = <String>{};
   String _activeConversationId = DateTime.now().millisecondsSinceEpoch.toString();
   bool _hasUserMessageInActiveConversation = false;
   
@@ -49,6 +50,7 @@ class ChatController extends ChangeNotifier {
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   List<Map<String, dynamic>> get savedConversations => List.unmodifiable(_savedConversations);
   String get activeConversationId => _activeConversationId;
+  bool isActionExecuted(String messageId) => _executedActionMessageIds.contains(messageId);
   String get activeConversationTitle {
     final match = _savedConversations
         .where((c) => c['id'] == _activeConversationId)
@@ -202,6 +204,7 @@ class ChatController extends ChangeNotifier {
     _activeConversationId = conversationId;
     _messages.clear();
     _conversationHistory.clear();
+    _executedActionMessageIds.clear();
     _hasUserMessageInActiveConversation = false;
 
     final msgs = (conversation.first['messages'] as List<dynamic>? ?? []);
@@ -236,6 +239,10 @@ class ChatController extends ChangeNotifier {
         _conversationHistory.add({'role': 'assistant', 'content': (map['text'] ?? '').toString()});
       }
     }
+    final executed = (conversation.first['executedActionMessageIds'] as List<dynamic>? ?? [])
+        .map((e) => e.toString())
+        .toList();
+    _executedActionMessageIds.addAll(executed);
 
     notifyListeners();
   }
@@ -244,6 +251,7 @@ class ChatController extends ChangeNotifier {
     _activeConversationId = DateTime.now().millisecondsSinceEpoch.toString();
     _messages.clear();
     _conversationHistory.clear();
+    _executedActionMessageIds.clear();
     _hasUserMessageInActiveConversation = false;
     _messages.add(ChatMessage.ai('Hi! What goal are you working on today?'));
     _addToHistory('assistant', 'Hi! What goal are you working on today?');
@@ -304,6 +312,7 @@ class ChatController extends ChangeNotifier {
       'id': _activeConversationId,
       'title': title,
       'updatedAt': now,
+      'executedActionMessageIds': _executedActionMessageIds.toList(),
       'messages': _messages.map((m) {
         return <String, dynamic>{
           'id': m.id,
@@ -326,6 +335,13 @@ class ChatController extends ChangeNotifier {
     await prefs.setString(_historyStorageKey, jsonEncode(_savedConversations));
   }
 
+  Future<void> markActionExecuted(String messageId) async {
+    if (messageId.isEmpty) return;
+    _executedActionMessageIds.add(messageId);
+    await _saveActiveConversation();
+    notifyListeners();
+  }
+
   String _deriveConversationTitle() {
     for (final m in _messages) {
       if (m.sender == ChatSender.user && m.text.trim().isNotEmpty) {
@@ -336,9 +352,10 @@ class ChatController extends ChangeNotifier {
     return 'New Conversation';
   }
 
-  void disposeHelper() {
-      _speech.stop();
-      _tts.stop();
-      super.dispose();
+  @override
+  void dispose() {
+    _speech.stop();
+    _tts.stop();
+    super.dispose();
   }
 }
