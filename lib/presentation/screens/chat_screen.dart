@@ -8,6 +8,7 @@ import '../../core/services/premium_service.dart';
 import 'premium_subscription_screen.dart';
 import '../providers/growth_provider.dart';
 import '../../data/models/goal_task.dart';
+import '../../data/models/goal.dart';
 import 'goals_screen.dart';
 
 class ChatScreen extends StatelessWidget {
@@ -193,6 +194,10 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
         await _createTaskFromAction(growth, actionData);
         return true;
       } else if (actionType.contains('GOAL')) {
+        if (_shouldApplyToExistingGoal(growth, actionData)) {
+          await _applyActionToExistingGoal(growth, actionData);
+          return true;
+        }
         await _createGoalFromAction(growth, actionData);
         return true;
       }
@@ -238,6 +243,100 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     );
   }
 
+  bool _shouldApplyToExistingGoal(
+    GrowthProvider growth,
+    Map<String, dynamic> actionData,
+  ) {
+    final recentUserText = _recentUserMessages().join(' ').toLowerCase();
+    final asksForTaskUpdate = recentUserText.contains('add task') ||
+        recentUserText.contains('add tasks') ||
+        recentUserText.contains('task for') ||
+        recentUserText.contains('tasks for');
+    if (!asksForTaskUpdate) return false;
+
+    return _findReferencedGoal(growth) != null;
+  }
+
+  Future<void> _applyActionToExistingGoal(
+    GrowthProvider growth,
+    Map<String, dynamic> actionData,
+  ) async {
+    final goal = _findReferencedGoal(growth);
+    if (goal == null) {
+      await _createGoalFromAction(growth, actionData);
+      return;
+    }
+
+    final parsedDeadline = _deriveGoalDeadline(actionData);
+    if (parsedDeadline != null) {
+      await growth.updateGoal(goal.copyWith(targetDeadline: parsedDeadline));
+    }
+
+    final tasksFromAction = actionData['tasks'];
+    var createdCount = 0;
+    if (tasksFromAction is List) {
+      for (final item in tasksFromAction) {
+        if (item is! Map) continue;
+        final map = Map<String, dynamic>.from(item);
+        final title = _sanitizeTaskCandidate((map['title'] ?? '').toString());
+        if (!_isMeaningfulTaskName(title)) continue;
+        await growth.createTask(
+          GoalTask(
+            id: 0,
+            goalId: goal.id,
+            title: title,
+            description: (map['description'] ?? '').toString(),
+            createdAt: DateTime.now(),
+            priority: _normalizePriority(map['priority']),
+            frequency: _normalizeFrequency(map['frequency']),
+            isCompleted: false,
+            estimatedHours: 1.0,
+            order: 0,
+            indentLevel: 0,
+            subtasks: const [],
+          ),
+        );
+        createdCount++;
+      }
+    }
+
+    if (createdCount == 0) {
+      final derivedTitle = _deriveTaskTitleFromContext(actionData);
+      if (_isMeaningfulTaskName(derivedTitle)) {
+        await growth.createTask(
+          GoalTask(
+            id: 0,
+            goalId: goal.id,
+            title: derivedTitle,
+            description: '',
+            createdAt: DateTime.now(),
+            scheduledDate: _deriveTaskScheduledDate(actionData),
+            priority: _normalizePriority(actionData['priority']),
+            frequency: _normalizeFrequency(actionData['frequency']),
+            isCompleted: false,
+            estimatedHours: 0.5,
+            order: 0,
+            indentLevel: 0,
+            subtasks: const [],
+          ),
+        );
+        createdCount = 1;
+      }
+    }
+
+    if (!mounted) return;
+    final deadlineText = parsedDeadline == null ? '' : ' and updated deadline';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          createdCount > 0
+              ? "Updated '${goal.name}' with $createdCount task(s)$deadlineText"
+              : "Updated '${goal.name}'$deadlineText",
+        ),
+      ),
+    );
+  }
+
   Future<void> _createGoalFromAction(
     GrowthProvider growth,
     Map<String, dynamic> actionData,
@@ -245,11 +344,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     final goalName = _deriveGoalNameFromContext(actionData);
     if (goalName.isEmpty) return;
 
-    DateTime? targetDeadline;
-    final deadlineRaw = actionData['deadline']?.toString();
-    if (deadlineRaw != null && deadlineRaw.isNotEmpty) {
-      targetDeadline = DateTime.tryParse(deadlineRaw);
-    }
+    final targetDeadline = _deriveGoalDeadline(actionData);
 
     final goalId = await growth.createGoal(
       goalName,
@@ -377,6 +472,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   bool _isMeaningfulGoalName(String name) {
     final value = name.trim();
     if (value.length < 4) return false;
+    if (_looksLikeDurationOnly(value)) return false;
 
     final lower = value.toLowerCase();
     final invalidFragments = [
@@ -389,6 +485,20 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     ];
     if (invalidFragments.any(lower.contains)) return false;
     return true;
+  }
+
+  DateTime? _deriveGoalDeadline(Map<String, dynamic> actionData) {
+    final deadlineRaw = actionData['deadline']?.toString();
+    if (deadlineRaw != null && deadlineRaw.isNotEmpty) {
+      final parsed = DateTime.tryParse(deadlineRaw);
+      if (parsed != null) return parsed;
+    }
+
+    for (final msg in _recentUserMessages()) {
+      final parsed = _parseRelativeDate(msg);
+      if (parsed != null) return parsed;
+    }
+    return null;
   }
 
   Future<int> _ensureInboxGoalId(GrowthProvider growth) async {
@@ -431,6 +541,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
         .toList();
 
     for (final msg in userMessages) {
+      if (_looksLikeDurationOnly(msg)) continue;
       final candidate = _sanitizeTaskCandidate(msg);
       if (_isMeaningfulTaskName(candidate)) return candidate;
     }
@@ -445,6 +556,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     final boilerplatePatterns = <RegExp>[
       RegExp(r"^i[' ]?ve\s+added\s+", caseSensitive: false),
       RegExp(r'^added\s+', caseSensitive: false),
+      RegExp(r'^add\s+', caseSensitive: false),
       RegExp(r'^task\s+created[:\-]?\s*', caseSensitive: false),
       RegExp(r'^create\s+(a\s+)?task(\s+for\s+today)?\s*(to)?\s*', caseSensitive: false),
       RegExp(r'^add\s+(a\s+)?task(\s+for\s+today)?\s*(to)?\s*', caseSensitive: false),
@@ -490,6 +602,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
   bool _isMeaningfulTaskName(String name) {
     final value = name.trim().toLowerCase();
     if (value.length < 3) return false;
+    if (_looksLikeDurationOnly(value)) return false;
     const bad = {'ve added', 'added', 'task created', 'new task', 'create a task'};
     if (bad.contains(value)) return false;
     return true;
@@ -537,6 +650,59 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
       return DateTime(baseDate.year, baseDate.month, baseDate.day, 18, 0);
     }
 
+    return null;
+  }
+
+  List<String> _recentUserMessages() {
+    final chat = context.read<ChatController>();
+    return chat.messages
+        .where((m) => m.sender == ChatSender.user)
+        .map((m) => m.text.trim())
+        .where((t) => t.isNotEmpty)
+        .toList()
+        .reversed
+        .take(6)
+        .toList();
+  }
+
+  Goal? _findReferencedGoal(GrowthProvider growth) {
+    final corpus = _recentUserMessages().join(' ').toLowerCase();
+    Goal? best;
+    var bestScore = 0;
+    for (final goal in growth.goals) {
+      if (goal.name == 'Inbox' || goal.name.startsWith('Daily Plan')) continue;
+      final name = goal.name.toLowerCase();
+      if (!corpus.contains(name)) continue;
+      final score = name.length;
+      if (score > bestScore) {
+        best = goal;
+        bestScore = score;
+      }
+    }
+    return best;
+  }
+
+  bool _looksLikeDurationOnly(String text) {
+    final lower = text.trim().toLowerCase();
+    return RegExp(r'^\d+\s*(day|days|week|weeks|month|months|year|years)$').hasMatch(lower);
+  }
+
+  DateTime? _parseRelativeDate(String text) {
+    final lower = text.toLowerCase();
+    final now = DateTime.now();
+    if (lower.contains('tomorrow')) return now.add(const Duration(days: 1));
+    if (lower.contains('today')) return now;
+
+    final match = RegExp(r'(\d+)\s*(day|days|week|weeks|month|months|year|years)').firstMatch(lower);
+    if (match != null) {
+      final amount = int.tryParse(match.group(1) ?? '0') ?? 0;
+      final unit = match.group(2) ?? '';
+      if (amount <= 0) return null;
+      if (unit.startsWith('day')) return now.add(Duration(days: amount));
+      if (unit.startsWith('week')) return now.add(Duration(days: amount * 7));
+      if (unit.startsWith('month')) return DateTime(now.year, now.month + amount, now.day);
+      if (unit.startsWith('year')) return DateTime(now.year + amount, now.month, now.day);
+    }
     return null;
   }
 
