@@ -225,7 +225,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                           onDismissed: (_) => provider.deleteGoal(goal.id),
                           child: Padding(
                           padding: EdgeInsets.only(bottom: LumioSpacing.md),
-                          child: _buildGoalCard(context, goal, tasks, progress, index == 0),
+                          child: _buildGoalCard(context, goal, tasks, progress, false),
                           ),
                         );
                       },
@@ -380,7 +380,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
         );
       },
       child: Container(
-        padding: EdgeInsets.all(LumioSpacing.lg),
+        padding: EdgeInsets.all(LumioSpacing.md),
         decoration: BoxDecoration(
           color: LumioColors.surface(context),
           borderRadius: LumioRadius.card,
@@ -411,8 +411,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
                       // Phase badge
                       Container(
                         padding: EdgeInsets.symmetric(
-                          horizontal: LumioSpacing.sm,
-                          vertical: LumioSpacing.xs,
+                          horizontal: LumioSpacing.xs,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
                           color: phaseColor.withOpacity(0.1),
@@ -426,15 +426,15 @@ class _GoalsScreenState extends State<GoalsScreen> {
                         ),
                       ),
 
-                      SizedBox(height: LumioSpacing.sm),
+                      SizedBox(height: LumioSpacing.xs),
 
                       // Title
                       Text(
                         goal.name,
-                        style: (isLarge ? LumioTypography.titleLarge : LumioTypography.titleMedium).copyWith(
+                        style: LumioTypography.titleMedium.copyWith(
                           color: LumioColors.textPrimary(context),
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
 
@@ -447,21 +447,16 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 SizedBox(width: LumioSpacing.md),
 
                 // Radial progress
-                _buildRadialProgress(
-                  context,
-                  progress,
-                  phaseColor,
-                  isLarge ? 56 : 48,
-                ),
+                _buildRadialProgress(context, progress, phaseColor, 42),
               ],
             ),
 
             if (isLarge) ...[
-              SizedBox(height: LumioSpacing.md),
+              SizedBox(height: LumioSpacing.sm),
 
               // Progress bar
               Container(
-                height: 8,
+                height: 6,
                 decoration: BoxDecoration(
                   color: LumioColors.border(context),
                   borderRadius: LumioRadius.progressBar,
@@ -479,7 +474,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
               ),
             ],
 
-            SizedBox(height: LumioSpacing.md),
+            SizedBox(height: LumioSpacing.sm),
 
             // Footer
             Row(

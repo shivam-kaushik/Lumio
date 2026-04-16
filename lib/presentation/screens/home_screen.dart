@@ -520,7 +520,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
       child: Container(
-        padding: EdgeInsets.all(LumioSpacing.lg),
+        padding: EdgeInsets.all(LumioSpacing.md),
         decoration: BoxDecoration(
           color: LumioColors.surface(context),
           borderRadius: LumioRadius.card,
@@ -531,8 +531,8 @@ class _HomeScreenState extends State<HomeScreen> {
             // Left color indicator
             Positioned(
               left: 0,
-              top: LumioSpacing.md,
-              bottom: LumioSpacing.md,
+              top: LumioSpacing.sm,
+              bottom: LumioSpacing.sm,
               child: Container(
                 width: 4,
                 decoration: BoxDecoration(
@@ -552,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: categoryColors['light'],
                           borderRadius: LumioRadius.categoryBadge,
@@ -565,8 +565,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       Container(
-                        width: 32,
-                        height: 32,
+                        width: 28,
+                        height: 28,
                         decoration: BoxDecoration(
                           color: LumioColors.background(context),
                           shape: BoxShape.circle,
@@ -574,25 +574,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Icon(
                           _getCategoryIcon(category),
                           color: LumioColors.textTertiary(context),
-                          size: 16,
+                          size: 14,
                         ),
                       ),
                     ],
                   ),
 
-                  SizedBox(height: LumioSpacing.sm),
+                  SizedBox(height: LumioSpacing.xs),
 
                   // Goal title
                   Text(
                     goal.name,
                     style: LumioTypography.titleMedium.copyWith(
                       color: LumioColors.textPrimary(context),
+                      fontSize: 20,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
 
-                  SizedBox(height: LumioSpacing.md),
+                  SizedBox(height: LumioSpacing.sm),
 
                   // Phase and progress
                   Row(
@@ -613,11 +614,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
 
-                  SizedBox(height: LumioSpacing.sm),
+                  SizedBox(height: LumioSpacing.xs),
 
                   // Progress bar
                   Container(
-                    height: 8,
+                    height: 6,
                     decoration: BoxDecoration(
                       color: LumioColors.background(context),
                       borderRadius: LumioRadius.progressBar,
