@@ -350,51 +350,41 @@ class MainNavigatorState extends State<MainNavigator>
   /// Build center plan button
   Widget _buildCenterPlanButton(BuildContext context) {
     return Transform.translate(
-      offset: const Offset(0, -12),
-      child: Container(
-        height: 52,
-        constraints: const BoxConstraints(minWidth: 120),
-        decoration: BoxDecoration(
-          color: LumioColors.primary,
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(
-            color: LumioColors.background(context),
-            width: 3,
-          ),
-          boxShadow: LumioShadows.fab,
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: _onPlanTodayPressed,
-            borderRadius: BorderRadius.circular(26),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.wb_sunny_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  SizedBox(width: 6),
-                  Text(
-                    'Plan Today',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+      offset: const Offset(0, -16),
+      child: GestureDetector(
+        onTap: _onPlanTodayPressed,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: LumioColors.primary,
+                border: Border.all(
+                  color: LumioColors.background(context),
+                  width: 4,
+                ),
+                boxShadow: LumioShadows.fab,
+              ),
+              child: const Icon(
+                Icons.edit_calendar_rounded,
+                color: Colors.white,
+                size: 28,
               ),
             ),
-          ),
+            const SizedBox(height: 4),
+            Text(
+              'Plan',
+              style: LumioTypography.navLabelActive.copyWith(
+                color: LumioColors.primary,
+              ),
+            ),
+          ],
         ),
-      )
-          .animate()
-          .scale(delay: 300.ms, duration: 600.ms, curve: Curves.elasticOut),
+      ).animate().scale(delay: 300.ms, duration: 600.ms, curve: Curves.elasticOut),
     );
   }
 
