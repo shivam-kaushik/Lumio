@@ -15,6 +15,7 @@ import 'premium_subscription_screen.dart';
 import '../widgets/avatar_widget.dart';
 import '../widgets/lumio_main_tab_header.dart';
 import 'avatar_editor_screen.dart';
+import 'subtasks_calendar_screen.dart';
 
 /// Profile screen based on Stitch AI mockup
 /// Features: Stats grid, productivity trends, badges, settings menu
@@ -747,6 +748,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const RecentNotificationsScreen()),
+            );
+          },
+        ),
+        SizedBox(height: LumioSpacing.md),
+        _buildSettingsItem(
+          context,
+          icon: Icons.calendar_today_outlined,
+          title: 'My Calendar',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SubtasksCalendarScreen()),
             );
           },
         ),

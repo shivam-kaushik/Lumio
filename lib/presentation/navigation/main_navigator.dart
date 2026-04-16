@@ -4,7 +4,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../screens/home_screen.dart';
 import '../screens/goals_screen.dart';
-import '../screens/subtasks_calendar_screen.dart';
 import '../screens/profile_screen.dart';
 
 import '../screens/goal_planning_screen.dart';
@@ -55,9 +54,9 @@ class MainNavigatorState extends State<MainNavigator>
       badge: null,
     ),
     NavigationTab(
-      icon: Icons.calendar_today_outlined,
-      activeIcon: Icons.calendar_today_rounded,
-      label: 'Calendar',
+      icon: Icons.chat_bubble_outline_rounded,
+      activeIcon: Icons.chat_bubble_rounded,
+      label: 'AI Chat',
       badge: null,
     ),
     NavigationTab(
@@ -72,7 +71,7 @@ class MainNavigatorState extends State<MainNavigator>
   final List<Widget> _pages = [
     const HomeScreen(), // Tasks list
     const GoalsScreen(), // Goals
-    const SubtasksCalendarScreen(), // Calendar (showing subtasks)
+    const ChatScreen(), // AI Chat
     const ProfileScreen(), // Profile (Stitch style)
     const DayPlannerScreen(), // Day Planner
   ];
@@ -136,9 +135,9 @@ class MainNavigatorState extends State<MainNavigator>
       }
   }
 
-  void _onRecordButtonPressed() {
+  void _onPlanTodayPressed() {
     HapticFeedback.mediumImpact();
-    _showCreateOptionsBottomSheet(context);
+    switchToDayPlanner();
   }
 
   void _showCreateOptionsBottomSheet(BuildContext context) {
@@ -335,8 +334,8 @@ class MainNavigatorState extends State<MainNavigator>
               Expanded(child: _buildNavItem(context, 0)),
               Expanded(child: _buildNavItem(context, 1)),
 
-              // Center FAB (elevated above nav bar)
-              _buildCenterRecordButton(context),
+              // Center plan action
+              _buildCenterPlanButton(context),
 
               // Last 2 tabs
               Expanded(child: _buildNavItem(context, 2)),
@@ -348,31 +347,48 @@ class MainNavigatorState extends State<MainNavigator>
     );
   }
 
-  /// Build center FAB button (Stitch style - elevated above nav bar)
-  Widget _buildCenterRecordButton(BuildContext context) {
+  /// Build center plan button
+  Widget _buildCenterPlanButton(BuildContext context) {
     return Transform.translate(
-      offset: const Offset(0, -16), // Elevate above nav bar
+      offset: const Offset(0, -12),
       child: Container(
-        width: 64,
-        height: 64,
+        height: 52,
+        constraints: const BoxConstraints(minWidth: 120),
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
           color: LumioColors.primary,
+          borderRadius: BorderRadius.circular(26),
           border: Border.all(
             color: LumioColors.background(context),
-            width: 4,
+            width: 3,
           ),
           boxShadow: LumioShadows.fab,
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: _onRecordButtonPressed,
-            customBorder: const CircleBorder(),
-            child: const Icon(
-              Icons.add_rounded,
-              color: Colors.white,
-              size: 32,
+            onTap: _onPlanTodayPressed,
+            borderRadius: BorderRadius.circular(26),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.wb_sunny_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'Plan Today',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

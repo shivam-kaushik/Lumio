@@ -13,7 +13,6 @@ import '../../data/models/goal_task.dart';
 import 'animated_goal_creation_screen.dart';
 import '../widgets/lumio_main_tab_header.dart';
 import '../widgets/quick_task_input_sheet.dart';
-import '../widgets/chatbot/flow_chat_widget.dart';
 import 'goal_details_screen.dart';
 
 /// Stitch-style Home Screen
@@ -49,17 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        _buildMainScaffold(context),
-        // Floating AI goal assistant — bottom-right corner above nav bar
-        Positioned(
-          right: 16,
-          bottom: 96, // sits above the bottom nav bar
-          child: const FlowChatWidget(),
-        ),
-      ],
-    );
+    return _buildMainScaffold(context);
   }
 
   Widget _buildMainScaffold(BuildContext context) {
