@@ -511,32 +511,32 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                 // Input Section
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 8),
                         Icon(
                           Icons.wb_sunny_outlined,
-                          size: 64,
+                          size: 52,
                           color: LumioColors.primary.withOpacity(0.3),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
                         Text(
                           isToday ? "What needs to happen today?" : "Plan for ${DateFormat('MMM d').format(_selectedDate)}",
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: textColor,
-                            fontSize: 24,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         Text(
                           "Dump your thoughts. We'll structure them.",
                           style: TextStyle(color: subtleColor, fontSize: 14),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 20),
                         Container(
                           decoration: BoxDecoration(
                             color: surfaceColor,
@@ -549,14 +549,14 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                               TextField(
                                 controller: _inputController,
                                 style: TextStyle(color: textColor, fontSize: 16),
-                                maxLines: 6,
+                                maxLines: 5,
                                 decoration: InputDecoration(
                                   hintText: "e.g., Finish the report, call John at 2pm, gym at 5...",
                                   hintStyle: TextStyle(color: subtleColor.withOpacity(0.5)),
                                   filled: true,
                                   fillColor: Colors.transparent,
                                   border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 56),
+                                  contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 54),
                                 ),
                               ),
                               Padding(
@@ -583,10 +583,10 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                             ],
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 18),
                         SizedBox(
                           width: double.infinity,
-                          height: 52,
+                          height: 50,
                           child: ElevatedButton(
                             onPressed: _isConverting ? null : _generatePlan,
                             style: ElevatedButton.styleFrom(
@@ -610,7 +610,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                                   ),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
                         TextButton.icon(
                           onPressed: () => _showQuickAdd(context, provider),
                           icon: Icon(Icons.add, color: subtleColor),
@@ -619,7 +619,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> with WidgetsBinding
                             style: TextStyle(color: subtleColor),
                           ),
                         ),
-                        const SizedBox(height: 100),
+                        const SizedBox(height: 40),
                       ],
                     ),
                   ),
