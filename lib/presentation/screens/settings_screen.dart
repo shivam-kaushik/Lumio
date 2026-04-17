@@ -294,23 +294,51 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
   }
 
   void _showThemeDialog(BuildContext context, ThemeProvider themeProvider) {
+    final dialogSurface = LumioColors.surface(context);
+    final dialogText = LumioColors.textPrimary(context);
+    final dialogSecondary = LumioColors.textSecondary(context);
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: LumioColors.surface(context),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: dialogSurface,
         shape: RoundedRectangleBorder(borderRadius: LumioRadius.card),
-        title: Text('Choose Theme', style: LumioTypography.titleMedium.copyWith(color: LumioColors.textPrimary(context))),
+        title: Text('Choose Theme', style: LumioTypography.titleMedium.copyWith(color: dialogText)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _themeOption(context, themeProvider, ThemeMode.light, 'Light Mode', Icons.light_mode_rounded),
-            _themeOption(context, themeProvider, ThemeMode.dark, 'Dark Mode', Icons.dark_mode_rounded),
-            _themeOption(context, themeProvider, ThemeMode.system, 'System Default', Icons.settings_brightness_rounded),
+            _themeOption(
+              dialogContext,
+              themeProvider,
+              ThemeMode.light,
+              'Light Mode',
+              Icons.light_mode_rounded,
+              dialogText,
+              dialogSecondary,
+            ),
+            _themeOption(
+              dialogContext,
+              themeProvider,
+              ThemeMode.dark,
+              'Dark Mode',
+              Icons.dark_mode_rounded,
+              dialogText,
+              dialogSecondary,
+            ),
+            _themeOption(
+              dialogContext,
+              themeProvider,
+              ThemeMode.system,
+              'System Default',
+              Icons.settings_brightness_rounded,
+              dialogText,
+              dialogSecondary,
+            ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: Text('Cancel', style: TextStyle(color: LumioColors.primary)),
           ),
         ],
@@ -318,13 +346,28 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     );
   }
 
-  Widget _themeOption(BuildContext context, ThemeProvider provider, ThemeMode mode, String label, IconData icon) {
+  Widget _themeOption(
+    BuildContext dialogContext,
+    ThemeProvider provider,
+    ThemeMode mode,
+    String label,
+    IconData icon,
+    Color textColor,
+    Color secondaryColor,
+  ) {
     return RadioListTile<ThemeMode>(
       value: mode,
       groupValue: provider.themeMode,
-      onChanged: (v) { if (v != null) { provider.setThemeMode(v); Navigator.pop(context); } },
-      title: Text(label, style: TextStyle(color: LumioColors.textPrimary(context))),
-      secondary: Icon(icon, color: provider.themeMode == mode ? LumioColors.primary : LumioColors.textSecondary(context)),
+      onChanged: (v) {
+        if (v == null) return;
+        Navigator.of(dialogContext).pop();
+        Future<void>.microtask(() => provider.setThemeMode(v));
+      },
+      title: Text(label, style: TextStyle(color: textColor)),
+      secondary: Icon(
+        icon,
+        color: provider.themeMode == mode ? LumioColors.primary : secondaryColor,
+      ),
       activeColor: LumioColors.primary,
       contentPadding: EdgeInsets.zero,
     );

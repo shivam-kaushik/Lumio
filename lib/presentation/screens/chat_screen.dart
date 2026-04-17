@@ -88,13 +88,13 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     final controller = context.watch<ChatController>();
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final backgroundColor = isDark ? const Color(0xFF201A12) : const Color(0xFFF8F7F6);
-    final surfaceColor = isDark ? const Color(0xFF2D261E) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1A150F);
-    final subtleColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
-    final aiMessageBg = isDark ? const Color(0xFF2D261E) : const Color(0xFFF2EEE9);
-    final userMessageBg = isDark ? LumioColors.primary : const Color(0xFF1A150F);
-    final dividerColor = isDark ? Colors.grey[800]! : Colors.grey[200]!;
+    final backgroundColor = LumioColors.background(context);
+    final surfaceColor = LumioColors.surface(context);
+    final textColor = LumioColors.textPrimary(context);
+    final subtleColor = LumioColors.textSecondary(context);
+    final aiMessageBg = isDark ? LumioColors.surface(context) : const Color(0xFFF2EEE9);
+    final userMessageBg = isDark ? LumioColors.primary : LumioColors.textPrimary(context);
+    final dividerColor = LumioColors.border(context);
 
     // Auto-scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -842,10 +842,8 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
             height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(
-                color: isDark ? const Color(0xFF2D261E) : Colors.white,
-                width: 2,
-              ),
+              // Use the AI message background color so the avatar ring matches the bubble
+              border: Border.all(color: aiMessageBg, width: 2),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.1),
@@ -948,7 +946,8 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
               child: Text(
                 msg.text,
                 style: TextStyle(
-                  color: isDark ? const Color(0xFF1A150F) : Colors.white,
+                  // Primary bubble text should be white in both themes
+                  color: Colors.white,
                   fontSize: 15,
                   height: 1.5,
                 ),
@@ -1450,8 +1449,8 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
 
   Widget _buildConversationSheet(ChatController controller) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor = isDark ? const Color(0xFF2D261E) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1A150F);
+    final backgroundColor = LumioColors.surface(context);
+    final textColor = LumioColors.textPrimary(context);
     final maxSheetHeight = MediaQuery.of(context).size.height * 0.75;
 
     return Container(
